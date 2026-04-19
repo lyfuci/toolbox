@@ -12,6 +12,20 @@ dist
 dist-ssr
 *.local
 
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# Local env files (whitelist .env.example if/when introduced)
+.env
+.env.*
+!.env.example
+
+# Test coverage
+coverage
+
+# Claude Code session artifacts
+.claude/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
