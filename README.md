@@ -38,19 +38,6 @@ The dev server sets `Cross-Origin-Opener-Policy: same-origin` and
 2. Register the route in `src/app/router.tsx`.
 3. Add an entry in `src/lib/tools.ts` — that drives the sidebar nav and home card grid.
 
-## Deploy
-
-Push-to-merge flow: every change goes through a PR.
-
-```text
-feature branch → PR → CI (typecheck/lint/build) + Claude Code Review
-              → merge to main → Deploy workflow → rsync dist/ to server Nginx
-```
-
-The server side is plain Nginx serving the static `dist/` output, with a SPA
-fallback to `index.html` and the cross-origin isolation headers required by
-`ffmpeg.wasm`.
-
 ## License
 
 [MIT](./LICENSE)
