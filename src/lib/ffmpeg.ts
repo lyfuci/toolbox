@@ -3,7 +3,12 @@ import { fetchFile, toBlobURL } from '@ffmpeg/util'
 
 // Pin the core version. Update intentionally; CDN files are immutable per version.
 const CORE_VERSION = '0.12.6'
-const CORE_BASE = `https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd`
+// Use the ESM build: @ffmpeg/ffmpeg's worker is spawned as `type: "module"`,
+// where `importScripts()` always throws. Its fallback path then `await import()`s
+// the coreURL, which only works on the ESM build (UMD throws "failed to import
+// ffmpeg-core.js"). The ESM core also needs `application/javascript` MIME, not
+// `text/javascript`, for the dynamic import to succeed under strict module rules.
+const CORE_BASE = `https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@${CORE_VERSION}/dist/esm`
 
 let instance: FFmpeg | null = null
 let loadPromise: Promise<FFmpeg> | null = null
@@ -25,11 +30,11 @@ export async function getFFmpeg(opts?: {
     if (opts?.onLog) ff.on('log', opts.onLog)
 
     await ff.load({
-      coreURL: await toBlobURL(`${CORE_BASE}/ffmpeg-core.js`, 'text/javascript'),
+      coreURL: await toBlobURL(`${CORE_BASE}/ffmpeg-core.js`, 'application/javascript'),
       wasmURL: await toBlobURL(`${CORE_BASE}/ffmpeg-core.wasm`, 'application/wasm'),
       workerURL: await toBlobURL(
         `${CORE_BASE}/ffmpeg-core.worker.js`,
-        'text/javascript',
+        'application/javascript',
       ),
     })
 
