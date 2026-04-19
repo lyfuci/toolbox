@@ -23,7 +23,12 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      # Always deploy the current main, not the PR's branch state.
+      # On `pull_request: closed`, actions/checkout otherwise defaults to the
+      # PR's head SHA, which can be missing other PRs that merged in parallel.
       - uses: actions/checkout@v5
+        with:
+          ref: main
 
       - uses: pnpm/action-setup@v4
 
