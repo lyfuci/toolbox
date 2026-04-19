@@ -1,4 +1,13 @@
-import { Braces, Film, KeyRound, type LucideIcon } from 'lucide-react'
+import {
+  Binary,
+  Braces,
+  CodeXml,
+  Film,
+  Hash,
+  KeyRound,
+  Link2,
+  type LucideIcon,
+} from 'lucide-react'
 
 export const categories = [
   { slug: 'format', name: 'Format', description: '格式化、压缩、校验结构化数据' },
@@ -25,6 +34,38 @@ export const tools: Tool[] = [
     description: '格式化、压缩、校验 JSON',
     icon: Braces,
     category: 'format',
+  },
+  {
+    slug: 'base64',
+    path: '/base64',
+    name: 'Base64',
+    description: 'Base64 编解码（UTF-8、URL-safe）',
+    icon: Binary,
+    category: 'encode',
+  },
+  {
+    slug: 'url',
+    path: '/url',
+    name: 'URL',
+    description: 'URL 编解码（component / uri）',
+    icon: Link2,
+    category: 'encode',
+  },
+  {
+    slug: 'hex',
+    path: '/hex',
+    name: 'Hex',
+    description: '文本 ↔ 十六进制字节',
+    icon: Hash,
+    category: 'encode',
+  },
+  {
+    slug: 'html-entity',
+    path: '/html-entity',
+    name: 'HTML Entity',
+    description: 'HTML 实体编解码',
+    icon: CodeXml,
+    category: 'encode',
   },
   {
     slug: 'jwt',

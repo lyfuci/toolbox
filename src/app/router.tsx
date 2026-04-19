@@ -17,6 +17,22 @@ export const router = createBrowserRouter([
         lazy: async () => ({ Component: (await import('@/pages/Json')).JsonPage }),
       },
       {
+        path: 'base64',
+        lazy: async () => ({ Component: (await import('@/pages/Base64')).Base64Page }),
+      },
+      {
+        path: 'url',
+        lazy: async () => ({ Component: (await import('@/pages/Url')).UrlPage }),
+      },
+      {
+        path: 'hex',
+        lazy: async () => ({ Component: (await import('@/pages/Hex')).HexPage }),
+      },
+      {
+        path: 'html-entity',
+        lazy: async () => ({ Component: (await import('@/pages/HtmlEntity')).HtmlEntityPage }),
+      },
+      {
         path: 'jwt',
         lazy: async () => ({ Component: (await import('@/pages/Jwt')).JwtPage }),
       },
