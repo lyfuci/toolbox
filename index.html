@@ -5,6 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Toolbox</title>
+    <!-- Google Analytics 4 -->
+    <script async crossorigin="anonymous" src="https://www.googletagmanager.com/gtag/js?id=G-WLZL6FRZ31"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      // Disable auto pageview — fired manually from React Router on every route change.
+      gtag('config', 'G-WLZL6FRZ31', { send_page_view: false });
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -71,6 +71,18 @@ If you add 3rd-party iframes or cross-origin resources to a tool, those
 resources must send `Cross-Origin-Resource-Policy: cross-origin`, or COEP
 will block them.
 
+## Analytics
+
+Google Analytics 4 (`G-WLZL6FRZ31`) is loaded once in `index.html` <head>.
+Because the app is a SPA, gtag's auto pageview is **disabled**
+(`send_page_view: false`) and replaced by `useGAPageview()` in
+`src/app/Layout.tsx`, which fires `page_view` on every route change
+(initial mount + navigation). **New tools require no analytics work** —
+just add the route, the layout-level hook handles it.
+
+If you ever add a route that bypasses `Layout`, call `useGAPageview()`
+inside it, or pageviews on that route will be silent.
+
 ## Build and verify
 
 ```bash
