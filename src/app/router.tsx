@@ -37,6 +37,30 @@ export const router = createBrowserRouter([
         lazy: async () => ({ Component: (await import('@/pages/Jwt')).JwtPage }),
       },
       {
+        path: 'hash',
+        lazy: async () => ({ Component: (await import('@/pages/Hash')).HashPage }),
+      },
+      {
+        path: 'hmac',
+        lazy: async () => ({ Component: (await import('@/pages/Hmac')).HmacPage }),
+      },
+      {
+        path: 'timestamp',
+        lazy: async () => ({ Component: (await import('@/pages/Timestamp')).TimestampPage }),
+      },
+      {
+        path: 'color',
+        lazy: async () => ({ Component: (await import('@/pages/Color')).ColorPage }),
+      },
+      {
+        path: 'number-base',
+        lazy: async () => ({ Component: (await import('@/pages/NumberBase')).NumberBasePage }),
+      },
+      {
+        path: 'csv-json',
+        lazy: async () => ({ Component: (await import('@/pages/CsvJson')).CsvJsonPage }),
+      },
+      {
         path: 'media',
         lazy: async () => ({ Component: (await import('@/pages/Media')).MediaPage }),
       },
