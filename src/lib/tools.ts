@@ -27,7 +27,7 @@ export const tools: Tool[] = [
     slug: 'media',
     path: '/media',
     name: 'Media',
-    description: '剪辑、拼接音视频（ffmpeg.wasm，本地处理）',
+    description: '剪辑、拼接、提取音轨、格式转换（ffmpeg.wasm，本地处理）',
     icon: Film,
   },
 ]
