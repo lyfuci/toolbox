@@ -17,6 +17,14 @@ export const router = createBrowserRouter([
         lazy: async () => ({ Component: (await import('@/pages/Json')).JsonPage }),
       },
       {
+        path: 'xml',
+        lazy: async () => ({ Component: (await import('@/pages/Xml')).XmlPage }),
+      },
+      {
+        path: 'yaml',
+        lazy: async () => ({ Component: (await import('@/pages/Yaml')).YamlPage }),
+      },
+      {
         path: 'base64',
         lazy: async () => ({ Component: (await import('@/pages/Base64')).Base64Page }),
       },
@@ -59,6 +67,22 @@ export const router = createBrowserRouter([
       {
         path: 'csv-json',
         lazy: async () => ({ Component: (await import('@/pages/CsvJson')).CsvJsonPage }),
+      },
+      {
+        path: 'uuid',
+        lazy: async () => ({ Component: (await import('@/pages/Uuid')).UuidPage }),
+      },
+      {
+        path: 'password',
+        lazy: async () => ({ Component: (await import('@/pages/Password')).PasswordPage }),
+      },
+      {
+        path: 'qr-code',
+        lazy: async () => ({ Component: (await import('@/pages/QrCode')).QrCodePage }),
+      },
+      {
+        path: 'lorem',
+        lazy: async () => ({ Component: (await import('@/pages/Lorem')).LoremPage }),
       },
       {
         path: 'media',
