@@ -1,19 +1,29 @@
 import { createBrowserRouter } from 'react-router'
 import { Layout } from '@/app/Layout'
-import { HomePage } from '@/pages/Home'
-import { JsonPage } from '@/pages/Json'
-import { JwtPage } from '@/pages/Jwt'
-import { MediaPage } from '@/pages/Media'
 
+// Lazy-load each tool route so the initial bundle stays small. Each tool
+// becomes its own chunk and only downloads when the user navigates to it.
 export const router = createBrowserRouter([
   {
     path: '/',
     Component: Layout,
     children: [
-      { index: true, Component: HomePage },
-      { path: 'json', Component: JsonPage },
-      { path: 'jwt', Component: JwtPage },
-      { path: 'media', Component: MediaPage },
+      {
+        index: true,
+        lazy: async () => ({ Component: (await import('@/pages/Home')).HomePage }),
+      },
+      {
+        path: 'json',
+        lazy: async () => ({ Component: (await import('@/pages/Json')).JsonPage }),
+      },
+      {
+        path: 'jwt',
+        lazy: async () => ({ Component: (await import('@/pages/Jwt')).JwtPage }),
+      },
+      {
+        path: 'media',
+        lazy: async () => ({ Component: (await import('@/pages/Media')).MediaPage }),
+      },
     ],
   },
 ])
