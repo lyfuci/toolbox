@@ -88,10 +88,10 @@ export function DnsPage() {
         <select
           value={type}
           onChange={(e) => setType(e.target.value as RecordType)}
-          className="h-9 rounded-md border border-input bg-transparent px-3 font-mono text-sm"
+          className="h-9 rounded-md border border-input bg-background px-3 font-mono text-sm text-foreground"
         >
           {RECORD_TYPES.map((t) => (
-            <option key={t} value={t}>
+            <option key={t} value={t} className="bg-background text-foreground">
               {t}
             </option>
           ))}

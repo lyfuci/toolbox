@@ -106,23 +106,3 @@ export function SearchTrigger({ className }: { className?: string }) {
   )
 }
 
-/** Hero variant for the home page — visually prominent, opens the same dialog. */
-export function HeroSearchTrigger({ className }: { className?: string }) {
-  const { setOpen } = usePalette()
-  return (
-    <button
-      type="button"
-      onClick={() => setOpen(true)}
-      className={cn(
-        'group flex w-full items-center gap-3 rounded-lg border border-border bg-card/40 px-4 py-3 text-left text-muted-foreground transition-colors hover:border-foreground/30 hover:bg-accent/40',
-        className,
-      )}
-    >
-      <Search className="h-5 w-5" />
-      <span className="flex-1">搜索工具…</span>
-      <kbd className="pointer-events-none hidden select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[11px] sm:inline-flex">
-        ⌘K
-      </kbd>
-    </button>
-  )
-}
