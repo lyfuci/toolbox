@@ -5,14 +5,37 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Toolbox</title>
-    <!-- Google Analytics 4 -->
-    <script async crossorigin="anonymous" src="https://www.googletagmanager.com/gtag/js?id=G-WLZL6FRZ31"></script>
+    <!-- Google Analytics 4 — must never affect page rendering. Every bit
+         of GA-touching code is wrapped (try/catch in our code, plus a
+         capture-phase window error handler that suppresses errors whose
+         source is googletagmanager.com / google-analytics.com) so
+         adblockers, COEP blocks, GFW blackholes, or upstream returning
+         broken JS cannot take the app down or trigger Vite's HMR overlay. -->
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      // Disable auto pageview — fired manually from React Router on every route change.
-      gtag('config', 'G-WLZL6FRZ31', { send_page_view: false });
+      // Must register before the gtag <script> below so we catch its load errors.
+      window.addEventListener('error', function (e) {
+        var src = (e && e.filename) || (e && e.target && e.target.src) || '';
+        if (typeof src === 'string' &&
+            (src.indexOf('googletagmanager.com') !== -1 ||
+             src.indexOf('google-analytics.com') !== -1)) {
+          e.preventDefault();
+          if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+        }
+      }, true);
+    </script>
+    <script async crossorigin="anonymous"
+            src="https://www.googletagmanager.com/gtag/js?id=G-WLZL6FRZ31"
+            onerror="window.console&&console.warn('GA script failed to load (non-fatal)')"></script>
+    <script>
+      try {
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function gtag(){
+          try { window.dataLayer.push(arguments) } catch (_) { /* swallow */ }
+        };
+        window.gtag('js', new Date());
+        // Disable auto pageview — fired manually from React Router on every route change.
+        window.gtag('config', 'G-WLZL6FRZ31', { send_page_view: false });
+      } catch (_) { /* GA must never break the page */ }
     </script>
   </head>
   <body>
