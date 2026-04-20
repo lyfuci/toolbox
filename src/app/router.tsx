@@ -85,6 +85,34 @@ export const router = createBrowserRouter([
         lazy: async () => ({ Component: (await import('@/pages/Lorem')).LoremPage }),
       },
       {
+        path: 'diff',
+        lazy: async () => ({ Component: (await import('@/pages/Diff')).DiffPage }),
+      },
+      {
+        path: 'case',
+        lazy: async () => ({ Component: (await import('@/pages/CaseConvert')).CaseConvertPage }),
+      },
+      {
+        path: 'sort-dedupe',
+        lazy: async () => ({ Component: (await import('@/pages/SortDedupe')).SortDedupePage }),
+      },
+      {
+        path: 'regex',
+        lazy: async () => ({ Component: (await import('@/pages/Regex')).RegexPage }),
+      },
+      {
+        path: 'ip-info',
+        lazy: async () => ({ Component: (await import('@/pages/IpInfo')).IpInfoPage }),
+      },
+      {
+        path: 'dns',
+        lazy: async () => ({ Component: (await import('@/pages/Dns')).DnsPage }),
+      },
+      {
+        path: 'cidr',
+        lazy: async () => ({ Component: (await import('@/pages/Cidr')).CidrPage }),
+      },
+      {
         path: 'media',
         lazy: async () => ({ Component: (await import('@/pages/Media')).MediaPage }),
       },
