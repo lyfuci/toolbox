@@ -1,7 +1,6 @@
 import { Link } from 'react-router'
 import { toolsByCategory } from '@/lib/tools'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { HeroSearchTrigger } from '@/components/CommandPalette'
 
 export function HomePage() {
   const groups = toolsByCategory()
@@ -13,7 +12,6 @@ export function HomePage() {
         <p className="mt-2 text-sm text-muted-foreground">
           A small set of personal frontend tools — everything runs in the browser.
         </p>
-        <HeroSearchTrigger className="mt-6 max-w-xl" />
       </header>
 
       <div className="flex flex-col gap-10">
