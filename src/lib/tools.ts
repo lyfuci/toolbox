@@ -228,7 +228,7 @@ export const tools: Tool[] = [
     slug: 'ip-info',
     path: '/ip-info',
     name: 'IP Info',
-    description: 'IP 归属查询（ipwho.is，点击触发）',
+    description: 'IP 归属查询（ipapi.co，点击触发）',
     icon: Globe,
     category: 'network',
   },
