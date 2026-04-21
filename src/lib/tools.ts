@@ -25,14 +25,17 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
+// Order: Encode/Decode and Generate pinned to the top per user request,
+// then the rest by tool count desc (with ties broken by everyday-use frequency),
+// Media kept last since it's heavy and niche.
 export const categories = [
-  { slug: 'format', name: 'Format', description: '格式化、压缩、校验结构化数据' },
   { slug: 'encode', name: 'Encode / Decode', description: '编解码、Token 解析' },
-  { slug: 'hash', name: 'Hash / Crypto', description: '哈希与签名（本地计算）' },
-  { slug: 'convert', name: 'Convert', description: '常用单位 / 进制 / 时间互转' },
   { slug: 'generate', name: 'Generate', description: 'UUID / 密码 / 二维码 / 占位文本' },
+  { slug: 'convert', name: 'Convert', description: '常用单位 / 进制 / 时间互转' },
   { slug: 'text', name: 'Text', description: '文本处理：差异 / 大小写 / 排序 / 正则' },
+  { slug: 'format', name: 'Format', description: '格式化、压缩、校验结构化数据' },
   { slug: 'network', name: 'Network', description: 'IP / DNS / 子网（含公共 API 查询）' },
+  { slug: 'hash', name: 'Hash / Crypto', description: '哈希与签名（本地计算）' },
   { slug: 'media', name: 'Media', description: '音视频处理（本地）' },
 ] as const
 

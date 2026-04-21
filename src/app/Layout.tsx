@@ -53,21 +53,20 @@ export function Layout() {
             </div>
           ))}
         </nav>
-
-        <a
-          href="https://github.com/lyfuci/toolbox/issues/new"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-auto flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
-        >
-          <MessageSquarePlus className="h-4 w-4" />
-          反馈 / 提建议
-        </a>
       </aside>
 
       <div className="flex min-h-svh flex-col">
         <header className="sticky top-0 z-10 flex h-14 items-center justify-end gap-3 border-b border-border bg-background/80 px-6 backdrop-blur">
           <SearchTrigger className="w-72" />
+          <a
+            href="https://github.com/lyfuci/toolbox/issues/new"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-9 items-center gap-2 rounded-md border border-input px-3 text-sm text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+          >
+            <MessageSquarePlus className="h-4 w-4" />
+            反馈
+          </a>
         </header>
         <main className="flex-1 overflow-auto">
           <Outlet />
