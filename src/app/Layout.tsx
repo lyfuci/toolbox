@@ -4,6 +4,7 @@ import { toolsByCategory } from '@/lib/tools'
 import { cn } from '@/lib/utils'
 import { useGAPageview } from '@/hooks/useGAPageview'
 import { CommandPaletteProvider, SearchTrigger } from '@/components/CommandPalette'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 export function Layout() {
   useGAPageview()
@@ -67,6 +68,7 @@ export function Layout() {
             <MessageSquarePlus className="h-4 w-4" />
             反馈
           </a>
+          <ThemeToggle />
         </header>
         <main className="flex-1 overflow-auto">
           <Outlet />
