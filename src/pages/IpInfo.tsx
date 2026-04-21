@@ -3,29 +3,37 @@ import { Globe, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
+// ipapi.co response shape (subset we use).
 type LookupResult = {
-  ip: string
-  type?: string
-  country?: string
-  country_code?: string
-  region?: string
+  ip?: string
+  network?: string
+  version?: string
   city?: string
+  region?: string
+  region_code?: string
+  country?: string
+  country_name?: string
+  country_code?: string
+  postal?: string
   latitude?: number
   longitude?: number
-  postal?: string
-  timezone?: { id?: string; utc?: string }
-  connection?: { isp?: string; org?: string; asn?: number }
-  flag?: { emoji?: string }
-  success?: boolean
-  message?: string
+  timezone?: string
+  utc_offset?: string
+  asn?: string
+  org?: string
+  // Error shape
+  error?: boolean
+  reason?: string
 }
 
 async function lookup(ip: string): Promise<LookupResult> {
-  const url = ip ? `https://ipwho.is/${encodeURIComponent(ip)}` : 'https://ipwho.is/'
+  const url = ip
+    ? `https://ipapi.co/${encodeURIComponent(ip)}/json/`
+    : 'https://ipapi.co/json/'
   const resp = await fetch(url)
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
   const data: LookupResult = await resp.json()
-  if (data.success === false) throw new Error(data.message || '查询失败')
+  if (data.error) throw new Error(data.reason || '查询失败')
   return data
 }
 
@@ -51,8 +59,12 @@ export function IpInfoPage() {
 
   const rows: [string, string][] = data
     ? [
-        ['IP', `${data.flag?.emoji ?? ''} ${data.ip}${data.type ? `  (${data.type})` : ''}`],
-        ['国家 / 地区', `${data.country ?? '—'} (${data.country_code ?? '—'})`],
+        ['IP', `${data.ip ?? '—'}${data.version ? `  (${data.version})` : ''}`],
+        ['网段', data.network ?? '—'],
+        [
+          '国家 / 地区',
+          `${data.country_name ?? data.country ?? '—'} (${data.country_code ?? '—'})`,
+        ],
         ['省 / 州', data.region ?? '—'],
         ['城市', data.city ?? '—'],
         ['邮编', data.postal ?? '—'],
@@ -62,10 +74,9 @@ export function IpInfoPage() {
             ? `${data.latitude}, ${data.longitude}`
             : '—',
         ],
-        ['时区', `${data.timezone?.id ?? '—'} (${data.timezone?.utc ?? '—'})`],
-        ['ISP', data.connection?.isp ?? '—'],
-        ['组织', data.connection?.org ?? '—'],
-        ['ASN', data.connection?.asn != null ? `AS${data.connection.asn}` : '—'],
+        ['时区', `${data.timezone ?? '—'}${data.utc_offset ? ` (${data.utc_offset})` : ''}`],
+        ['ASN', data.asn ?? '—'],
+        ['组织', data.org ?? '—'],
       ]
     : []
 
@@ -74,7 +85,7 @@ export function IpInfoPage() {
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">IP Info</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          IP 归属查询。点击按钮才会向 <code className="font-mono">ipwho.is</code> 公共服务发起请求。
+          IP 归属查询。点击按钮才会向 <code className="font-mono">ipapi.co</code> 公共服务发起请求（免费档 1k 次/天/IP）。
         </p>
       </header>
 
@@ -82,7 +93,7 @@ export function IpInfoPage() {
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="留空查自己的 IP，或填 IPv4 / IPv6 / 域名"
+          placeholder="留空查自己的 IP，或填 IPv4 / IPv6"
           className="flex-1 font-mono text-sm"
           spellCheck={false}
           onKeyDown={(e) => {
