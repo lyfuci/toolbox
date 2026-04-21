@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Copy, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -50,6 +51,7 @@ function generate(mode: Mode, count: number): string {
 }
 
 export function LoremPage() {
+  const { t } = useTranslation()
   const [mode, setMode] = useState<Mode>('paragraphs')
   const [count, setCount] = useState(3)
   const [nonce, setNonce] = useState(0)
@@ -61,25 +63,23 @@ export function LoremPage() {
   const handleCopy = async () => {
     if (!text) return
     await navigator.clipboard.writeText(text)
-    toast.success('已复制')
+    toast.success(t('common.copied'))
   }
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Lorem Ipsum</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          经典占位文本生成器。可按段落 / 句子 / 单词数量输出。
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.lorem.name')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('pages.lorem.description')}</p>
       </header>
 
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <div className="flex rounded-md border border-input bg-transparent text-sm">
           {(
             [
-              ['paragraphs', '段落'],
-              ['sentences', '句子'],
-              ['words', '单词'],
+              ['paragraphs', t('pages.lorem.paragraphs')],
+              ['sentences', t('pages.lorem.sentences')],
+              ['words', t('pages.lorem.words')],
             ] as [Mode, string][]
           ).map(([m, label]) => (
             <button
@@ -97,7 +97,7 @@ export function LoremPage() {
           ))}
         </div>
         <Label htmlFor="count" className="text-xs text-muted-foreground">
-          数量
+          {t('pages.lorem.count')}
         </Label>
         <Input
           id="count"
@@ -113,11 +113,11 @@ export function LoremPage() {
         />
         <Button size="sm" variant="secondary" onClick={() => setNonce((n) => n + 1)}>
           <RefreshCw className="h-4 w-4" />
-          重新生成
+          {t('common.regenerate')}
         </Button>
         <Button size="sm" variant="ghost" onClick={handleCopy} disabled={!text} className="ml-auto">
           <Copy className="h-4 w-4" />
-          复制
+          {t('common.copy')}
         </Button>
       </div>
 

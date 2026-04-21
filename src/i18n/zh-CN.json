@@ -1,0 +1,448 @@
+{
+  "common": {
+    "copy": "复制",
+    "copied": "已复制",
+    "copiedLabel": "已复制 {{label}}",
+    "clear": "清空",
+    "sample": "示例",
+    "format": "格式化",
+    "minify": "压缩",
+    "encode": "编码",
+    "decode": "解码",
+    "swap": "交换",
+    "regenerate": "重新生成",
+    "regenerateAll": "全部重新生成",
+    "copyAll": "全部复制",
+    "download": "下载",
+    "lookup": "查询",
+    "lookupSelf": "查我自己",
+    "input": "输入",
+    "output": "输出",
+    "noResult": "无结果",
+    "parseFailed": "解析失败：{{error}}",
+    "emptyInput": "空输入"
+  },
+  "topbar": {
+    "searchPlaceholder": "搜索工具...",
+    "feedback": "反馈",
+    "toggleTheme": "切换主题",
+    "toggleLanguage": "切换语言"
+  },
+  "sidebar": {
+    "brand": "Toolbox"
+  },
+  "home": {
+    "title": "Toolbox",
+    "tagline": "一套纯前端的小工具集合，全部在浏览器本地运行。"
+  },
+  "palette": {
+    "title": "搜索工具",
+    "description": "按工具名或描述搜索",
+    "placeholder": "搜索工具...",
+    "empty": "没有匹配的工具"
+  },
+  "categories": {
+    "encode": {
+      "name": "Encode / Decode",
+      "description": "编解码、Token 解析"
+    },
+    "generate": {
+      "name": "Generate",
+      "description": "UUID / 密码 / 二维码 / 占位文本"
+    },
+    "convert": {
+      "name": "Convert",
+      "description": "常用单位 / 进制 / 时间互转"
+    },
+    "text": {
+      "name": "Text",
+      "description": "文本处理：差异 / 大小写 / 排序 / 正则"
+    },
+    "format": {
+      "name": "Format",
+      "description": "格式化、压缩、校验结构化数据"
+    },
+    "network": {
+      "name": "Network",
+      "description": "IP / DNS / 子网（含公共 API 查询）"
+    },
+    "hash": {
+      "name": "Hash / Crypto",
+      "description": "哈希与签名（本地计算）"
+    },
+    "media": {
+      "name": "Media",
+      "description": "音视频处理（本地）"
+    }
+  },
+  "tools": {
+    "json": {
+      "name": "JSON",
+      "description": "格式化、压缩、校验 JSON"
+    },
+    "xml": {
+      "name": "XML",
+      "description": "格式化、压缩、校验 XML"
+    },
+    "yaml": {
+      "name": "YAML",
+      "description": "YAML ↔ JSON 互转"
+    },
+    "base64": {
+      "name": "Base64",
+      "description": "Base64 编解码（UTF-8、URL-safe）"
+    },
+    "url": {
+      "name": "URL",
+      "description": "URL 编解码（component / uri）"
+    },
+    "hex": {
+      "name": "Hex",
+      "description": "文本 ↔ 十六进制字节"
+    },
+    "html-entity": {
+      "name": "HTML Entity",
+      "description": "HTML 实体编解码"
+    },
+    "jwt": {
+      "name": "JWT",
+      "description": "解码、签发、校验 JSON Web Token"
+    },
+    "hash": {
+      "name": "Hash",
+      "description": "同时输出 MD5 / SHA-1 / SHA-256 / SHA-384 / SHA-512"
+    },
+    "hmac": {
+      "name": "HMAC",
+      "description": "基于 Web Crypto 的 HMAC 签名"
+    },
+    "timestamp": {
+      "name": "Timestamp",
+      "description": "时间戳 ↔ 日期（Unix / ISO / RFC）"
+    },
+    "color": {
+      "name": "Color",
+      "description": "HEX / RGB / HSL 互转"
+    },
+    "number-base": {
+      "name": "Number Base",
+      "description": "整数进制互转（基于 BigInt）"
+    },
+    "csv-json": {
+      "name": "CSV ↔ JSON",
+      "description": "CSV 与 JSON 互转"
+    },
+    "uuid": {
+      "name": "UUID",
+      "description": "UUID v4 批量生成（crypto.randomUUID）"
+    },
+    "password": {
+      "name": "Password",
+      "description": "CSPRNG 随机密码生成器"
+    },
+    "qr-code": {
+      "name": "QR Code",
+      "description": "二维码生成（SVG / PNG，本地）"
+    },
+    "lorem": {
+      "name": "Lorem Ipsum",
+      "description": "占位文本生成（段落 / 句子 / 单词）"
+    },
+    "diff": {
+      "name": "Diff",
+      "description": "文本差异对比（行级 / 词级）"
+    },
+    "case": {
+      "name": "Case Convert",
+      "description": "命名风格互转（camel / snake / kebab 等）"
+    },
+    "sort-dedupe": {
+      "name": "Sort & Dedupe",
+      "description": "按行排序、去重、修剪"
+    },
+    "regex": {
+      "name": "Regex Tester",
+      "description": "正则匹配、捕获组、替换预览"
+    },
+    "ip-info": {
+      "name": "IP Info",
+      "description": "IP 归属查询（ipapi.co，点击触发）"
+    },
+    "dns": {
+      "name": "DNS Lookup",
+      "description": "DNS 解析（Cloudflare DoH，点击触发）"
+    },
+    "cidr": {
+      "name": "CIDR Calculator",
+      "description": "IPv4 子网计算（本地）"
+    },
+    "media": {
+      "name": "Media",
+      "description": "剪辑、拼接、提取音轨、格式转换（ffmpeg.wasm，本地处理）"
+    }
+  },
+  "pages": {
+    "json": {
+      "description": "格式化、压缩、校验 JSON。所有处理都在浏览器本地完成。",
+      "placeholder": "在此粘贴 JSON…",
+      "indent": "缩进",
+      "stats": "{{chars}} chars · {{minified}} minified"
+    },
+    "xml": {
+      "description": "XML 格式化、压缩、校验。基于浏览器原生 DOMParser（无第三方依赖）。",
+      "placeholder": "在此粘贴 XML…",
+      "indent": "缩进",
+      "stats": "{{chars}} chars"
+    },
+    "yaml": {
+      "description": "YAML 与 JSON 互转。基于 js-yaml，兼容 YAML 1.2 子集。"
+    },
+    "base64": {
+      "description": "Base64 编解码，支持 UTF-8 与 URL-safe（-_）变体。所有处理在浏览器本地完成。",
+      "urlSafe": "URL-safe (-_)"
+    },
+    "url": {
+      "description": "URL 编解码。Component 模式（encodeURIComponent）转义所有保留字；URI 模式（encodeURI）保留 :/?&#= 等结构字符。"
+    },
+    "hex": {
+      "description": "文本 ↔ 十六进制字节（UTF-8）。解码时自动忽略空格 / 冒号 / 逗号 / 短横 / 下划线分隔。",
+      "withSpace": "编码时按字节加空格"
+    },
+    "html-entity": {
+      "description": "HTML 实体编解码。编码使用最小安全集（& < > &quot; &#39;）；解码支持所有命名实体 + 数字实体（十进制 / 十六进制）。"
+    },
+    "jwt": {
+      "description": "解码、签名校验 JSON Web Token。所有处理都在浏览器本地完成。",
+      "encoded": "Encoded",
+      "header": "Header",
+      "payload": "Payload",
+      "signature": "Signature",
+      "algorithm": "Algorithm: {{alg}}",
+      "secretHmac": "密钥 (HMAC secret，文本)",
+      "secretAsymmetric": "公钥 (PEM / SPKI 格式)",
+      "secretGeneric": "密钥",
+      "secretPlaceholderHmac": "your-secret",
+      "secretPlaceholderAsymmetric": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
+      "verify": "验证签名",
+      "tokenPlaceholder": "粘贴 JWT，例如 eyJhbGciOi...",
+      "structureError": "Token 必须是 3 段：header.payload.signature",
+      "needSecret": "需要提供密钥/公钥",
+      "unsupportedAlg": "不支持的算法: {{alg}}",
+      "sigMismatch": "签名不匹配",
+      "expired": "Token 已过期",
+      "claimFailed": "claim 校验失败: {{message}}",
+      "badgeIdle": "未验证",
+      "badgeVerifying": "验证中…",
+      "badgeValid": "签名有效"
+    },
+    "encodeDecode": {
+      "encodeBtn": "编码",
+      "decodeBtn": "解码",
+      "inputPlaceholderEncode": "原文…",
+      "inputPlaceholderDecode": "编码后字符串…",
+      "outputPlaceholderEncode": "编码结果…",
+      "outputPlaceholderDecode": "解码结果…"
+    },
+    "hash": {
+      "description": "同时输出 MD5 / SHA-1 / SHA-256 / SHA-384 / SHA-512。SHA 系列走 Web Crypto 原生实现；MD5 用 js-md5（仅供校验，**不要用于安全场景**）。",
+      "placeholder": "输入要哈希的文本…"
+    },
+    "hmac": {
+      "description": "基于 Web Crypto 的 HMAC（SHA-1 / 256 / 384 / 512）。本地计算，密钥不出浏览器。",
+      "outputEncoding": "输出",
+      "key": "密钥",
+      "data": "数据",
+      "signature": "签名",
+      "keyPlaceholder": "HMAC secret…",
+      "dataPlaceholder": "要签名的内容…"
+    },
+    "timestamp": {
+      "description": "时间戳与日期相互转换。支持 Unix 秒 / 毫秒 / ISO 8601 / RFC 2822 输入。",
+      "input": "输入",
+      "now": "现在",
+      "unixSeconds": "Unix 秒",
+      "unixMs": "Unix 毫秒",
+      "iso8601": "ISO 8601 (UTC)",
+      "localTime": "本地时间",
+      "relativeTime": "相对时间",
+      "cannotParse": "无法解析为日期"
+    },
+    "color": {
+      "description": "颜色格式互转：HEX / RGB / HSL。改任一字段或拖动取色器都会同步更新其他格式。"
+    },
+    "numberBase": {
+      "description": "整数进制互转。基于 BigInt，支持任意大整数与负数。",
+      "base2": "二进制 (2)",
+      "base8": "八进制 (8)",
+      "base10": "十进制 (10)",
+      "base16": "十六进制 (16)",
+      "custom": "自定义",
+      "customBaseLabel": "进制 (2-36)",
+      "baseN": "Base {{base}}"
+    },
+    "csvJson": {
+      "description": "CSV 与 JSON 互转。CSV 第一行作为字段名；JSON 须为对象数组。支持引号字段、字段内逗号 / 换行 / 转义引号。",
+      "csvToJson": "CSV → JSON",
+      "jsonToCsv": "JSON → CSV",
+      "csvLabel": "CSV",
+      "jsonLabel": "JSON",
+      "jsonArrayLabel": "JSON (array of objects)",
+      "errRootArray": "期望根节点是数组（array of objects）",
+      "errRowObject": "数组每个元素必须是对象"
+    },
+    "uuid": {
+      "description": "生成 UUID v4（基于 crypto.randomUUID()，浏览器原生）。",
+      "count": "数量",
+      "copiedMany": "已复制 {{count}} 条"
+    },
+    "password": {
+      "description": "基于 crypto.getRandomValues 的密码生成器（CSPRNG，无模偏置）。",
+      "entropy": "熵 ≈",
+      "strength": "强度：",
+      "strengthVeryStrong": "极强",
+      "strengthStrong": "强",
+      "strengthMedium": "中等",
+      "strengthWeak": "弱",
+      "strengthNone": "空",
+      "length": "长度"
+    },
+    "qr": {
+      "description": "生成二维码（SVG / PNG）。本地渲染，输入内容不出浏览器。",
+      "content": "内容",
+      "contentPlaceholder": "URL / 文本 / vCard…",
+      "size": "尺寸 (px)",
+      "level": "纠错等级",
+      "downloaded": "已下载 {{format}}",
+      "placeholder": "输入内容生成二维码…",
+      "generating": "生成中…"
+    },
+    "lorem": {
+      "description": "经典占位文本生成器。可按段落 / 句子 / 单词数量输出。",
+      "paragraphs": "段落",
+      "sentences": "句子",
+      "words": "单词",
+      "count": "数量"
+    },
+    "diff": {
+      "description": "文本差异对比（行级 / 词级）。本地计算，不上传任何内容。",
+      "byLines": "按行",
+      "byWords": "按词",
+      "original": "原始",
+      "modified": "修改后",
+      "diff": "差异"
+    },
+    "case": {
+      "description": "常见命名风格互转：camelCase / PascalCase / snake_case / kebab-case / Title Case 等。",
+      "placeholder": "输入文本…",
+      "lower": "lowercase",
+      "upper": "UPPERCASE",
+      "title": "Title Case",
+      "sentence": "Sentence case",
+      "camel": "camelCase",
+      "pascal": "PascalCase",
+      "snake": "snake_case",
+      "constant": "CONSTANT_CASE",
+      "kebab": "kebab-case",
+      "dot": "dot.case"
+    },
+    "sortDedupe": {
+      "description": "按行处理：排序、去重、修剪空白、忽略大小写。",
+      "sort": "排序",
+      "noSort": "不排序",
+      "asc": "A → Z",
+      "desc": "Z → A",
+      "dedupe": "去重",
+      "trim": "修剪空白",
+      "removeBlank": "删除空行",
+      "ignoreCase": "忽略大小写",
+      "lineCount": "{{n}} 行"
+    },
+    "regex": {
+      "description": "基于浏览器原生 RegExp。支持全部 ECMAScript 标志。",
+      "patternPlaceholder": "正则表达式…",
+      "flagG": "g (全局)",
+      "flagI": "i (忽略大小写)",
+      "flagM": "m (多行)",
+      "flagS": "s (.匹配换行)",
+      "flagU": "u (Unicode)",
+      "flagY": "y (粘性)",
+      "testText": "测试文本",
+      "matches": "匹配",
+      "noMatch": "无匹配",
+      "replacement": "替换字符串（支持 $1 / $<name> 等反向引用）",
+      "replacePreview": "替换后预览"
+    },
+    "ipInfo": {
+      "description": "IP 归属查询。点击按钮才会向 ipapi.co 公共服务发起请求（免费档 1k 次/天/IP）。",
+      "inputPlaceholder": "留空查自己的 IP，或填 IPv4 / IPv6",
+      "rowIp": "IP",
+      "rowNetwork": "网段",
+      "rowCountry": "国家 / 地区",
+      "rowRegion": "省 / 州",
+      "rowCity": "城市",
+      "rowPostal": "邮编",
+      "rowLatLng": "经纬度",
+      "rowTimezone": "时区",
+      "rowAsn": "ASN",
+      "rowOrg": "组织",
+      "empty": "点击 <1>查询</1> 或 <3>查我自己</3> 开始"
+    },
+    "dns": {
+      "description": "基于 Cloudflare DoH（cloudflare-dns.com）。点击查询才会发起请求。",
+      "typeLabel": "类型",
+      "status": "Status",
+      "answers": "{{n}} answers",
+      "noAnswers": "no answers",
+      "noDirect": "No direct answer; authority: {{authority}}",
+      "empty": "填入域名 + 选择记录类型，点击 <1>查询</1>"
+    },
+    "cidr": {
+      "description": "IPv4 子网计算：网络 / 广播 / 掩码 / 可用范围 / 主机数。",
+      "cidrLabel": "CIDR",
+      "placeholder": "192.168.1.0/24",
+      "rowNetwork": "网络地址",
+      "rowBroadcast": "广播地址",
+      "rowNetmask": "子网掩码",
+      "rowWildcard": "通配符掩码",
+      "rowFirstUsable": "首个可用",
+      "rowLastUsable": "最后可用",
+      "rowHosts": "可用主机数",
+      "rowTotal": "地址总数",
+      "rowClass": "类别"
+    }
+  },
+  "media": {
+    "description": "剪辑、拼接、提取音轨、格式转换。基于 ffmpeg.wasm，所有处理在浏览器本地完成。",
+    "dropZoneTitle": "拖拽音视频文件到这里，或点击选择",
+    "dropZoneSub": "所有处理都在浏览器本地完成，文件不会上传",
+    "outputDownload": "下载",
+    "outputClear": "清除",
+    "cardReset": "重置",
+    "tabTrim": "剪辑",
+    "tabConcat": "拼接",
+    "tabExtractAudio": "提取音轨",
+    "tabConvert": "格式转换",
+    "trimDescription": "剪辑当前选中文件的 in → out 段。使用 `-c copy` 不重编码，速度快，但切点会对齐到最近的关键帧。",
+    "trimRun": "剪辑并导出",
+    "concatDescription": "按当前列表顺序拼接所有文件。",
+    "concatWarning": "要求所有文件容器和编码一致；in/out 标记不生效（要先剪后拼，请分别 trim 后再拼接）。",
+    "concatRun": "拼接并导出（{{count}} 个文件）",
+    "audioDescription": "从当前选中文件提取整段音轨。",
+    "audioFormat": "格式：",
+    "audioRun": "提取并导出",
+    "convertDescription": "转换当前选中文件的格式。重编码，**会比较慢**（几十秒到几分钟，看视频长度）。",
+    "convertFormat": "目标格式：",
+    "convertRun": "转换并导出",
+    "selectionNone": "未选中文件 — 点上面的卡片选中",
+    "selectionLabel": "选中：",
+    "loadingCore": "加载 ffmpeg.wasm（首次约 30MB，加载完后续秒进）…",
+    "processing": "处理中… {{percent}}%",
+    "processingDone": "处理完成",
+    "errSelectFirst": "请先选择一个文件",
+    "errOutAfterIn": "out 必须大于 in",
+    "errNeedTwoFiles": "需要至少 2 个文件",
+    "errMixedExt": "所有文件扩展名必须相同（concat demuxer 要求容器与编码一致）",
+    "errConcat": "concat 失败：通常是因为各文件的编码或封装不一致。先用 Convert 统一格式再拼接。",
+    "errUnexpectedString": "意外的字符串输出"
+  }
+}

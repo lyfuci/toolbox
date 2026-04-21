@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { Globe, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,11 +34,12 @@ async function lookup(ip: string): Promise<LookupResult> {
   const resp = await fetch(url)
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
   const data: LookupResult = await resp.json()
-  if (data.error) throw new Error(data.reason || '查询失败')
+  if (data.error) throw new Error(data.reason || 'lookup failed')
   return data
 }
 
 export function IpInfoPage() {
+  const { t } = useTranslation()
   const [input, setInput] = useState('')
   const [data, setData] = useState<LookupResult | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -59,41 +61,42 @@ export function IpInfoPage() {
 
   const rows: [string, string][] = data
     ? [
-        ['IP', `${data.ip ?? '—'}${data.version ? `  (${data.version})` : ''}`],
-        ['网段', data.network ?? '—'],
+        [t('pages.ipInfo.rowIp'), `${data.ip ?? '—'}${data.version ? `  (${data.version})` : ''}`],
+        [t('pages.ipInfo.rowNetwork'), data.network ?? '—'],
         [
-          '国家 / 地区',
+          t('pages.ipInfo.rowCountry'),
           `${data.country_name ?? data.country ?? '—'} (${data.country_code ?? '—'})`,
         ],
-        ['省 / 州', data.region ?? '—'],
-        ['城市', data.city ?? '—'],
-        ['邮编', data.postal ?? '—'],
+        [t('pages.ipInfo.rowRegion'), data.region ?? '—'],
+        [t('pages.ipInfo.rowCity'), data.city ?? '—'],
+        [t('pages.ipInfo.rowPostal'), data.postal ?? '—'],
         [
-          '经纬度',
+          t('pages.ipInfo.rowLatLng'),
           data.latitude != null && data.longitude != null
             ? `${data.latitude}, ${data.longitude}`
             : '—',
         ],
-        ['时区', `${data.timezone ?? '—'}${data.utc_offset ? ` (${data.utc_offset})` : ''}`],
-        ['ASN', data.asn ?? '—'],
-        ['组织', data.org ?? '—'],
+        [
+          t('pages.ipInfo.rowTimezone'),
+          `${data.timezone ?? '—'}${data.utc_offset ? ` (${data.utc_offset})` : ''}`,
+        ],
+        [t('pages.ipInfo.rowAsn'), data.asn ?? '—'],
+        [t('pages.ipInfo.rowOrg'), data.org ?? '—'],
       ]
     : []
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">IP Info</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          IP 归属查询。点击按钮才会向 <code className="font-mono">ipapi.co</code> 公共服务发起请求（免费档 1k 次/天/IP）。
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.ip-info.name')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('pages.ipInfo.description')}</p>
       </header>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="留空查自己的 IP，或填 IPv4 / IPv6"
+          placeholder={t('pages.ipInfo.inputPlaceholder')}
           className="flex-1 font-mono text-sm"
           spellCheck={false}
           onKeyDown={(e) => {
@@ -106,7 +109,7 @@ export function IpInfoPage() {
           ) : (
             <Globe className="h-4 w-4" />
           )}
-          查询
+          {t('common.lookup')}
         </Button>
         <Button
           variant="secondary"
@@ -116,7 +119,7 @@ export function IpInfoPage() {
           }}
           disabled={loading}
         >
-          查我自己
+          {t('common.lookupSelf')}
         </Button>
       </div>
 
@@ -138,7 +141,10 @@ export function IpInfoPage() {
         </div>
       ) : !loading && !error ? (
         <div className="rounded-md border border-dashed border-border bg-card/20 p-6 text-center text-xs text-muted-foreground">
-          点击 <strong>查询</strong> 或 <strong>查我自己</strong> 开始
+          <Trans
+            i18nKey="pages.ipInfo.empty"
+            components={{ 1: <strong />, 3: <strong /> }}
+          />
         </div>
       ) : null}
     </div>

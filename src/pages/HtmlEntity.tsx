@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { EncodeDecode } from '@/components/EncodeDecode'
 
 const SAMPLE = `<div class="hello">"工具箱" & friends — 5 < 10</div>`
@@ -23,10 +24,11 @@ function decodeHtml(s: string): string {
 }
 
 export function HtmlEntityPage() {
+  const { t } = useTranslation()
   return (
     <EncodeDecode
-      title="HTML Entity"
-      description="HTML 实体编解码。编码使用最小安全集（& < > &quot; &#39;）；解码支持所有命名实体 + 数字实体（十进制 / 十六进制）。"
+      title={t('tools.html-entity.name')}
+      description={t('pages.html-entity.description')}
       encode={encodeHtml}
       decode={decodeHtml}
       sample={SAMPLE}

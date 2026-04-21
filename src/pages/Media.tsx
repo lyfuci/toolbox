@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2, Play, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -24,6 +25,7 @@ const stripExt = (name: string) => name.replace(/\.[^./]+$/, '')
 const getExt = (name: string) => name.split('.').pop()?.toLowerCase() ?? 'bin'
 
 export function MediaPage() {
+  const { t } = useTranslation()
   const [items, setItems] = useState<MediaItem[]>([])
   const [output, setOutput] = useState<OutputResult | null>(null)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
@@ -91,7 +93,7 @@ export function MediaPage() {
       await getFFmpeg() // lazy load (no-op if already loaded)
       setStatus({ kind: 'processing', progress: 0 })
       await op()
-      toast.success('处理完成')
+      toast.success(t('media.processingDone'))
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       toast.error(msg, { duration: 8000 })
@@ -104,13 +106,13 @@ export function MediaPage() {
 
   const doTrim = () =>
     runOp(async () => {
-      if (!selected) throw new Error('请先选择一个文件')
+      if (!selected) throw new Error(t('media.errSelectFirst'))
       const ext = getExt(selected.file.name)
       const inputName = `input.${ext}`
       const outputName = `trim.${ext}`
       const outSec = selected.outSec ?? selected.duration ?? 0
       if (outSec <= selected.inSec) {
-        throw new Error('out 必须大于 in')
+        throw new Error(t('media.errOutAfterIn'))
       }
       const { blob } = await run({
         inputs: [{ name: inputName, data: selected.file }],
@@ -139,14 +141,12 @@ export function MediaPage() {
 
   const doConcat = () =>
     runOp(async () => {
-      if (items.length < 2) throw new Error('需要至少 2 个文件')
+      if (items.length < 2) throw new Error(t('media.errNeedTwoFiles'))
       const ff = await getFFmpeg()
       const ext = getExt(items[0].file.name)
       // Demand uniform extension; concat demuxer needs matching codecs/containers.
       if (items.some((i) => getExt(i.file.name) !== ext)) {
-        throw new Error(
-          '所有文件扩展名必须相同（concat demuxer 要求容器与编码一致）',
-        )
+        throw new Error(t('media.errMixedExt'))
       }
       const inputNames = items.map((_, i) => `in${i}.${ext}`)
       const outputName = `concat.${ext}`
@@ -164,12 +164,10 @@ export function MediaPage() {
           outputName,
         ])
         if (code !== 0) {
-          throw new Error(
-            'concat 失败：通常是因为各文件的编码或封装不一致。先用 Convert 统一格式再拼接。',
-          )
+          throw new Error(t('media.errConcat'))
         }
         const data = await ff.readFile(outputName)
-        if (typeof data === 'string') throw new Error('意外的字符串输出')
+        if (typeof data === 'string') throw new Error(t('media.errUnexpectedString'))
         const mime = inferMime(outputName)
         const blob = new Blob([new Uint8Array(data)], { type: mime })
         setResult(blob, `concat.${ext}`, mime)
@@ -184,7 +182,7 @@ export function MediaPage() {
 
   const doExtractAudio = () =>
     runOp(async () => {
-      if (!selected) throw new Error('请先选择一个文件')
+      if (!selected) throw new Error(t('media.errSelectFirst'))
       const ext = getExt(selected.file.name)
       const inputName = `input.${ext}`
       const outputName = `audio.${audioFormat}`
@@ -213,7 +211,7 @@ export function MediaPage() {
 
   const doConvert = () =>
     runOp(async () => {
-      if (!selected) throw new Error('请先选择一个文件')
+      if (!selected) throw new Error(t('media.errSelectFirst'))
       const inputExt = getExt(selected.file.name)
       const inputName = `input.${inputExt}`
       const outputName = `out.${convertFormat}`
@@ -254,18 +252,16 @@ export function MediaPage() {
   const busy = status.kind !== 'idle'
   const statusLabel =
     status.kind === 'loading_ffmpeg'
-      ? '加载 ffmpeg.wasm（首次约 30MB，加载完后续秒进）…'
+      ? t('media.loadingCore')
       : status.kind === 'processing'
-        ? `处理中… ${(status.progress * 100).toFixed(0)}%`
+        ? t('media.processing', { percent: (status.progress * 100).toFixed(0) })
         : ''
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-12">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Media</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          剪辑、拼接、提取音轨、格式转换。基于 ffmpeg.wasm，所有处理在浏览器本地完成。
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.media.name')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('media.description')}</p>
       </header>
 
       <DropZone onFiles={addFiles} />
@@ -293,46 +289,40 @@ export function MediaPage() {
       {items.length > 0 && (
         <Tabs defaultValue="trim" className="mt-8">
           <TabsList>
-            <TabsTrigger value="trim">剪辑</TabsTrigger>
-            <TabsTrigger value="concat">拼接</TabsTrigger>
-            <TabsTrigger value="audio">提取音轨</TabsTrigger>
-            <TabsTrigger value="convert">格式转换</TabsTrigger>
+            <TabsTrigger value="trim">{t('media.tabTrim')}</TabsTrigger>
+            <TabsTrigger value="concat">{t('media.tabConcat')}</TabsTrigger>
+            <TabsTrigger value="audio">{t('media.tabExtractAudio')}</TabsTrigger>
+            <TabsTrigger value="convert">{t('media.tabConvert')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="trim" className="mt-4 space-y-3">
-            <p className="text-sm text-muted-foreground">
-              剪辑当前选中文件的 in → out 段。使用 <code>-c copy</code> 不重编码，
-              速度快，但切点会对齐到最近的关键帧。
-            </p>
+            <p className="text-sm text-muted-foreground">{t('media.trimDescription')}</p>
             <ActiveSelectionHint selected={selected} />
             <Button onClick={doTrim} disabled={busy || !selected}>
               <Play className="h-4 w-4" />
-              剪辑并导出
+              {t('media.trimRun')}
             </Button>
           </TabsContent>
 
           <TabsContent value="concat" className="mt-4 space-y-3">
             <p className="text-sm text-muted-foreground">
-              按当前列表顺序拼接所有文件。
+              {t('media.concatDescription')}
               <br />
               <span className="inline-flex items-center gap-1 text-amber-500">
-                <AlertTriangle className="h-3 w-3" /> 要求所有文件容器和编码一致
-                ；in/out 标记不生效（要先剪后拼，请分别 trim 后再拼接）。
+                <AlertTriangle className="h-3 w-3" /> {t('media.concatWarning')}
               </span>
             </p>
             <Button onClick={doConcat} disabled={busy || items.length < 2}>
               <Play className="h-4 w-4" />
-              拼接并导出 ({items.length} 个文件)
+              {t('media.concatRun', { count: items.length })}
             </Button>
           </TabsContent>
 
           <TabsContent value="audio" className="mt-4 space-y-3">
-            <p className="text-sm text-muted-foreground">
-              从当前选中文件提取整段音轨。
-            </p>
+            <p className="text-sm text-muted-foreground">{t('media.audioDescription')}</p>
             <ActiveSelectionHint selected={selected} />
             <div className="flex items-center gap-3">
-              <Label className="text-xs text-muted-foreground">格式：</Label>
+              <Label className="text-xs text-muted-foreground">{t('media.audioFormat')}</Label>
               <SegmentedChoice
                 value={audioFormat}
                 options={[
@@ -344,17 +334,15 @@ export function MediaPage() {
             </div>
             <Button onClick={doExtractAudio} disabled={busy || !selected}>
               <Play className="h-4 w-4" />
-              提取并导出
+              {t('media.audioRun')}
             </Button>
           </TabsContent>
 
           <TabsContent value="convert" className="mt-4 space-y-3">
-            <p className="text-sm text-muted-foreground">
-              转换当前选中文件的格式。重编码，**会比较慢**（几十秒到几分钟，看视频长度）。
-            </p>
+            <p className="text-sm text-muted-foreground">{t('media.convertDescription')}</p>
             <ActiveSelectionHint selected={selected} />
             <div className="flex items-center gap-3">
-              <Label className="text-xs text-muted-foreground">目标格式：</Label>
+              <Label className="text-xs text-muted-foreground">{t('media.convertFormat')}</Label>
               <SegmentedChoice
                 value={convertFormat}
                 options={[
@@ -366,7 +354,7 @@ export function MediaPage() {
             </div>
             <Button onClick={doConvert} disabled={busy || !selected}>
               <Play className="h-4 w-4" />
-              转换并导出
+              {t('media.convertRun')}
             </Button>
           </TabsContent>
         </Tabs>
@@ -403,14 +391,13 @@ export function MediaPage() {
 }
 
 function ActiveSelectionHint({ selected }: { selected: MediaItem | null }) {
+  const { t } = useTranslation()
   if (!selected) {
-    return (
-      <p className="text-xs text-muted-foreground">未选中文件 — 点上面的卡片选中</p>
-    )
+    return <p className="text-xs text-muted-foreground">{t('media.selectionNone')}</p>
   }
   return (
     <p className="text-xs text-muted-foreground">
-      选中：<span className="font-mono">{selected.file.name}</span>
+      {t('media.selectionLabel')} <span className="font-mono">{selected.file.name}</span>
     </p>
   )
 }

@@ -1,4 +1,5 @@
 import { useRef, useState, type DragEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Upload } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -7,6 +8,7 @@ export function DropZone({
 }: {
   onFiles: (files: File[]) => void
 }) {
+  const { t } = useTranslation()
   const [over, setOver] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -41,10 +43,8 @@ export function DropZone({
       )}
     >
       <Upload className="h-8 w-8 text-muted-foreground" />
-      <p className="text-sm font-medium">拖拽音视频文件到这里，或点击选择</p>
-      <p className="text-xs text-muted-foreground">
-        所有处理都在浏览器本地完成，文件不会上传
-      </p>
+      <p className="text-sm font-medium">{t('media.dropZoneTitle')}</p>
+      <p className="text-xs text-muted-foreground">{t('media.dropZoneSub')}</p>
       <input
         ref={inputRef}
         type="file"

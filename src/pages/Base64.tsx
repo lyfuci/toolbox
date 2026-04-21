@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { EncodeDecode } from '@/components/EncodeDecode'
 
 const SAMPLE = 'Hello, 工具箱! 🛠️'
@@ -24,6 +25,7 @@ function base64ToBytes(input: string, urlSafe: boolean): Uint8Array {
 }
 
 export function Base64Page() {
+  const { t } = useTranslation()
   const [urlSafe, setUrlSafe] = useState(false)
 
   const encode = useCallback(
@@ -37,8 +39,8 @@ export function Base64Page() {
 
   return (
     <EncodeDecode
-      title="Base64"
-      description="Base64 编解码，支持 UTF-8 与 URL-safe（-_）变体。所有处理在浏览器本地完成。"
+      title={t('tools.base64.name')}
+      description={t('pages.base64.description')}
       encode={encode}
       decode={decode}
       sample={SAMPLE}
@@ -50,7 +52,7 @@ export function Base64Page() {
             onChange={(e) => setUrlSafe(e.target.checked)}
             className="accent-primary"
           />
-          URL-safe (-_)
+          {t('pages.base64.urlSafe')}
         </label>
       }
     />

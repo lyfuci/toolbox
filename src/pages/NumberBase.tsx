@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -36,18 +37,19 @@ function parseToBigInt(input: string, base: number): bigint | null {
   return negative ? -n : n
 }
 
-const FIXED_BASES: { base: number; label: string }[] = [
-  { base: 2, label: '二进制 (2)' },
-  { base: 8, label: '八进制 (8)' },
-  { base: 10, label: '十进制 (10)' },
-  { base: 16, label: '十六进制 (16)' },
-]
-
 export function NumberBasePage() {
+  const { t } = useTranslation()
   // Source-of-truth value, big enough to handle 64-bit and beyond.
   const [value, setValue] = useState<bigint>(255n)
   const [customBase, setCustomBase] = useState(36)
   const [errors, setErrors] = useState<Record<number, boolean>>({})
+
+  const FIXED_BASES: { base: number; label: string }[] = [
+    { base: 2, label: t('pages.numberBase.base2') },
+    { base: 8, label: t('pages.numberBase.base8') },
+    { base: 10, label: t('pages.numberBase.base10') },
+    { base: 16, label: t('pages.numberBase.base16') },
+  ]
 
   const updateFrom = (base: number, raw: string) => {
     if (!raw.trim()) {
@@ -66,7 +68,7 @@ export function NumberBasePage() {
 
   const handleCopy = async (label: string, v: string) => {
     await navigator.clipboard.writeText(v)
-    toast.success(`已复制 ${label}`)
+    toast.success(t('common.copiedLabel', { label }))
   }
 
   const renderRow = (base: number, label: string) => {
@@ -92,10 +94,8 @@ export function NumberBasePage() {
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Number Base</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          整数进制互转。基于 BigInt，支持任意大整数与负数。
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.number-base.name')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('pages.numberBase.description')}</p>
       </header>
 
       <div className="flex flex-col gap-3">
@@ -103,7 +103,7 @@ export function NumberBasePage() {
 
         <div className="mt-2 flex items-center gap-3">
           <Label className="w-24 shrink-0 text-xs font-medium text-muted-foreground">
-            自定义
+            {t('pages.numberBase.custom')}
           </Label>
           <Input
             type="number"
@@ -116,9 +116,9 @@ export function NumberBasePage() {
             }}
             className="w-20 font-mono text-sm"
           />
-          <span className="text-xs text-muted-foreground">进制 (2-36)</span>
+          <span className="text-xs text-muted-foreground">{t('pages.numberBase.customBaseLabel')}</span>
         </div>
-        {renderRow(customBase, `Base ${customBase}`)}
+        {renderRow(customBase, t('pages.numberBase.baseN', { base: customBase }))}
       </div>
     </div>
   )

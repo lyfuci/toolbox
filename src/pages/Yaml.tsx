@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import yaml from 'js-yaml'
 import { ArrowLeftRight, Copy, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -49,6 +50,7 @@ function transform(input: string, mode: Mode): string {
 }
 
 export function YamlPage() {
+  const { t } = useTranslation()
   const [mode, setMode] = useState<Mode>('yaml2json')
   const [input, setInput] = useState(SAMPLE_YAML)
 
@@ -66,7 +68,7 @@ export function YamlPage() {
   const handleCopy = async () => {
     if (!canCopy) return
     await navigator.clipboard.writeText(outputValue)
-    toast.success('已复制')
+    toast.success(t('common.copied'))
   }
   const handleSwap = () => {
     if (result.ok && result.value) setInput(result.value)
@@ -86,10 +88,8 @@ export function YamlPage() {
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">YAML</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          YAML 与 JSON 互转。基于 js-yaml，兼容 YAML 1.2 子集。
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.yaml.name')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('pages.yaml.description')}</p>
       </header>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -116,11 +116,11 @@ export function YamlPage() {
         </div>
         <Button size="sm" variant="ghost" onClick={handleSwap}>
           <ArrowLeftRight className="h-4 w-4" />
-          交换
+          {t('common.swap')}
         </Button>
         <Button size="sm" variant="ghost" onClick={handleClear}>
           <Trash2 className="h-4 w-4" />
-          清空
+          {t('common.clear')}
         </Button>
       </div>
 
@@ -139,7 +139,7 @@ export function YamlPage() {
             <Label className="text-xs text-muted-foreground">{outputLabel}</Label>
             <Button size="sm" variant="ghost" onClick={handleCopy} disabled={!canCopy}>
               <Copy className="h-3.5 w-3.5" />
-              复制
+              {t('common.copy')}
             </Button>
           </div>
           <Textarea

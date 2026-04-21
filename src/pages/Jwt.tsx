@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   decodeJwt,
   decodeProtectedHeader,
@@ -37,11 +38,13 @@ type VerifyState =
   | { kind: 'verified' }
   | { kind: 'invalid'; reason: string }
 
-function decode(token: string): DecodeState {
+type Translator = (key: string, opts?: Record<string, unknown>) => string
+
+function decode(token: string, t: Translator): DecodeState {
   if (!token.trim()) return { ok: false, error: '' }
   const parts = token.trim().split('.')
   if (parts.length !== 3) {
-    return { ok: false, error: 'Token 必须是 3 段：header.payload.signature' }
+    return { ok: false, error: t('pages.jwt.structureError') }
   }
   try {
     return {
@@ -59,9 +62,10 @@ async function runVerify(
   token: string,
   secret: string,
   alg: string,
+  t: Translator,
 ): Promise<VerifyState> {
   if (!secret.trim()) {
-    return { kind: 'invalid', reason: '需要提供密钥/公钥' }
+    return { kind: 'invalid', reason: t('pages.jwt.needSecret') }
   }
   try {
     let key: Uint8Array | CryptoKey
@@ -70,30 +74,37 @@ async function runVerify(
     } else if (ASYMMETRIC_ALGS.has(alg)) {
       key = await importSPKI(secret.trim(), alg)
     } else {
-      return { kind: 'invalid', reason: `不支持的算法: ${alg || '(空)'}` }
+      return {
+        kind: 'invalid',
+        reason: t('pages.jwt.unsupportedAlg', { alg: alg || '(empty)' }),
+      }
     }
     await jwtVerify(token, key)
     return { kind: 'verified' }
   } catch (e) {
     if (e instanceof errors.JWSSignatureVerificationFailed) {
-      return { kind: 'invalid', reason: '签名不匹配' }
+      return { kind: 'invalid', reason: t('pages.jwt.sigMismatch') }
     }
     if (e instanceof errors.JWTExpired) {
-      return { kind: 'invalid', reason: 'Token 已过期' }
+      return { kind: 'invalid', reason: t('pages.jwt.expired') }
     }
     if (e instanceof errors.JWTClaimValidationFailed) {
-      return { kind: 'invalid', reason: `claim 校验失败: ${e.message}` }
+      return {
+        kind: 'invalid',
+        reason: t('pages.jwt.claimFailed', { message: e.message }),
+      }
     }
     return { kind: 'invalid', reason: e instanceof Error ? e.message : String(e) }
   }
 }
 
 export function JwtPage() {
+  const { t } = useTranslation()
   const [token, setToken] = useState(SAMPLE_TOKEN)
   const [secret, setSecret] = useState(SAMPLE_SECRET)
   const [verify, setVerify] = useState<VerifyState>({ kind: 'idle' })
 
-  const decoded = useMemo(() => decode(token), [token])
+  const decoded = useMemo(() => decode(token, t), [token, t])
   const alg = decoded.ok ? String(decoded.header.alg ?? '') : ''
   const isHmac = HMAC_ALGS.has(alg)
   const isAsym = ASYMMETRIC_ALGS.has(alg)
@@ -109,16 +120,14 @@ export function JwtPage() {
   const handleVerify = async () => {
     if (!decoded.ok) return
     setVerify({ kind: 'verifying' })
-    setVerify(await runVerify(token, secret, alg))
+    setVerify(await runVerify(token, secret, alg, t))
   }
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-12">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">JWT</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          解码、签名校验 JSON Web Token。所有处理都在浏览器本地完成。
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.jwt.name')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('pages.jwt.description')}</p>
       </header>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -126,7 +135,7 @@ export function JwtPage() {
         <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <Label htmlFor="token" className="text-sm font-medium">
-              Encoded
+              {t('pages.jwt.encoded')}
             </Label>
             <div className="flex gap-1">
               <Button
@@ -134,14 +143,14 @@ export function JwtPage() {
                 variant="ghost"
                 onClick={() => onTokenChange(SAMPLE_TOKEN)}
               >
-                示例
+                {t('common.sample')}
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => onTokenChange('')}
               >
-                清空
+                {t('common.clear')}
               </Button>
             </div>
           </div>
@@ -151,7 +160,7 @@ export function JwtPage() {
             onChange={(e) => onTokenChange(e.target.value)}
             spellCheck={false}
             className="min-h-[400px] resize-y break-all font-mono text-sm leading-relaxed"
-            placeholder="粘贴 JWT，例如 eyJhbGciOi..."
+            placeholder={t('pages.jwt.tokenPlaceholder')}
           />
           {!decoded.ok && decoded.error && (
             <p className="text-xs text-destructive">⚠ {decoded.error}</p>
@@ -160,23 +169,26 @@ export function JwtPage() {
 
         {/* RIGHT: decoded panels */}
         <section className="flex flex-col gap-5">
-          <Panel title="Header" subtitle={alg ? `Algorithm: ${alg}` : undefined}>
+          <Panel
+            title={t('pages.jwt.header')}
+            subtitle={alg ? t('pages.jwt.algorithm', { alg }) : undefined}
+          >
             <JsonView value={decoded.ok ? decoded.header : null} maxHeight="9rem" />
           </Panel>
 
-          <Panel title="Payload">
+          <Panel title={t('pages.jwt.payload')}>
             <JsonView value={decoded.ok ? decoded.payload : null} maxHeight="14rem" />
           </Panel>
 
-          <Panel title="Signature">
+          <Panel title={t('pages.jwt.signature')}>
             <div className="flex flex-col gap-3">
               <div>
                 <Label className="mb-1.5 block text-xs text-muted-foreground">
                   {isHmac
-                    ? '密钥 (HMAC secret，文本)'
+                    ? t('pages.jwt.secretHmac')
                     : isAsym
-                      ? '公钥 (PEM / SPKI 格式)'
-                      : '密钥'}
+                      ? t('pages.jwt.secretAsymmetric')
+                      : t('pages.jwt.secretGeneric')}
                 </Label>
                 <Textarea
                   value={secret}
@@ -187,8 +199,8 @@ export function JwtPage() {
                   }`}
                   placeholder={
                     isAsym
-                      ? '-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----'
-                      : 'your-secret'
+                      ? t('pages.jwt.secretPlaceholderAsymmetric')
+                      : t('pages.jwt.secretPlaceholderHmac')
                   }
                 />
               </div>
@@ -198,7 +210,7 @@ export function JwtPage() {
                   disabled={!decoded.ok || verify.kind === 'verifying'}
                   size="sm"
                 >
-                  验证签名
+                  {t('pages.jwt.verify')}
                 </Button>
                 <VerifyBadge state={verify} />
               </div>
@@ -250,11 +262,12 @@ function JsonView({
 }
 
 function VerifyBadge({ state }: { state: VerifyState }) {
+  const { t } = useTranslation()
   if (state.kind === 'idle') {
     return (
       <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <ShieldQuestion className="h-4 w-4" />
-        未验证
+        {t('pages.jwt.badgeIdle')}
       </span>
     )
   }
@@ -262,7 +275,7 @@ function VerifyBadge({ state }: { state: VerifyState }) {
     return (
       <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
-        验证中…
+        {t('pages.jwt.badgeVerifying')}
       </span>
     )
   }
@@ -270,7 +283,7 @@ function VerifyBadge({ state }: { state: VerifyState }) {
     return (
       <span className="flex items-center gap-1.5 text-xs text-emerald-500">
         <CheckCircle2 className="h-4 w-4" />
-        签名有效
+        {t('pages.jwt.badgeValid')}
       </span>
     )
   }

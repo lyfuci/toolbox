@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -8,6 +9,7 @@ import { HASH_ALGOS, type HashAlgo, hashText } from '@/lib/hash'
 const SAMPLE = 'The quick brown fox jumps over the lazy dog'
 
 export function HashPage() {
+  const { t } = useTranslation()
   const [input, setInput] = useState(SAMPLE)
   const [results, setResults] = useState<Record<HashAlgo, string>>({
     'MD5': '',
@@ -34,16 +36,14 @@ export function HashPage() {
 
   const handleCopy = async (algo: HashAlgo) => {
     await navigator.clipboard.writeText(results[algo])
-    toast.success(`已复制 ${algo}`)
+    toast.success(t('common.copiedLabel', { label: algo }))
   }
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Hash</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          同时输出 MD5 / SHA-1 / SHA-256 / SHA-384 / SHA-512。SHA 系列走 Web Crypto 原生实现；MD5 用 js-md5（仅供校验，**不要用于安全场景**）。
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.hash.name')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('pages.hash.description')}</p>
       </header>
 
       <Textarea
@@ -51,7 +51,7 @@ export function HashPage() {
         onChange={(e) => setInput(e.target.value)}
         spellCheck={false}
         className="mb-6 min-h-[180px] font-mono text-sm leading-relaxed"
-        placeholder="输入要哈希的文本…"
+        placeholder={t('pages.hash.placeholder')}
       />
 
       <div className="flex flex-col gap-2">

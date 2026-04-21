@@ -79,14 +79,14 @@ function escapeField(s: string): string {
 
 export function jsonToCsv(data: unknown): string {
   if (!Array.isArray(data)) {
-    throw new Error('期望根节点是数组（array of objects）')
+    throw new Error('Expected root to be an array of objects')
   }
   if (data.length === 0) return ''
   // Collect keys in insertion order, but include any keys later rows introduce.
   const keys: string[] = []
   for (const row of data) {
     if (typeof row !== 'object' || row === null || Array.isArray(row)) {
-      throw new Error('数组每个元素必须是对象')
+      throw new Error('Each array element must be an object')
     }
     for (const k of Object.keys(row as object)) {
       if (!keys.includes(k)) keys.push(k)

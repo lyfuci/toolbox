@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import QRCode, { type QRCodeErrorCorrectionLevel } from 'qrcode'
 import { Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -19,6 +20,7 @@ const ERROR_LABELS: Record<ShortLevel, string> = {
 }
 
 export function QrCodePage() {
+  const { t } = useTranslation()
   const [text, setText] = useState(SAMPLE)
   const [size, setSize] = useState(320)
   const [level, setLevel] = useState<ShortLevel>('M')
@@ -54,7 +56,7 @@ export function QrCodePage() {
     a.download = 'qrcode.svg'
     a.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
-    toast.success('已下载 SVG')
+    toast.success(t('pages.qr.downloaded', { format: 'SVG' }))
   }
   const handleDownloadPng = async () => {
     try {
@@ -67,7 +69,7 @@ export function QrCodePage() {
       a.href = dataUrl
       a.download = 'qrcode.png'
       a.click()
-      toast.success('已下载 PNG')
+      toast.success(t('pages.qr.downloaded', { format: 'PNG' }))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err))
     }
@@ -76,25 +78,23 @@ export function QrCodePage() {
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">QR Code</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          生成二维码（SVG / PNG）。本地渲染，输入内容不出浏览器。
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.qr-code.name')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('pages.qr.description')}</p>
       </header>
 
       <div className="mb-4">
-        <Label className="mb-1.5 block text-xs text-muted-foreground">内容</Label>
+        <Label className="mb-1.5 block text-xs text-muted-foreground">{t('pages.qr.content')}</Label>
         <Textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           spellCheck={false}
           className="min-h-[120px] font-mono text-sm"
-          placeholder="URL / 文本 / vCard…"
+          placeholder={t('pages.qr.contentPlaceholder')}
         />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Label className="text-xs text-muted-foreground">尺寸 (px)</Label>
+        <Label className="text-xs text-muted-foreground">{t('pages.qr.size')}</Label>
         <Input
           type="number"
           min={64}
@@ -107,7 +107,7 @@ export function QrCodePage() {
           }}
           className="w-24 font-mono text-sm"
         />
-        <Label className="text-xs text-muted-foreground">纠错等级</Label>
+        <Label className="text-xs text-muted-foreground">{t('pages.qr.level')}</Label>
         <div className="flex rounded-md border border-input bg-transparent text-xs">
           {ERROR_LEVELS.map((l) => (
             <button
@@ -138,7 +138,7 @@ export function QrCodePage() {
 
       <div className="flex justify-center rounded-lg border border-border bg-card/40 p-6">
         {!text ? (
-          <div className="text-sm text-muted-foreground">输入内容生成二维码…</div>
+          <div className="text-sm text-muted-foreground">{t('pages.qr.placeholder')}</div>
         ) : error ? (
           <div className="text-sm text-destructive">⚠ {error}</div>
         ) : svg ? (
@@ -148,7 +148,7 @@ export function QrCodePage() {
             dangerouslySetInnerHTML={{ __html: svg }}
           />
         ) : (
-          <div className="text-sm text-muted-foreground">生成中…</div>
+          <div className="text-sm text-muted-foreground">{t('pages.qr.generating')}</div>
         )}
       </div>
 
