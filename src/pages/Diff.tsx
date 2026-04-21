@@ -103,9 +103,9 @@ export function DiffPage() {
               key={i}
               className={
                 p.added
-                  ? 'bg-emerald-500/15 text-emerald-200'
+                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-200'
                   : p.removed
-                    ? 'bg-rose-500/15 text-rose-200 line-through decoration-rose-400/40'
+                    ? 'bg-rose-500/15 text-rose-700 line-through decoration-rose-400/40 dark:text-rose-200'
                     : 'text-muted-foreground'
               }
             >

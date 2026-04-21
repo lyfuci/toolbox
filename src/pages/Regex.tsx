@@ -149,7 +149,7 @@ export function RegexPage() {
                   >
                     <div>
                       <span className="text-muted-foreground">[{m.index}]</span>{' '}
-                      <span className="text-emerald-300">{m.match}</span>
+                      <span className="text-emerald-700 dark:text-emerald-300">{m.match}</span>
                     </div>
                     {m.groups.length > 0 ? (
                       <div className="mt-1 text-muted-foreground">
