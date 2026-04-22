@@ -213,6 +213,31 @@
     },
     "jwt": {
       "description": "解码、签名校验 JSON Web Token。所有处理都在浏览器本地完成。",
+      "claim": {
+        "iss": "Issuer — 签发方标识（RFC 7519 §4.1.1）",
+        "sub": "Subject — Token 描述的主体（RFC 7519 §4.1.2）",
+        "aud": "Audience — 受众，指定使用方（RFC 7519 §4.1.3）",
+        "exp": "Expiration Time — 过期时间（Unix 秒），之后该 JWT 不可被接受（RFC 7519 §4.1.4）",
+        "nbf": "Not Before — 生效时间（Unix 秒），之前该 JWT 不可被接受（RFC 7519 §4.1.5）",
+        "iat": "Issued At — 签发时间（Unix 秒）（RFC 7519 §4.1.6）",
+        "jti": "JWT ID — 唯一标识，用于防重放（RFC 7519 §4.1.7）",
+        "name": "显示名（OpenID Connect）",
+        "email": "邮箱（OpenID Connect）",
+        "scope": "OAuth 2.0 scope — 空格分隔的权限列表（RFC 8693）",
+        "auth_time": "auth_time — 用户实际完成认证的 Unix 秒（OIDC）",
+        "azp": "Authorized Party — Token 颁发给的 OAuth 客户端 ID（OIDC）",
+        "nonce": "Nonce — 与认证请求绑定的防重放值（OIDC）"
+      },
+      "headerField": {
+        "alg": "签名算法（RFC 7515 §4.1.1，如 HS256 / RS256 / ES256）",
+        "typ": "类型字段，通常是 'JWT'（RFC 7515 §4.1.9）",
+        "kid": "Key ID — 用于提示使用了哪个 key（RFC 7515 §4.1.4）",
+        "cty": "Content Type — 嵌套 JWT 的载荷类型（RFC 7515 §4.1.10）",
+        "jku": "JWK Set URL — 指向一组 JWK 的 URL（RFC 7515 §4.1.2）",
+        "jwk": "JSON Web Key — header 内嵌的公钥（RFC 7515 §4.1.3）",
+        "x5u": "X.509 URL — 指向 X.509 证书链的 URL（RFC 7515 §4.1.5）",
+        "x5c": "X.509 Cert Chain — 内嵌的 X.509 证书链（RFC 7515 §4.1.6）"
+      },
       "encoded": "Encoded",
       "header": "Header",
       "payload": "Payload",
@@ -410,6 +435,52 @@
       "rowTotal": "地址总数",
       "rowClass": "类别"
     }
+  },
+  "fieldMeta": {
+    "dnsType": {
+      "A": "IPv4 地址 — 32 位 IPv4（RFC 1035 §3.4.1）",
+      "AAAA": "IPv6 地址 — 128 位 IPv6（RFC 3596）",
+      "CNAME": "Canonical Name — 别名指向另一个域名（RFC 1035 §3.3.1）",
+      "MX": "Mail Exchanger — 邮件服务器（RFC 1035 §3.3.9）",
+      "TXT": "TXT — 任意文本记录（RFC 1035 §3.3.14）",
+      "NS": "Name Server — 权威 DNS 服务器（RFC 1035 §3.3.11）",
+      "SOA": "Start of Authority — 区域元信息、主 NS、刷新间隔等（RFC 1035 §3.3.13）",
+      "CAA": "Certification Authority Authorization — 限定哪些 CA 可签发该域名证书（RFC 8659）"
+    },
+    "dnsStatus": {
+      "0": "NOERROR — 无错误（RFC 1035 §4.1.1）",
+      "1": "FORMERR — 请求格式错误",
+      "2": "SERVFAIL — 服务器内部错误",
+      "3": "NXDOMAIN — 域名不存在",
+      "4": "NOTIMP — 不支持该查询类型",
+      "5": "REFUSED — 拒绝响应"
+    },
+    "regexFlag": {
+      "g": "global — 全局匹配，返回所有结果而非只第一条（每次 exec 会推进 lastIndex）",
+      "i": "ignoreCase — 不区分大小写",
+      "m": "multiline — ^ 和 $ 匹配每行开头/结尾，而非整段开头/结尾",
+      "s": "dotAll — '.' 也匹配换行符（ES2018）",
+      "u": "unicode — 正确处理 Unicode、代理对、Unicode 属性转义（ES2015）",
+      "y": "sticky — 只从 RegExp.lastIndex 位置匹配，否则不前进（ES2015）"
+    },
+    "hmacAlg": {
+      "SHA-1": "HMAC-SHA1 — 160 位签名（RFC 2104 + FIPS 180-4）。新场景已不建议使用。",
+      "SHA-256": "HMAC-SHA256 — 256 位签名（RFC 2104 + FIPS 180-4）",
+      "SHA-384": "HMAC-SHA384 — 384 位签名",
+      "SHA-512": "HMAC-SHA512 — 512 位签名"
+    },
+    "hashAlg": {
+      "MD5": "MD5 — 128 位摘要（RFC 1321）。已破，存在实用碰撞攻击。**不要用于安全场景**。",
+      "SHA-1": "SHA-1 — 160 位摘要（FIPS 180-4）。新场景已弃用，请用 SHA-256 及以上。",
+      "SHA-256": "SHA-256 — 256 位 SHA-2 摘要（FIPS 180-4）",
+      "SHA-384": "SHA-384 — 384 位 SHA-2 摘要",
+      "SHA-512": "SHA-512 — 512 位 SHA-2 摘要"
+    }
+  },
+  "tooltip": {
+    "tsBreakdown": "{{utc}}\n本地：{{local}}\n{{relative}}",
+    "tsFutureSeconds": "{{n}} 秒后",
+    "tsPastSeconds": "{{n}} 秒前"
   },
   "media": {
     "description": "剪辑、拼接、提取音轨、格式转换。基于 ffmpeg.wasm，所有处理在浏览器本地完成。",

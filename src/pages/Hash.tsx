@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { HASH_ALGOS, type HashAlgo, hashText } from '@/lib/hash'
+import { FieldTooltip } from '@/components/FieldTooltip'
 
 const SAMPLE = 'The quick brown fox jumps over the lazy dog'
 
@@ -60,9 +61,11 @@ export function HashPage() {
             key={algo}
             className="flex items-center gap-3 rounded-md border border-border bg-card/40 px-3 py-2"
           >
-            <span className="w-20 shrink-0 font-mono text-xs font-medium text-muted-foreground">
-              {algo}
-            </span>
+            <FieldTooltip body={`fieldMeta.hashAlg.${algo}`} bodyIsKey>
+              <span className="w-20 shrink-0 font-mono text-xs font-medium text-muted-foreground">
+                {algo}
+              </span>
+            </FieldTooltip>
             <code className="flex-1 truncate font-mono text-xs">{results[algo]}</code>
             <Button
               size="sm"

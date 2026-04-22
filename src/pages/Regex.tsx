@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
+import { FieldTooltip } from '@/components/FieldTooltip'
 
 const SAMPLE_PATTERN = String.raw`(\w+)@(\w+)\.com`
 const SAMPLE_TEXT = `联系：alice@example.com 或 bob@toolbox.com
@@ -112,7 +113,9 @@ export function RegexPage() {
               }}
               className="accent-primary"
             />
-            {flagLabel(flag)}
+            <FieldTooltip body={`fieldMeta.regexFlag.${flag}`} bodyIsKey>
+              {flagLabel(flag)}
+            </FieldTooltip>
           </label>
         ))}
       </div>

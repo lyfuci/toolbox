@@ -11,6 +11,8 @@ import { CheckCircle2, ShieldQuestion, XCircle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { FieldTooltip } from '@/components/FieldTooltip'
+import { formatTimestampBreakdown } from '@/lib/time'
 
 const SAMPLE_TOKEN =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
@@ -23,6 +25,9 @@ const ASYMMETRIC_ALGS = new Set([
   'ES256', 'ES256K', 'ES384', 'ES512',
   'EdDSA',
 ])
+
+// Payload claims that are Unix-second timestamps (RFC 7519 + OIDC).
+const TIMESTAMP_CLAIMS = new Set(['iat', 'exp', 'nbf', 'auth_time', 'updated_at'])
 
 type DecodeOk = {
   ok: true
@@ -173,11 +178,19 @@ export function JwtPage() {
             title={t('pages.jwt.header')}
             subtitle={alg ? t('pages.jwt.algorithm', { alg }) : undefined}
           >
-            <JsonView value={decoded.ok ? decoded.header : null} maxHeight="9rem" />
+            <ClaimsView
+              panel="header"
+              value={decoded.ok ? decoded.header : null}
+              maxHeight="9rem"
+            />
           </Panel>
 
           <Panel title={t('pages.jwt.payload')}>
-            <JsonView value={decoded.ok ? decoded.payload : null} maxHeight="14rem" />
+            <ClaimsView
+              panel="payload"
+              value={decoded.ok ? decoded.payload : null}
+              maxHeight="14rem"
+            />
           </Panel>
 
           <Panel title={t('pages.jwt.signature')}>
@@ -244,20 +257,98 @@ function Panel({
   )
 }
 
-function JsonView({
+/**
+ * Pretty-print a JWT header or payload object with hover tooltips on:
+ * - top-level claim keys (RFC 7515/7519/OIDC explanations)
+ * - timestamp values like iat/exp/nbf (formatted date breakdown)
+ *
+ * Nested objects/arrays are inlined as JSON.stringify for now — could expand
+ * later if we have nested claims worth annotating.
+ */
+function ClaimsView({
+  panel,
   value,
   maxHeight,
 }: {
+  panel: 'header' | 'payload'
   value: Record<string, unknown> | null
   maxHeight: string
 }) {
+  const { t, i18n } = useTranslation()
+  const locale = i18n.resolvedLanguage ?? i18n.language
+
+  if (!value) {
+    return (
+      <pre
+        className="overflow-auto rounded-md border border-border bg-card/50 p-3 font-mono text-sm text-foreground/90"
+        style={{ maxHeight }}
+      >
+        —
+      </pre>
+    )
+  }
+
+  const entries = Object.entries(value)
+  const keyMetaPrefix = panel === 'header' ? 'pages.jwt.headerField' : 'pages.jwt.claim'
+
   return (
-    <pre
-      className="overflow-auto rounded-md border border-border bg-card/50 p-3 font-mono text-sm text-foreground/90"
+    <div
+      className="overflow-auto rounded-md border border-border bg-card/50 p-3 font-mono text-sm leading-relaxed text-foreground/90"
       style={{ maxHeight }}
     >
-      {value ? JSON.stringify(value, null, 2) : '—'}
-    </pre>
+      <span className="text-muted-foreground">{'{'}</span>
+      {entries.map(([key, val], idx) => {
+        const isLast = idx === entries.length - 1
+        const isTimestamp =
+          panel === 'payload' &&
+          TIMESTAMP_CLAIMS.has(key) &&
+          typeof val === 'number' &&
+          isFinite(val)
+        return (
+          <div key={key} className="pl-4">
+            <span className="text-muted-foreground">{'"'}</span>
+            <FieldTooltip body={`${keyMetaPrefix}.${key}`} bodyIsKey>
+              <span className="text-sky-600 dark:text-sky-300">{key}</span>
+            </FieldTooltip>
+            <span className="text-muted-foreground">{'": '}</span>
+            {isTimestamp ? (
+              <TimestampValue unixSeconds={val as number} locale={locale} t={t} />
+            ) : (
+              <span className="text-foreground/90">{stringifyValue(val)}</span>
+            )}
+            {!isLast && <span className="text-muted-foreground">,</span>}
+          </div>
+        )
+      })}
+      <span className="text-muted-foreground">{'}'}</span>
+    </div>
+  )
+}
+
+function stringifyValue(v: unknown): string {
+  if (typeof v === 'string') return JSON.stringify(v)
+  if (typeof v === 'number' || typeof v === 'boolean' || v === null) {
+    return JSON.stringify(v)
+  }
+  // arrays / objects: compact one-line
+  return JSON.stringify(v)
+}
+
+function TimestampValue({
+  unixSeconds,
+  locale,
+  t,
+}: {
+  unixSeconds: number
+  locale: string
+  t: Translator
+}) {
+  const { utc, local, relative } = formatTimestampBreakdown(unixSeconds, locale)
+  const body = t('tooltip.tsBreakdown', { utc, local, relative })
+  return (
+    <FieldTooltip body={body}>
+      <span className="text-amber-600 dark:text-amber-300">{unixSeconds}</span>
+    </FieldTooltip>
   )
 }
 

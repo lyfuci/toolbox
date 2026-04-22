@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { HMAC_ALGOS, type HmacAlgo, bytesToBase64, bytesToHex, hmacText } from '@/lib/hash'
+import { FieldTooltip } from '@/components/FieldTooltip'
 
 type Encoding = 'hex' | 'base64'
 
@@ -53,18 +54,19 @@ export function HmacPage() {
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="flex rounded-md border border-input bg-transparent text-sm">
           {HMAC_ALGOS.map((a) => (
-            <button
-              key={a}
-              type="button"
-              onClick={() => setAlgo(a)}
-              className={`px-3 py-1.5 transition-colors ${
-                algo === a
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {a.replace('SHA-', 'HS')}
-            </button>
+            <FieldTooltip key={a} body={`fieldMeta.hmacAlg.${a}`} bodyIsKey underline={false}>
+              <button
+                type="button"
+                onClick={() => setAlgo(a)}
+                className={`px-3 py-1.5 transition-colors ${
+                  algo === a
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {a.replace('SHA-', 'HS')}
+              </button>
+            </FieldTooltip>
           ))}
         </div>
 

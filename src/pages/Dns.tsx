@@ -4,6 +4,7 @@ import { Loader2, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { FieldTooltip } from '@/components/FieldTooltip'
 
 const RECORD_TYPES = ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'SOA', 'CAA'] as const
 type RecordType = (typeof RECORD_TYPES)[number]
@@ -108,9 +109,11 @@ export function DnsPage() {
         <>
           <div className="mb-3 text-xs text-muted-foreground">
             {t('pages.dns.status')}:{' '}
-            <code className="font-mono text-foreground">
-              {STATUS_LABELS[data.Status] ?? data.Status}
-            </code>
+            <FieldTooltip body={`fieldMeta.dnsStatus.${data.Status}`} bodyIsKey>
+              <code className="font-mono text-foreground">
+                {STATUS_LABELS[data.Status] ?? data.Status}
+              </code>
+            </FieldTooltip>
             {'  ·  '}
             {data.Answer
               ? t('pages.dns.answers', { n: data.Answer.length })
@@ -118,18 +121,23 @@ export function DnsPage() {
           </div>
           {data.Answer && data.Answer.length > 0 ? (
             <div className="flex flex-col gap-2">
-              {data.Answer.map((a, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-3 rounded-md border border-border bg-card/40 px-3 py-2"
-                >
-                  <span className="w-16 shrink-0 font-mono text-xs text-muted-foreground">
-                    {TYPE_NAMES[a.type] ?? a.type}
-                  </span>
-                  <code className="flex-1 truncate font-mono text-sm">{a.data}</code>
-                  <span className="font-mono text-xs text-muted-foreground">TTL {a.TTL}</span>
-                </div>
-              ))}
+              {data.Answer.map((a, i) => {
+                const typeName = TYPE_NAMES[a.type] ?? String(a.type)
+                return (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 rounded-md border border-border bg-card/40 px-3 py-2"
+                  >
+                    <FieldTooltip body={`fieldMeta.dnsType.${typeName}`} bodyIsKey>
+                      <span className="w-16 shrink-0 font-mono text-xs text-muted-foreground">
+                        {typeName}
+                      </span>
+                    </FieldTooltip>
+                    <code className="flex-1 truncate font-mono text-sm">{a.data}</code>
+                    <span className="font-mono text-xs text-muted-foreground">TTL {a.TTL}</span>
+                  </div>
+                )
+              })}
             </div>
           ) : data.Authority && data.Authority.length > 0 ? (
             <div className="text-xs text-muted-foreground">
