@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { Loader2, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -43,6 +44,7 @@ async function lookup(name: string, type: RecordType): Promise<DohResp> {
 }
 
 export function DnsPage() {
+  const { t } = useTranslation()
   const [name, setName] = useState('toolbox.seansun.xyz')
   const [type, setType] = useState<RecordType>('A')
   const [data, setData] = useState<DohResp | null>(null)
@@ -67,10 +69,8 @@ export function DnsPage() {
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">DNS Lookup</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          基于 Cloudflare DoH（<code className="font-mono">cloudflare-dns.com</code>）。点击查询才会发起请求。
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.dns.name')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('pages.dns.description')}</p>
       </header>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -84,7 +84,7 @@ export function DnsPage() {
             if (e.key === 'Enter') run()
           }}
         />
-        <Label className="text-xs text-muted-foreground">类型</Label>
+        <Label className="text-xs text-muted-foreground">{t('pages.dns.typeLabel')}</Label>
         <select
           value={type}
           onChange={(e) => setType(e.target.value as RecordType)}
@@ -98,7 +98,7 @@ export function DnsPage() {
         </select>
         <Button onClick={run} disabled={loading || !name.trim()}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-          查询
+          {t('common.lookup')}
         </Button>
       </div>
 
@@ -107,8 +107,14 @@ export function DnsPage() {
       {data ? (
         <>
           <div className="mb-3 text-xs text-muted-foreground">
-            Status: <code className="font-mono text-foreground">{STATUS_LABELS[data.Status] ?? data.Status}</code>
-            {data.Answer ? `  ·  ${data.Answer.length} answers` : '  ·  no answers'}
+            {t('pages.dns.status')}:{' '}
+            <code className="font-mono text-foreground">
+              {STATUS_LABELS[data.Status] ?? data.Status}
+            </code>
+            {'  ·  '}
+            {data.Answer
+              ? t('pages.dns.answers', { n: data.Answer.length })
+              : t('pages.dns.noAnswers')}
           </div>
           {data.Answer && data.Answer.length > 0 ? (
             <div className="flex flex-col gap-2">
@@ -127,13 +133,15 @@ export function DnsPage() {
             </div>
           ) : data.Authority && data.Authority.length > 0 ? (
             <div className="text-xs text-muted-foreground">
-              No direct answer; authority: {data.Authority.map((a) => a.data).join('; ')}
+              {t('pages.dns.noDirect', {
+                authority: data.Authority.map((a) => a.data).join('; '),
+              })}
             </div>
           ) : null}
         </>
       ) : !loading && !error ? (
         <div className="rounded-md border border-dashed border-border bg-card/20 p-6 text-center text-xs text-muted-foreground">
-          填入域名 + 选择记录类型，点击 <strong>查询</strong>
+          <Trans i18nKey="pages.dns.empty" components={{ 1: <strong /> }} />
         </div>
       ) : null}
     </div>

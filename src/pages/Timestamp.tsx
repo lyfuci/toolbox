@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Clock, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,9 +20,9 @@ function parseInput(raw: string): Date | null {
   return isNaN(d.getTime()) ? null : d
 }
 
-function relativeTime(date: Date): string {
+function relativeTime(date: Date, locale: string): string {
   const diffMs = date.getTime() - Date.now()
-  const fmt = new Intl.RelativeTimeFormat('zh-CN', { numeric: 'auto' })
+  const fmt = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
   const abs = Math.abs(diffMs)
   if (abs < 60_000) return fmt.format(Math.round(diffMs / 1000), 'second')
   if (abs < 3_600_000) return fmt.format(Math.round(diffMs / 60_000), 'minute')
@@ -32,43 +33,43 @@ function relativeTime(date: Date): string {
 }
 
 export function TimestampPage() {
+  const { t, i18n } = useTranslation()
+  const locale = i18n.resolvedLanguage ?? i18n.language
   const [input, setInput] = useState(() => String(Math.floor(Date.now() / 1000)))
   const [, setTick] = useState(0)
 
   // Re-render the relative-time row every 30s so "X seconds ago" stays fresh.
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 30_000)
+    const id = setInterval(() => setTick((tv) => tv + 1), 30_000)
     return () => clearInterval(id)
   }, [])
 
   const date = useMemo(() => parseInput(input), [input])
 
-  const rows = date
+  const rows: [string, string][] = date
     ? [
-        ['Unix 秒', String(Math.floor(date.getTime() / 1000))],
-        ['Unix 毫秒', String(date.getTime())],
-        ['ISO 8601 (UTC)', date.toISOString()],
-        ['本地时间', date.toLocaleString('zh-CN', { timeZoneName: 'short' })],
-        ['相对时间', relativeTime(date)],
+        [t('pages.timestamp.unixSeconds'), String(Math.floor(date.getTime() / 1000))],
+        [t('pages.timestamp.unixMs'), String(date.getTime())],
+        [t('pages.timestamp.iso8601'), date.toISOString()],
+        [t('pages.timestamp.localTime'), date.toLocaleString(locale, { timeZoneName: 'short' })],
+        [t('pages.timestamp.relativeTime'), relativeTime(date, locale)],
       ]
     : []
 
   const handleCopy = async (label: string, value: string) => {
     await navigator.clipboard.writeText(value)
-    toast.success(`已复制${label}`)
+    toast.success(t('common.copiedLabel', { label }))
   }
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Timestamp</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          时间戳与日期相互转换。支持 Unix 秒 / 毫秒 / ISO 8601 / RFC 2822 输入。
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.timestamp.name')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('pages.timestamp.description')}</p>
       </header>
 
       <div className="mb-2 flex items-center gap-2">
-        <Label className="text-xs text-muted-foreground">输入</Label>
+        <Label className="text-xs text-muted-foreground">{t('pages.timestamp.input')}</Label>
         <Button
           size="sm"
           variant="ghost"
@@ -76,7 +77,7 @@ export function TimestampPage() {
           className="h-7 gap-1.5 px-2 text-xs"
         >
           <Clock className="h-3.5 w-3.5" />
-          现在
+          {t('pages.timestamp.now')}
         </Button>
       </div>
       <Input
@@ -109,7 +110,7 @@ export function TimestampPage() {
           ))}
         </div>
       ) : input.trim() ? (
-        <div className="text-xs text-destructive">⚠ 无法解析为日期</div>
+        <div className="text-xs text-destructive">⚠ {t('pages.timestamp.cannotParse')}</div>
       ) : null}
     </div>
   )

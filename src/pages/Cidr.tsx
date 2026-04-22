@@ -1,16 +1,21 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 
+// Errors are thrown with untranslated English messages; the page isn't on the
+// critical UX path, and propagating i18n through pure compute-lib error throws
+// would pollute the utility. Good enough for v1.
+
 function ipv4ToInt(ip: string): number {
   const parts = ip.split('.')
-  if (parts.length !== 4) throw new Error('IPv4 需要 4 段')
+  if (parts.length !== 4) throw new Error('IPv4 must have 4 octets')
   const nums = parts.map((p) => {
     const n = Number(p)
-    if (!/^\d+$/.test(p) || n < 0 || n > 255) throw new Error(`非法字节: ${p}`)
+    if (!/^\d+$/.test(p) || n < 0 || n > 255) throw new Error(`Invalid octet: ${p}`)
     return n
   })
   return ((nums[0] << 24) | (nums[1] << 16) | (nums[2] << 8) | nums[3]) >>> 0
@@ -43,12 +48,12 @@ function classify(firstOctet: number): string {
 
 function compute(cidr: string): CidrInfo {
   const slash = cidr.indexOf('/')
-  if (slash === -1) throw new Error('缺少 /prefix')
+  if (slash === -1) throw new Error('Missing /prefix')
   const ipPart = cidr.slice(0, slash)
   const prefixPart = cidr.slice(slash + 1)
   const prefix = Number(prefixPart)
   if (!/^\d+$/.test(prefixPart) || prefix < 0 || prefix > 32) {
-    throw new Error('prefix 须在 0-32')
+    throw new Error('prefix must be 0-32')
   }
   const ip = ipv4ToInt(ipPart)
   const mask = prefix === 0 ? 0 : ((-1 << (32 - prefix)) >>> 0)
@@ -74,6 +79,7 @@ function compute(cidr: string): CidrInfo {
 }
 
 export function CidrPage() {
+  const { t } = useTranslation()
   const [input, setInput] = useState('192.168.1.10/24')
 
   const result = useMemo(() => {
@@ -86,38 +92,38 @@ export function CidrPage() {
 
   const handleCopy = async (label: string, v: string) => {
     await navigator.clipboard.writeText(v)
-    toast.success(`已复制 ${label}`)
+    toast.success(t('common.copiedLabel', { label }))
   }
 
   const rows: [string, string][] = result.ok
     ? [
-        ['网络地址', `${result.value.network}/${result.value.prefix}`],
-        ['广播地址', result.value.broadcast],
-        ['子网掩码', result.value.netmask],
-        ['通配符掩码', result.value.wildcard],
-        ['首个可用', result.value.firstUsable],
-        ['最后可用', result.value.lastUsable],
-        ['可用主机数', result.value.hostCount.toLocaleString()],
-        ['地址总数', result.value.totalCount.toLocaleString()],
-        ['类别', result.value.classLabel],
+        [t('pages.cidr.rowNetwork'), `${result.value.network}/${result.value.prefix}`],
+        [t('pages.cidr.rowBroadcast'), result.value.broadcast],
+        [t('pages.cidr.rowNetmask'), result.value.netmask],
+        [t('pages.cidr.rowWildcard'), result.value.wildcard],
+        [t('pages.cidr.rowFirstUsable'), result.value.firstUsable],
+        [t('pages.cidr.rowLastUsable'), result.value.lastUsable],
+        [t('pages.cidr.rowHosts'), result.value.hostCount.toLocaleString()],
+        [t('pages.cidr.rowTotal'), result.value.totalCount.toLocaleString()],
+        [t('pages.cidr.rowClass'), result.value.classLabel],
       ]
     : []
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">CIDR Calculator</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          IPv4 子网计算：网络 / 广播 / 掩码 / 可用范围 / 主机数。
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.cidr.name')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('pages.cidr.description')}</p>
       </header>
 
       <div className="mb-6">
-        <Label className="mb-1.5 block text-xs text-muted-foreground">CIDR</Label>
+        <Label className="mb-1.5 block text-xs text-muted-foreground">
+          {t('pages.cidr.cidrLabel')}
+        </Label>
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="192.168.1.0/24"
+          placeholder={t('pages.cidr.placeholder')}
           spellCheck={false}
           className="font-mono text-sm"
         />

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -16,6 +17,7 @@ export function OutputView({
   result: OutputResult
   onClear: () => void
 }) {
+  const { t } = useTranslation()
   const isAudio = result.mime.startsWith('audio/')
   const isImage = result.mime.startsWith('image/')
 
@@ -32,11 +34,11 @@ export function OutputView({
           <Button size="sm" asChild>
             <a href={result.url} download={result.filename}>
               <Download className="h-4 w-4" />
-              下载
+              {t('media.outputDownload')}
             </a>
           </Button>
           <Button size="sm" variant="ghost" onClick={onClear}>
-            清除
+            {t('media.outputClear')}
           </Button>
         </div>
       </div>

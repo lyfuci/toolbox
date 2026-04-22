@@ -4,6 +4,7 @@ import { RouterProvider } from 'react-router'
 import { ThemeProvider } from 'next-themes'
 import { router } from '@/app/router'
 import { Toaster } from '@/components/ui/sonner'
+import '@/i18n'
 import './index.css'
 
 createRoot(document.getElementById('root')!).render(

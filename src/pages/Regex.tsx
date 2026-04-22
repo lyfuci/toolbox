@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,14 +11,8 @@ const SAMPLE_PATTERN = String.raw`(\w+)@(\w+)\.com`
 const SAMPLE_TEXT = `联系：alice@example.com 或 bob@toolbox.com
 其他: invalid@nope, another@example.com`
 
-const FLAG_OPTS: { flag: string; label: string }[] = [
-  { flag: 'g', label: 'g (全局)' },
-  { flag: 'i', label: 'i (忽略大小写)' },
-  { flag: 'm', label: 'm (多行)' },
-  { flag: 's', label: 's (.匹配换行)' },
-  { flag: 'u', label: 'u (Unicode)' },
-  { flag: 'y', label: 'y (粘性)' },
-]
+const FLAG_LIST = ['g', 'i', 'm', 's', 'u', 'y'] as const
+type Flag = (typeof FLAG_LIST)[number]
 
 type Match = {
   match: string
@@ -51,8 +46,9 @@ function evalRegex(pattern: string, flags: string, text: string) {
 }
 
 export function RegexPage() {
+  const { t } = useTranslation()
   const [pattern, setPattern] = useState(SAMPLE_PATTERN)
-  const [flagSet, setFlagSet] = useState<Set<string>>(new Set(['g']))
+  const [flagSet, setFlagSet] = useState<Set<Flag>>(new Set<Flag>(['g']))
   const [text, setText] = useState(SAMPLE_TEXT)
   const [replacement, setReplacement] = useState('<$1@$2.com>')
 
@@ -71,16 +67,17 @@ export function RegexPage() {
   const handleCopy = async (v: string) => {
     if (!v) return
     await navigator.clipboard.writeText(v)
-    toast.success('已复制')
+    toast.success(t('common.copied'))
   }
+
+  const flagLabel = (flag: Flag): string =>
+    t(`pages.regex.flag${flag.toUpperCase()}`)
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Regex Tester</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          基于浏览器原生 RegExp。支持全部 ECMAScript 标志。
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.regex.name')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('pages.regex.description')}</p>
       </header>
 
       <div className="mb-3 flex items-center gap-2">
@@ -90,14 +87,14 @@ export function RegexPage() {
           onChange={(e) => setPattern(e.target.value)}
           spellCheck={false}
           className="flex-1 font-mono text-sm"
-          placeholder="正则表达式…"
+          placeholder={t('pages.regex.patternPlaceholder')}
         />
         <code className="text-muted-foreground">/</code>
         <code className="font-mono text-sm">{flags}</code>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-3">
-        {FLAG_OPTS.map(({ flag, label }) => (
+        {FLAG_LIST.map((flag) => (
           <label
             key={flag}
             className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground select-none"
@@ -115,13 +112,15 @@ export function RegexPage() {
               }}
               className="accent-primary"
             />
-            {label}
+            {flagLabel(flag)}
           </label>
         ))}
       </div>
 
       <div className="mb-4">
-        <Label className="mb-1.5 block text-xs text-muted-foreground">测试文本</Label>
+        <Label className="mb-1.5 block text-xs text-muted-foreground">
+          {t('pages.regex.testText')}
+        </Label>
         <Textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -136,10 +135,10 @@ export function RegexPage() {
         <>
           <div className="mb-4">
             <Label className="mb-2 block text-xs text-muted-foreground">
-              匹配 ({result.matches.length})
+              {t('pages.regex.matches')} ({result.matches.length})
             </Label>
             {result.matches.length === 0 ? (
-              <div className="text-xs text-muted-foreground">无匹配</div>
+              <div className="text-xs text-muted-foreground">{t('pages.regex.noMatch')}</div>
             ) : (
               <div className="flex flex-col gap-2">
                 {result.matches.map((m, i) => (
@@ -176,7 +175,7 @@ export function RegexPage() {
 
           <div className="mb-2">
             <Label className="mb-1.5 block text-xs text-muted-foreground">
-              替换字符串（支持 $1 / $&lt;name&gt; 等反向引用）
+              {t('pages.regex.replacement')}
             </Label>
             <Input
               value={replacement}
@@ -187,10 +186,12 @@ export function RegexPage() {
           </div>
           <div>
             <div className="mb-1.5 flex items-center justify-between">
-              <Label className="text-xs text-muted-foreground">替换后预览</Label>
+              <Label className="text-xs text-muted-foreground">
+                {t('pages.regex.replacePreview')}
+              </Label>
               <Button size="sm" variant="ghost" onClick={() => handleCopy(replacePreview)}>
                 <Copy className="h-3.5 w-3.5" />
-                复制
+                {t('common.copy')}
               </Button>
             </div>
             <Textarea

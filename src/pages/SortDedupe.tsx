@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Copy, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -47,6 +48,7 @@ function process(input: string, opts: {
 }
 
 export function SortDedupePage() {
+  const { t } = useTranslation()
   const [input, setInput] = useState(SAMPLE)
   const [sort, setSort] = useState<Sort>('asc')
   const [dedupe, setDedupe] = useState(true)
@@ -63,7 +65,7 @@ export function SortDedupePage() {
   const handleCopy = async () => {
     if (!output) return
     await navigator.clipboard.writeText(output)
-    toast.success('已复制')
+    toast.success(t('common.copied'))
   }
 
   const inputLineCount = input.split('\n').length
@@ -71,20 +73,18 @@ export function SortDedupePage() {
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Sort &amp; Dedupe</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          按行处理：排序、去重、修剪空白、忽略大小写。
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.sort-dedupe.name')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('pages.sortDedupe.description')}</p>
       </header>
 
       <div className="mb-3 flex flex-wrap items-center gap-3">
-        <Label className="text-xs text-muted-foreground">排序</Label>
+        <Label className="text-xs text-muted-foreground">{t('pages.sortDedupe.sort')}</Label>
         <div className="flex rounded-md border border-input bg-transparent text-sm">
           {(
             [
-              ['none', '不排序'],
-              ['asc', 'A → Z'],
-              ['desc', 'Z → A'],
+              ['none', t('pages.sortDedupe.noSort')],
+              ['asc', t('pages.sortDedupe.asc')],
+              ['desc', t('pages.sortDedupe.desc')],
             ] as [Sort, string][]
           ).map(([v, label]) => (
             <button
@@ -103,12 +103,15 @@ export function SortDedupePage() {
         </div>
 
         {[
-          { label: '去重', state: dedupe, setter: setDedupe },
-          { label: '修剪空白', state: trim, setter: setTrim },
-          { label: '删除空行', state: removeBlank, setter: setRemoveBlank },
-          { label: '忽略大小写', state: ignoreCase, setter: setIgnoreCase },
+          { label: t('pages.sortDedupe.dedupe'), state: dedupe, setter: setDedupe },
+          { label: t('pages.sortDedupe.trim'), state: trim, setter: setTrim },
+          { label: t('pages.sortDedupe.removeBlank'), state: removeBlank, setter: setRemoveBlank },
+          { label: t('pages.sortDedupe.ignoreCase'), state: ignoreCase, setter: setIgnoreCase },
         ].map(({ label, state, setter }) => (
-          <label key={label} className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground select-none">
+          <label
+            key={label}
+            className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground select-none"
+          >
             <input
               type="checkbox"
               checked={state}
@@ -121,14 +124,14 @@ export function SortDedupePage() {
 
         <Button size="sm" variant="ghost" onClick={() => setInput('')} className="ml-auto">
           <Trash2 className="h-4 w-4" />
-          清空
+          {t('common.clear')}
         </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div>
           <Label className="mb-1.5 block text-xs text-muted-foreground">
-            输入 ({inputLineCount} 行)
+            {t('common.input')} ({t('pages.sortDedupe.lineCount', { n: inputLineCount })})
           </Label>
           <Textarea
             value={input}
@@ -139,10 +142,12 @@ export function SortDedupePage() {
         </div>
         <div>
           <div className="mb-1.5 flex items-center justify-between">
-            <Label className="text-xs text-muted-foreground">输出 ({lines.length} 行)</Label>
+            <Label className="text-xs text-muted-foreground">
+              {t('common.output')} ({t('pages.sortDedupe.lineCount', { n: lines.length })})
+            </Label>
             <Button size="sm" variant="ghost" onClick={handleCopy} disabled={!output}>
               <Copy className="h-3.5 w-3.5" />
-              复制
+              {t('common.copy')}
             </Button>
           </div>
           <Textarea

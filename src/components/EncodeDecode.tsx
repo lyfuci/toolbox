@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeftRight, Copy, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -38,6 +39,7 @@ export function EncodeDecode({
   options,
   initialMode = 'encode',
 }: EncodeDecodeProps) {
+  const { t } = useTranslation()
   const [mode, setMode] = useState<Mode>(initialMode)
   const [input, setInput] = useState(sample ?? '')
 
@@ -56,7 +58,7 @@ export function EncodeDecode({
   const handleCopy = async () => {
     if (!canCopy) return
     await navigator.clipboard.writeText(outputValue)
-    toast.success('已复制')
+    toast.success(t('common.copied'))
   }
 
   const handleClear = () => setInput('')
@@ -88,38 +90,42 @@ export function EncodeDecode({
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              {m === 'encode' ? '编码' : '解码'}
+              {m === 'encode' ? t('pages.encodeDecode.encodeBtn') : t('pages.encodeDecode.decodeBtn')}
             </button>
           ))}
         </div>
         <Button size="sm" variant="ghost" onClick={handleSwap}>
           <ArrowLeftRight className="h-4 w-4" />
-          交换
+          {t('common.swap')}
         </Button>
         <Button size="sm" variant="ghost" onClick={handleClear}>
           <Trash2 className="h-4 w-4" />
-          清空
+          {t('common.clear')}
         </Button>
         {options ? <div className="ml-auto flex items-center gap-3">{options}</div> : null}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <Label className="mb-1.5 block text-xs text-muted-foreground">输入</Label>
+          <Label className="mb-1.5 block text-xs text-muted-foreground">{t('common.input')}</Label>
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             spellCheck={false}
             className="min-h-[360px] font-mono text-sm leading-relaxed"
-            placeholder={mode === 'encode' ? '原文…' : '编码后字符串…'}
+            placeholder={
+              mode === 'encode'
+                ? t('pages.encodeDecode.inputPlaceholderEncode')
+                : t('pages.encodeDecode.inputPlaceholderDecode')
+            }
           />
         </div>
         <div>
           <div className="mb-1.5 flex items-center justify-between">
-            <Label className="text-xs text-muted-foreground">输出</Label>
+            <Label className="text-xs text-muted-foreground">{t('common.output')}</Label>
             <Button size="sm" variant="ghost" onClick={handleCopy} disabled={!canCopy}>
               <Copy className="h-3.5 w-3.5" />
-              复制
+              {t('common.copy')}
             </Button>
           </div>
           <Textarea
@@ -127,7 +133,11 @@ export function EncodeDecode({
             readOnly
             spellCheck={false}
             className="min-h-[360px] font-mono text-sm leading-relaxed"
-            placeholder={mode === 'encode' ? '编码结果…' : '解码结果…'}
+            placeholder={
+              mode === 'encode'
+                ? t('pages.encodeDecode.outputPlaceholderEncode')
+                : t('pages.encodeDecode.outputPlaceholderDecode')
+            }
           />
         </div>
       </div>

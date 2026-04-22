@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Copy, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,6 +39,7 @@ function entropyBits(length: number, classes: Record<Toggle, boolean>): number {
 }
 
 export function PasswordPage() {
+  const { t } = useTranslation()
   const [length, setLength] = useState(20)
   const [classes, setClasses] = useState<Record<Toggle, boolean>>({
     lower: true,
@@ -53,22 +55,29 @@ export function PasswordPage() {
   }, [length, classes, nonce])
 
   const bits = useMemo(() => entropyBits(length, classes), [length, classes])
-  const strength = bits >= 80 ? '极强' : bits >= 60 ? '强' : bits >= 40 ? '中等' : bits > 0 ? '弱' : '空'
+  const strength =
+    bits >= 80
+      ? t('pages.password.strengthVeryStrong')
+      : bits >= 60
+        ? t('pages.password.strengthStrong')
+        : bits >= 40
+          ? t('pages.password.strengthMedium')
+          : bits > 0
+            ? t('pages.password.strengthWeak')
+            : t('pages.password.strengthNone')
 
   const handleCopy = async () => {
     if (!value) return
     await navigator.clipboard.writeText(value)
-    toast.success('已复制')
+    toast.success(t('common.copied'))
   }
   const regenerate = () => setNonce((n) => n + 1)
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Password</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          基于 <code className="font-mono">crypto.getRandomValues</code> 的密码生成器（CSPRNG，无模偏置）。
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.password.name')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('pages.password.description')}</p>
       </header>
 
       <div className="mb-3 flex items-center gap-3">
@@ -80,7 +89,7 @@ export function PasswordPage() {
         />
         <Button size="sm" onClick={regenerate}>
           <RefreshCw className="h-4 w-4" />
-          重新生成
+          {t('common.regenerate')}
         </Button>
         <Button size="sm" variant="ghost" onClick={handleCopy} disabled={!value}>
           <Copy className="h-4 w-4" />
@@ -88,12 +97,14 @@ export function PasswordPage() {
       </div>
 
       <div className="mb-4 text-xs text-muted-foreground">
-        熵 ≈ <code className="font-mono">{bits.toFixed(1)} bits</code> · 强度: {strength}
+        {t('pages.password.entropy')}{' '}
+        <code className="font-mono">{bits.toFixed(1)} bits</code> · {t('pages.password.strength')}{' '}
+        {strength}
       </div>
 
       <div className="mb-4 flex items-center gap-3">
         <Label htmlFor="length" className="w-12 shrink-0 text-xs text-muted-foreground">
-          长度
+          {t('pages.password.length')}
         </Label>
         <input
           id="length"

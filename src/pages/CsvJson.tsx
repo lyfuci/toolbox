@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeftRight, Copy, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -32,6 +33,7 @@ function transform(input: string, mode: Mode): string {
 }
 
 export function CsvJsonPage() {
+  const { t } = useTranslation()
   const [mode, setMode] = useState<Mode>('csv2json')
   const [input, setInput] = useState(SAMPLE_CSV)
 
@@ -49,7 +51,7 @@ export function CsvJsonPage() {
   const handleCopy = async () => {
     if (!canCopy) return
     await navigator.clipboard.writeText(outputValue)
-    toast.success('已复制')
+    toast.success(t('common.copied'))
   }
 
   const handleSwap = () => {
@@ -65,24 +67,24 @@ export function CsvJsonPage() {
     setInput(next === 'csv2json' ? SAMPLE_CSV : SAMPLE_JSON)
   }
 
-  const inputLabel = mode === 'csv2json' ? 'CSV' : 'JSON (array of objects)'
-  const outputLabel = mode === 'csv2json' ? 'JSON' : 'CSV'
+  const inputLabel =
+    mode === 'csv2json' ? t('pages.csvJson.csvLabel') : t('pages.csvJson.jsonArrayLabel')
+  const outputLabel =
+    mode === 'csv2json' ? t('pages.csvJson.jsonLabel') : t('pages.csvJson.csvLabel')
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">CSV ↔ JSON</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          CSV 与 JSON 互转。CSV 第一行作为字段名；JSON 须为对象数组。支持引号字段、字段内逗号 / 换行 / 转义引号。
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.csv-json.name')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('pages.csvJson.description')}</p>
       </header>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="flex rounded-md border border-input bg-transparent text-sm">
           {(
             [
-              ['csv2json', 'CSV → JSON'],
-              ['json2csv', 'JSON → CSV'],
+              ['csv2json', t('pages.csvJson.csvToJson')],
+              ['json2csv', t('pages.csvJson.jsonToCsv')],
             ] as [Mode, string][]
           ).map(([m, label]) => (
             <button
@@ -101,11 +103,11 @@ export function CsvJsonPage() {
         </div>
         <Button size="sm" variant="ghost" onClick={handleSwap}>
           <ArrowLeftRight className="h-4 w-4" />
-          交换
+          {t('common.swap')}
         </Button>
         <Button size="sm" variant="ghost" onClick={handleClear}>
           <Trash2 className="h-4 w-4" />
-          清空
+          {t('common.clear')}
         </Button>
       </div>
 
@@ -124,7 +126,7 @@ export function CsvJsonPage() {
             <Label className="text-xs text-muted-foreground">{outputLabel}</Label>
             <Button size="sm" variant="ghost" onClick={handleCopy} disabled={!canCopy}>
               <Copy className="h-3.5 w-3.5" />
-              复制
+              {t('common.copy')}
             </Button>
           </div>
           <Textarea

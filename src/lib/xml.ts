@@ -10,7 +10,7 @@ export function formatXml(xml: string, indent = 2): string {
   const doc = parser.parseFromString(xml, 'application/xml')
   const errEl = doc.querySelector('parsererror')
   if (errEl) {
-    throw new Error(errEl.textContent?.trim() || 'XML 解析失败')
+    throw new Error(errEl.textContent?.trim() || 'XML parse failed')
   }
   return serialize(doc.documentElement, 0, indent).trimEnd()
 }
@@ -20,7 +20,7 @@ export function minifyXml(xml: string): string {
   const doc = parser.parseFromString(xml, 'application/xml')
   const errEl = doc.querySelector('parsererror')
   if (errEl) {
-    throw new Error(errEl.textContent?.trim() || 'XML 解析失败')
+    throw new Error(errEl.textContent?.trim() || 'XML parse failed')
   }
   return new XMLSerializer().serializeToString(doc).replace(/>\s+</g, '><').trim()
 }

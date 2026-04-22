@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
+import { useTranslation } from 'react-i18next'
 import { Search } from 'lucide-react'
 import {
   CommandDialog,
@@ -27,12 +28,13 @@ function usePalette() {
 
 /**
  * Owns the single dialog instance + the global cmd/ctrl+K listener.
- * Triggers ({@link SearchTrigger}, {@link HeroSearchTrigger}) just dispatch
- * setOpen via context so we never end up with two dialogs mounted at once.
+ * Triggers just dispatch setOpen via context so we never end up with two
+ * dialogs mounted at once.
  */
 export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -51,35 +53,40 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
       <CommandDialog
         open={open}
         onOpenChange={setOpen}
-        title="搜索工具"
-        description="按工具名或描述搜索"
+        title={t('palette.title')}
+        description={t('palette.description')}
       >
-        <CommandInput placeholder="搜索工具..." />
+        <CommandInput placeholder={t('palette.placeholder')} />
         <CommandList>
-          <CommandEmpty>没有匹配的工具</CommandEmpty>
-          {toolsByCategory().map((cat) => (
-            <CommandGroup key={cat.slug} heading={cat.name}>
-              {cat.tools.map((tool) => {
-                const Icon = tool.icon
-                return (
-                  <CommandItem
-                    key={tool.slug}
-                    value={`${tool.name} ${tool.description} ${cat.name}`}
-                    onSelect={() => {
-                      navigate(tool.path)
-                      setOpen(false)
-                    }}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="font-medium">{tool.name}</span>
-                    <span className="ml-2 truncate text-xs text-muted-foreground">
-                      {tool.description}
-                    </span>
-                  </CommandItem>
-                )
-              })}
-            </CommandGroup>
-          ))}
+          <CommandEmpty>{t('palette.empty')}</CommandEmpty>
+          {toolsByCategory().map((cat) => {
+            const catName = t(`categories.${cat.slug}.name`)
+            return (
+              <CommandGroup key={cat.slug} heading={catName}>
+                {cat.tools.map((tool) => {
+                  const Icon = tool.icon
+                  const toolName = t(`tools.${tool.slug}.name`)
+                  const toolDesc = t(`tools.${tool.slug}.description`)
+                  return (
+                    <CommandItem
+                      key={tool.slug}
+                      value={`${toolName} ${toolDesc} ${catName}`}
+                      onSelect={() => {
+                        navigate(tool.path)
+                        setOpen(false)
+                      }}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span className="font-medium">{toolName}</span>
+                      <span className="ml-2 truncate text-xs text-muted-foreground">
+                        {toolDesc}
+                      </span>
+                    </CommandItem>
+                  )
+                })}
+              </CommandGroup>
+            )
+          })}
         </CommandList>
       </CommandDialog>
     </PaletteContext.Provider>
@@ -88,6 +95,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
 
 export function SearchTrigger({ className }: { className?: string }) {
   const { setOpen } = usePalette()
+  const { t } = useTranslation()
   return (
     <Button
       variant="outline"
@@ -98,11 +106,10 @@ export function SearchTrigger({ className }: { className?: string }) {
       )}
     >
       <Search className="h-4 w-4" />
-      <span className="flex-1 text-left">搜索工具...</span>
+      <span className="flex-1 text-left">{t('topbar.searchPlaceholder')}</span>
       <kbd className="pointer-events-none hidden select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] text-muted-foreground sm:inline-flex">
         ⌘K
       </kbd>
     </Button>
   )
 }
-

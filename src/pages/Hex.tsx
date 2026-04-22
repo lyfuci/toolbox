@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { EncodeDecode } from '@/components/EncodeDecode'
 
 const SAMPLE = 'Hello 工具箱'
@@ -11,8 +12,8 @@ function hexToBytes(input: string): Uint8Array {
   // Tolerate the common visual separators users paste in.
   const clean = input.replace(/[\s:,\-_]+/g, '').toLowerCase()
   if (clean.length === 0) return new Uint8Array(0)
-  if (clean.length % 2 !== 0) throw new Error('hex 字符数不是偶数')
-  if (!/^[0-9a-f]*$/.test(clean)) throw new Error('包含非 hex 字符')
+  if (clean.length % 2 !== 0) throw new Error('hex string must have an even number of characters')
+  if (!/^[0-9a-f]*$/.test(clean)) throw new Error('contains non-hex characters')
   const bytes = new Uint8Array(clean.length / 2)
   for (let i = 0; i < bytes.length; i++) {
     bytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16)
@@ -21,6 +22,7 @@ function hexToBytes(input: string): Uint8Array {
 }
 
 export function HexPage() {
+  const { t } = useTranslation()
   const [withSpace, setWithSpace] = useState(false)
 
   const encode = useCallback(
@@ -34,8 +36,8 @@ export function HexPage() {
 
   return (
     <EncodeDecode
-      title="Hex"
-      description="文本 ↔ 十六进制字节（UTF-8）。解码时自动忽略空格 / 冒号 / 逗号 / 短横 / 下划线分隔。"
+      title={t('tools.hex.name')}
+      description={t('pages.hex.description')}
       encode={encode}
       decode={decode}
       sample={SAMPLE}
@@ -47,7 +49,7 @@ export function HexPage() {
             onChange={(e) => setWithSpace(e.target.checked)}
             className="accent-primary"
           />
-          编码时按字节加空格
+          {t('pages.hex.withSpace')}
         </label>
       }
     />

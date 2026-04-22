@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Copy, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,6 +12,7 @@ function genMany(count: number): string[] {
 }
 
 export function UuidPage() {
+  const { t } = useTranslation()
   const [count, setCount] = useState(5)
   // Bumping nonce reroles the values without writing into state from an effect.
   const [nonce, setNonce] = useState(0)
@@ -23,25 +25,23 @@ export function UuidPage() {
 
   const handleCopyOne = async (uuid: string) => {
     await navigator.clipboard.writeText(uuid)
-    toast.success('已复制')
+    toast.success(t('common.copied'))
   }
   const handleCopyAll = async () => {
     await navigator.clipboard.writeText(values.join('\n'))
-    toast.success(`已复制 ${values.length} 条`)
+    toast.success(t('pages.uuid.copiedMany', { count: values.length }))
   }
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">UUID</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          生成 UUID v4（基于 <code className="font-mono">crypto.randomUUID()</code>，浏览器原生）。
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.uuid.name')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('pages.uuid.description')}</p>
       </header>
 
       <div className="mb-4 flex items-center gap-3">
         <Label htmlFor="count" className="text-xs text-muted-foreground">
-          数量
+          {t('pages.uuid.count')}
         </Label>
         <Input
           id="count"
@@ -57,11 +57,11 @@ export function UuidPage() {
         />
         <Button size="sm" onClick={regenerate}>
           <RefreshCw className="h-4 w-4" />
-          重新生成
+          {t('common.regenerate')}
         </Button>
         <Button size="sm" variant="ghost" onClick={handleCopyAll}>
           <Copy className="h-4 w-4" />
-          全部复制
+          {t('common.copyAll')}
         </Button>
       </div>
 

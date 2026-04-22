@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { EncodeDecode } from '@/components/EncodeDecode'
 
 const SAMPLE = 'https://example.com/path?key=值 1&hello=世界'
@@ -11,6 +12,7 @@ const VARIANT_LABELS: Record<Variant, string> = {
 }
 
 export function UrlPage() {
+  const { t } = useTranslation()
   const [variant, setVariant] = useState<Variant>('component')
 
   const encode = useCallback(
@@ -24,8 +26,8 @@ export function UrlPage() {
 
   return (
     <EncodeDecode
-      title="URL"
-      description="URL 编解码。Component 模式（encodeURIComponent）转义所有保留字；URI 模式（encodeURI）保留 :/?&#= 等结构字符。"
+      title={t('tools.url.name')}
+      description={t('pages.url.description')}
       encode={encode}
       decode={decode}
       sample={SAMPLE}

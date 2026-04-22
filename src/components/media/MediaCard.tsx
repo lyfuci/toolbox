@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { X, Scissors, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -23,6 +24,7 @@ export function MediaCard({
   onUpdate: (patch: Partial<MediaItem>) => void
   onRemove: () => void
 }) {
+  const { t } = useTranslation()
   const ref = useRef<HTMLVideoElement | HTMLAudioElement>(null)
   const [currentTime, setCurrentTime] = useState(0)
 
@@ -122,7 +124,7 @@ export function MediaCard({
         </Button>
         <Button size="sm" variant="ghost" onClick={reset} className="ml-auto">
           <RotateCcw className="h-3 w-3" />
-          重置
+          {t('media.cardReset')}
         </Button>
       </div>
     </Card>
