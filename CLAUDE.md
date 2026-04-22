@@ -7,7 +7,7 @@ this repository.
 
 Personal frontend toolset, **pure client-side, no backend, no API calls to
 external services without explicit user trigger**. Hosted at
-`https://toolbox.seansun.xyz`. Source at `github.com/lyfuci/toolbox`.
+`https://toolbox.seansun.net`. Source at `github.com/lyfuci/toolbox`.
 
 Tools live under `src/pages/` and are registered in `src/lib/tools.ts` — that
 single file drives both the sidebar nav and the home page card grid.

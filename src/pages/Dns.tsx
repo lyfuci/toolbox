@@ -45,7 +45,7 @@ async function lookup(name: string, type: RecordType): Promise<DohResp> {
 
 export function DnsPage() {
   const { t } = useTranslation()
-  const [name, setName] = useState('toolbox.seansun.xyz')
+  const [name, setName] = useState('toolbox.seansun.net')
   const [type, setType] = useState<RecordType>('A')
   const [data, setData] = useState<DohResp | null>(null)
   const [error, setError] = useState<string | null>(null)
