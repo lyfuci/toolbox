@@ -2,7 +2,7 @@
 
 A small set of personal frontend tools — everything runs in the browser, no backend.
 
-Live: <https://toolbox.seansun.xyz>
+Live: <https://toolbox.seansun.net>
 
 ## Tools
 

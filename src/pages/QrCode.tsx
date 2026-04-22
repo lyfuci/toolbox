@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 
-const SAMPLE = 'https://toolbox.seansun.xyz'
+const SAMPLE = 'https://toolbox.seansun.net'
 
 const ERROR_LEVELS = ['L', 'M', 'Q', 'H'] as const satisfies readonly QRCodeErrorCorrectionLevel[]
 type ShortLevel = (typeof ERROR_LEVELS)[number]
