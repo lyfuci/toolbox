@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from 'react-router'
+import { useEffect } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { MessageSquarePlus, Wrench } from 'lucide-react'
 import { toolsByCategory } from '@/lib/tools'
@@ -11,6 +12,16 @@ import { LanguageToggle } from '@/components/LanguageToggle'
 export function Layout() {
   useGAPageview()
   const { t } = useTranslation()
+  const location = useLocation()
+
+  // The actual scroll container is the document/window: outer is `min-h-svh`
+  // so <main>'s `overflow-auto` never engages and content scrolls the page.
+  // Without this effect, navigating between tools after scrolling drops the
+  // user mid-page. `behavior: 'auto'` (no smooth) — entering a new page
+  // should feel like a jump, not an animated slide.
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [location.pathname])
 
   const groups = toolsByCategory()
 
