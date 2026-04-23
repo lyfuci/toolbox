@@ -47,6 +47,9 @@ export type Adjustments = {
   saturation: number
   grayscale: number // %
   blur: number // px
+  hue: number // degrees, 0 = identity, range -180..180
+  sepia: number // %, 0 = identity
+  invert: number // %, 0 = identity
 }
 
 export type Point = { x: number; y: number }
