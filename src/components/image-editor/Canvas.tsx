@@ -45,6 +45,8 @@ type Props = {
   onCommitLayer: (layer: Layer) => void
   /** Replace an existing layer in-place (move/resize commit). */
   onCommitLayerUpdate: (id: string, layer: Layer) => void
+  /** When true (Space held), Canvas suppresses its mouse logic so Workspace can pan. */
+  panMode: boolean
 }
 
 type Interaction =
@@ -76,6 +78,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     onSelect,
     onCommitLayer,
     onCommitLayerUpdate,
+    panMode,
   },
   ref,
 ) {
@@ -162,6 +165,9 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
   }
 
   const handleMouseDown = (e: ReactMouseEvent<HTMLCanvasElement>) => {
+    // Pan mode: yield to Workspace's drag handler.
+    if (panMode) return
+
     const p = eventToCanvasXY(e)
 
     // Drawing tools take priority over selection.
@@ -366,6 +372,11 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
   // Cheap (one state set per move while idle).
   const handleHover = (e: ReactMouseEvent<HTMLCanvasElement>) => {
     if (interaction.kind !== 'idle') return
+    if (panMode) {
+      // Workspace owns the cursor in pan mode (grab/grabbing).
+      setHoverCursor('inherit')
+      return
+    }
     if (tool !== 'none') {
       setHoverCursor('crosshair')
       return

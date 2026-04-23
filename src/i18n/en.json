@@ -464,6 +464,8 @@
       "noLayerSelected": "No layer selected",
       "focusEnterHint": "Enter focus mode (F) — hides the toolbox chrome and gives the canvas the full viewport",
       "focusExitHint": "Exit focus mode (F or Esc)",
+      "currentTool": "Tool",
+      "zoomFit": "Fit (Cmd/Ctrl+0)",
       "style": "Style",
       "color": "Color",
       "strokeWidth": "Stroke width",

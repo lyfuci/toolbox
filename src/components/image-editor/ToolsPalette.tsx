@@ -12,14 +12,14 @@ import {
 } from 'lucide-react'
 import type { Tool } from '@/lib/image-editor/types'
 
-const TOOLS: { tool: Tool; icon: ReactNode; labelKey: string }[] = [
-  { tool: 'none', icon: <MousePointer2 className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.none' },
-  { tool: 'rect', icon: <Square className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.rect' },
-  { tool: 'arrow', icon: <ArrowRight className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.arrow' },
-  { tool: 'text', icon: <Type className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.text' },
+const TOOLS: { tool: Tool; icon: ReactNode; labelKey: string; key?: string }[] = [
+  { tool: 'none', icon: <MousePointer2 className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.none', key: 'V' },
+  { tool: 'rect', icon: <Square className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.rect', key: 'M' },
+  { tool: 'arrow', icon: <ArrowRight className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.arrow', key: 'A' },
+  { tool: 'text', icon: <Type className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.text', key: 'T' },
   { tool: 'mosaic', icon: <Squircle className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.mosaic' },
-  { tool: 'brush', icon: <Brush className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.brush' },
-  { tool: 'eraser', icon: <Eraser className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.eraser' },
+  { tool: 'brush', icon: <Brush className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.brush', key: 'B' },
+  { tool: 'eraser', icon: <Eraser className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.eraser', key: 'E' },
   { tool: 'mask', icon: <Crop className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.mask' },
 ]
 
@@ -48,14 +48,14 @@ export function ToolsPalette({
   const { t } = useTranslation()
   return (
     <div className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-border bg-card/40 py-3">
-      {TOOLS.map(({ tool: tToolKey, icon, labelKey }) => {
+      {TOOLS.map(({ tool: tToolKey, icon, labelKey, key }) => {
         const active = tool === tToolKey
         return (
           <button
             key={tToolKey}
             type="button"
             onClick={() => setTool(active ? 'none' : tToolKey)}
-            title={t(labelKey)}
+            title={key ? `${t(labelKey)} (${key})` : t(labelKey)}
             className={`flex h-9 w-9 items-center justify-center rounded transition-colors ${
               active
                 ? 'bg-accent text-accent-foreground'
