@@ -179,6 +179,10 @@
     "media": {
       "name": "Media",
       "description": "剪辑、拼接、提取音轨、格式转换（ffmpeg.wasm，本地处理）"
+    },
+    "image-editor": {
+      "name": "图片编辑",
+      "description": "裁剪 / 旋转 / 滤镜 / 标注，可保存项目文件继续编辑"
     }
   },
   "pages": {
@@ -420,6 +424,79 @@
       "noAnswers": "no answers",
       "noDirect": "No direct answer; authority: {{authority}}",
       "empty": "填入域名 + 选择记录类型，点击 <1>查询</1>"
+    },
+    "imageEditor": {
+      "description": "本地图片编辑——图层、蒙版、笔刷/橡皮、调色、标注、撤销/重做。可保存 .json 项目文件下次继续编辑。",
+      "dropTitle": "拖入图片（PNG / JPEG / WebP / GIF），或点击选择",
+      "dropSub": "所有处理都在浏览器本地完成，不会上传。也可以拖入之前保存的 .json 项目文件继续编辑。",
+      "replaceImage": "更换图片",
+      "fullscreen": "全屏",
+      "exitFullscreen": "退出全屏",
+      "undo": "撤销",
+      "redo": "重做",
+      "tabAdjust": "调整",
+      "tabAnnotate": "标注",
+      "tabOutput": "导出",
+      "transform": "变换",
+      "rotate90": "旋转 90°",
+      "flipH": "水平翻转",
+      "flipV": "垂直翻转",
+      "reset": "重置",
+      "filter": "滤镜",
+      "brightness": "亮度",
+      "contrast": "对比度",
+      "saturation": "饱和度",
+      "grayscale": "灰度",
+      "blur": "模糊 (px)",
+      "tool": {
+        "title": "工具",
+        "rect": "矩形",
+        "arrow": "箭头",
+        "text": "文字",
+        "mosaic": "马赛克",
+        "brush": "笔刷",
+        "eraser": "橡皮",
+        "mask": "蒙版"
+      },
+      "toolHint": "绘制：{{tool}} — 在画布上拖拽；再次点击同一工具可取消选择",
+      "style": "样式",
+      "color": "颜色",
+      "strokeWidth": "线宽",
+      "format": "格式",
+      "quality": "质量",
+      "layers": "图层",
+      "layerImage": "图片（背景）",
+      "layerProps": "图层属性",
+      "opacity": "不透明度",
+      "blend": "混合模式",
+      "blendMode": {
+        "normal": "正常",
+        "multiply": "正片叠底",
+        "screen": "滤色",
+        "overlay": "叠加",
+        "darken": "变暗",
+        "lighten": "变亮"
+      },
+      "annoLabel": {
+        "rect": "矩形",
+        "arrow": "箭头",
+        "text": "文字 \"{{text}}\"",
+        "mosaic": "马赛克",
+        "brush": "笔刷",
+        "eraser": "橡皮",
+        "mask": "蒙版"
+      },
+      "project": "项目",
+      "projectSave": "保存项目 (.json)",
+      "projectLoad": "加载项目 (.json)",
+      "projectSaved": "项目已保存",
+      "projectLoaded": "项目已加载",
+      "projectInvalid": "不是有效的项目文件",
+      "textPrompt": "标注文字",
+      "errNotImage": "不是图片文件",
+      "errLoadFailed": "图片加载失败",
+      "errExport": "导出失败",
+      "downloaded": "已下载 {{format}}"
     },
     "cidr": {
       "description": "IPv4 子网计算：网络 / 广播 / 掩码 / 可用范围 / 主机数。",

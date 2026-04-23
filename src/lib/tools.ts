@@ -13,6 +13,7 @@ import {
   Film,
   Globe,
   Hash,
+  Image as ImageIcon,
   KeyRound,
   Link2,
   ListOrdered,
@@ -78,6 +79,7 @@ export const tools: Tool[] = [
   { slug: 'ip-info', path: '/ip-info', icon: Globe, category: 'network' },
   { slug: 'dns', path: '/dns', icon: Network, category: 'network' },
   { slug: 'cidr', path: '/cidr', icon: Network, category: 'network' },
+  { slug: 'image-editor', path: '/image-editor', icon: ImageIcon, category: 'media' },
   { slug: 'media', path: '/media', icon: Film, category: 'media' },
 ]
 

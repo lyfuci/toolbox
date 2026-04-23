@@ -179,6 +179,10 @@
     "media": {
       "name": "Media",
       "description": "Clip, concat, extract audio, convert (ffmpeg.wasm, local)"
+    },
+    "image-editor": {
+      "name": "Image Editor",
+      "description": "Crop / rotate / filter / annotate, with project save/reload"
     }
   },
   "pages": {
@@ -420,6 +424,79 @@
       "noAnswers": "no answers",
       "noDirect": "No direct answer; authority: {{authority}}",
       "empty": "Enter a domain + record type, then click <1>Lookup</1>"
+    },
+    "imageEditor": {
+      "description": "Local image editor — layers, masks, brush/eraser, adjustments, annotations, undo/redo. Save a project file (.json) to resume editing later.",
+      "dropTitle": "Drop an image (PNG / JPEG / WebP / GIF), or click to pick",
+      "dropSub": "All processing runs in your browser; nothing is uploaded. You can also drop a previously-saved .json project to resume.",
+      "replaceImage": "Replace image",
+      "fullscreen": "Fullscreen",
+      "exitFullscreen": "Exit fullscreen",
+      "undo": "Undo",
+      "redo": "Redo",
+      "tabAdjust": "Adjust",
+      "tabAnnotate": "Annotate",
+      "tabOutput": "Output",
+      "transform": "Transform",
+      "rotate90": "Rotate 90°",
+      "flipH": "Flip H",
+      "flipV": "Flip V",
+      "reset": "Reset",
+      "filter": "Filter",
+      "brightness": "Brightness",
+      "contrast": "Contrast",
+      "saturation": "Saturation",
+      "grayscale": "Grayscale",
+      "blur": "Blur (px)",
+      "tool": {
+        "title": "Tool",
+        "rect": "Rectangle",
+        "arrow": "Arrow",
+        "text": "Text",
+        "mosaic": "Mosaic",
+        "brush": "Brush",
+        "eraser": "Eraser",
+        "mask": "Mask"
+      },
+      "toolHint": "Drawing: {{tool}} — drag on the canvas; click the same tool again to deselect",
+      "style": "Style",
+      "color": "Color",
+      "strokeWidth": "Stroke width",
+      "format": "Format",
+      "quality": "Quality",
+      "layers": "Layers",
+      "layerImage": "Image (background)",
+      "layerProps": "Layer properties",
+      "opacity": "Opacity",
+      "blend": "Blend",
+      "blendMode": {
+        "normal": "Normal",
+        "multiply": "Multiply",
+        "screen": "Screen",
+        "overlay": "Overlay",
+        "darken": "Darken",
+        "lighten": "Lighten"
+      },
+      "annoLabel": {
+        "rect": "Rectangle",
+        "arrow": "Arrow",
+        "text": "Text \"{{text}}\"",
+        "mosaic": "Mosaic",
+        "brush": "Brush stroke",
+        "eraser": "Eraser stroke",
+        "mask": "Mask"
+      },
+      "project": "Project",
+      "projectSave": "Save project (.json)",
+      "projectLoad": "Load project (.json)",
+      "projectSaved": "Project saved",
+      "projectLoaded": "Project loaded",
+      "projectInvalid": "Not a valid project file",
+      "textPrompt": "Annotation text",
+      "errNotImage": "Not an image file",
+      "errLoadFailed": "Failed to load image",
+      "errExport": "Export failed",
+      "downloaded": "Downloaded {{format}}"
     },
     "cidr": {
       "description": "IPv4 subnet math: network / broadcast / mask / usable range / host count.",
