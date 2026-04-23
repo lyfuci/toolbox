@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { Canvas, type CanvasHandle } from '@/components/image-editor/Canvas'
 import { DropZone } from '@/components/image-editor/DropZone'
 import { RightSidebar } from '@/components/image-editor/RightSidebar'
+import { StatusBar } from '@/components/image-editor/StatusBar'
 import { ToolsPalette } from '@/components/image-editor/ToolsPalette'
 import { TopActionBar } from '@/components/image-editor/TopActionBar'
 import { Workspace } from '@/components/image-editor/Workspace'
@@ -44,23 +45,108 @@ export function ImageEditorPage() {
   const [focused, setFocused] = useState(false)
   const canvasRef = useRef<CanvasHandle | null>(null)
 
-  // ── Keyboard: F to toggle focus, Esc to exit ─────────────────────────────
+  // Zoom + pan + Space-held pan mode.
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [panMode, setPanMode] = useState(false)
+
+  const ZOOM_MIN = 0.1
+  const ZOOM_MAX = 8
+  const ZOOM_STEP = 1.25
+  const clampZoom = (z: number) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z))
+  const zoomIn = useCallback(() => setZoom((z) => clampZoom(z * ZOOM_STEP)), [])
+  const zoomOut = useCallback(() => setZoom((z) => clampZoom(z / ZOOM_STEP)), [])
+  const zoomReset = useCallback(() => {
+    setZoom(1)
+    setPan({ x: 0, y: 0 })
+  }, [])
+
+  // ── Global keyboard shortcuts ────────────────────────────────────────────
+  // F = focus toggle / Esc exit (existing).
+  // Space-hold = pan tool override.
+  // Z / Shift+Z / Cmd+/-/0/1 = zoom.
+  // V / M / T / B / E / A = tool shortcuts (PS conventions).
+  // (Cmd+Z / Cmd+Shift+Z handled in useHistoryState.)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      // Don't steal keys typed into form fields.
+    const onKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+
+      // Space → pan mode (no modifiers).
+      if (e.code === 'Space' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+        e.preventDefault()
+        setPanMode(true)
+        return
+      }
+
+      // Cmd/Ctrl combos.
+      const mod = e.metaKey || e.ctrlKey
+      if (mod) {
+        if (e.key === '+' || e.key === '=') {
+          e.preventDefault()
+          zoomIn()
+          return
+        }
+        if (e.key === '-' || e.key === '_') {
+          e.preventDefault()
+          zoomOut()
+          return
+        }
+        if (e.key === '0') {
+          e.preventDefault()
+          zoomReset()
+          return
+        }
+        if (e.key === '1') {
+          e.preventDefault()
+          setZoom(1)
+          setPan({ x: 0, y: 0 })
+          return
+        }
+        return
+      }
+
+      // No-modifier letter shortcuts.
       if (e.key === 'f' || e.key === 'F') {
         e.preventDefault()
         setFocused((v) => !v)
-      } else if (e.key === 'Escape' && focused) {
+        return
+      }
+      if (e.key === 'Escape' && focused) {
         e.preventDefault()
         setFocused(false)
+        return
+      }
+      if (e.key === 'z') {
+        e.preventDefault()
+        zoomIn()
+        return
+      }
+      if (e.key === 'Z') {
+        e.preventDefault()
+        zoomOut()
+        return
+      }
+      // Tool shortcuts (lowercase only, PS-style).
+      if (e.key === 'v') { e.preventDefault(); setTool('none'); return }
+      if (e.key === 'm') { e.preventDefault(); setTool('rect'); return }
+      if (e.key === 'a') { e.preventDefault(); setTool('arrow'); return }
+      if (e.key === 't') { e.preventDefault(); setTool('text'); return }
+      if (e.key === 'b') { e.preventDefault(); setTool('brush'); return }
+      if (e.key === 'e') { e.preventDefault(); setTool('eraser'); return }
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setPanMode(false)
       }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [focused])
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+    }
+  }, [focused, zoomIn, zoomOut, zoomReset])
 
   // ── State helpers ────────────────────────────────────────────────────────
   const setLayers = useCallback(
@@ -236,7 +322,7 @@ export function ImageEditorPage() {
           setStrokeWidth={setStrokeWidth}
         />
 
-        <Workspace>
+        <Workspace zoom={zoom} pan={pan} setPan={setPan} panMode={panMode}>
           <Canvas
             ref={canvasRef}
             image={image}
@@ -248,6 +334,7 @@ export function ImageEditorPage() {
             onSelect={setSelectedLayerId}
             onCommitLayer={commitLayer}
             onCommitLayerUpdate={commitLayerUpdate}
+            panMode={panMode}
           />
         </Workspace>
 
@@ -263,6 +350,16 @@ export function ImageEditorPage() {
           setAdjust={(adjust) => history.set({ ...state, adjust })}
         />
       </div>
+
+      <StatusBar
+        width={image.naturalWidth}
+        height={image.naturalHeight}
+        zoom={zoom}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        onZoomReset={zoomReset}
+        tool={panMode ? 'none' : tool}
+      />
     </div>
   )
 }
