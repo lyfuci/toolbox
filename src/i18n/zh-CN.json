@@ -459,8 +459,15 @@
         "eraser": "橡皮",
         "mask": "蒙版",
         "eyedropper": "吸管",
-        "zoom": "缩放"
+        "zoom": "缩放",
+        "crop": "裁剪"
       },
+      "cropApply": "应用裁剪",
+      "cropCancel": "取消",
+      "cropClear": "清除裁剪",
+      "cropPendingHint": "按 Enter 应用，Esc 取消",
+      "cropApplied": "已应用裁剪",
+      "cropCleared": "已清除裁剪",
       "colors": "前景色 / 背景色",
       "fgColor": "前景色",
       "bgColor": "背景色",
