@@ -1,5 +1,6 @@
 import { drawShape } from './drawing'
 import { filterString } from './filters'
+import { getHandles, getLayerBBox, normalizeRect } from './hit'
 import type {
   BlendMode,
   EditorState,
@@ -23,6 +24,11 @@ export type RenderInput = {
   previewScale: number
   /** Optional in-progress shape drawn on top of all committed layers. */
   drawingPreview?: { layer: Layer }
+  /**
+   * If set, draw selection chrome (dashed bbox + handles) for this layer
+   * after all rendering is done. Live preview only — never set during export.
+   */
+  selection?: { layer: Layer }
 }
 
 export function dimsAfterRotation(
@@ -119,6 +125,49 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
       applyMask(ctx, layer, annoScale, w, h)
     }
   }
+
+  // Selection chrome — drawn last so it sits above all content. Skipped for
+  // export renders (caller doesn't pass `selection`).
+  if (input.selection) {
+    drawSelectionChrome(ctx, input.selection.layer, annoScale)
+  }
+}
+
+/**
+ * Draw a dashed bbox + handle markers for the selected layer.
+ * Coordinates are in preview-canvas pixel space, scaled to target via `scale`.
+ */
+function drawSelectionChrome(
+  ctx: CanvasRenderingContext2D,
+  layer: Layer,
+  scale: number,
+) {
+  const bbox = getLayerBBox(layer)
+  if (!bbox) return
+  const r = normalizeRect(bbox)
+
+  // Dashed outline. Dashes scale with `scale` so they look the same in preview vs export.
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.strokeStyle = 'oklch(0.7 0.18 250)'
+  ctx.lineWidth = Math.max(1, scale)
+  ctx.setLineDash([6 * scale, 4 * scale])
+  ctx.strokeRect(r.x * scale, r.y * scale, r.w * scale, r.h * scale)
+  ctx.setLineDash([])
+
+  // Handles
+  const handles = getHandles(layer)
+  const size = 8 * scale
+  for (const h of handles) {
+    const hx = h.x * scale - size / 2
+    const hy = h.y * scale - size / 2
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(hx, hy, size, size)
+    ctx.strokeStyle = 'oklch(0.55 0.20 250)'
+    ctx.lineWidth = Math.max(1, scale)
+    ctx.strokeRect(hx, hy, size, size)
+  }
+  ctx.restore()
 }
 
 function blendModeToOp(b: BlendMode): GlobalCompositeOperation {

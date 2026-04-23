@@ -93,6 +93,15 @@ export function ImageEditorPage() {
       history.set({ ...state, imageLayer: { ...state.imageLayer, ...patch } }),
     [history, state],
   )
+  // Replace a layer's full data — used by Canvas after a move/resize commits.
+  const commitLayerUpdate = useCallback(
+    (id: string, layer: Layer) =>
+      history.set({
+        ...state,
+        layers: state.layers.map((l) => (l.id === id ? layer : l)),
+      }),
+    [history, state],
+  )
 
   // ── File handling ────────────────────────────────────────────────────────
   const acceptFile = useCallback(
@@ -235,7 +244,10 @@ export function ImageEditorPage() {
             tool={tool}
             toolColor={color}
             toolStrokeWidth={strokeWidth}
+            selectedId={selectedLayerId}
+            onSelect={setSelectedLayerId}
             onCommitLayer={commitLayer}
+            onCommitLayerUpdate={commitLayerUpdate}
           />
         </Workspace>
 
