@@ -450,6 +450,7 @@
       "blur": "模糊 (px)",
       "tool": {
         "title": "工具",
+        "none": "选择（无工具）",
         "rect": "矩形",
         "arrow": "箭头",
         "text": "文字",
@@ -459,6 +460,10 @@
         "mask": "蒙版"
       },
       "toolHint": "绘制：{{tool}} — 在画布上拖拽；再次点击同一工具可取消选择",
+      "adjust": "调整",
+      "noLayerSelected": "未选中图层",
+      "focusEnterHint": "进入焦点模式（F）——隐藏工具站界面，画布占满整个视口",
+      "focusExitHint": "退出焦点模式（F 或 Esc）",
       "style": "样式",
       "color": "颜色",
       "strokeWidth": "线宽",
