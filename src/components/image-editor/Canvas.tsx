@@ -155,12 +155,17 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     const c = canvasRef.current
     if (!c) return { x: 0, y: 0 }
     const rect = c.getBoundingClientRect()
+    // canvas.width is the bitmap pixel count; rect.width is the visual size
+    // (post-CSS-transform). The ratio gives bitmap-px-per-CSS-px. Result is in
+    // the canvas's bitmap-pixel coordinate space, which is also the
+    // "preview-canvas pixel" space that shape coords are stored in. Do NOT
+    // divide by previewScale — that was a regression; previewScale converts
+    // SOURCE-image px → preview-canvas px, which is the wrong direction here.
     const sx = c.width / rect.width
     const sy = c.height / rect.height
-    // Shape coords are stored in PREVIEW pixels — convert from CSS px.
     return {
-      x: ((e.clientX - rect.left) * sx) / previewScale,
-      y: ((e.clientY - rect.top) * sy) / previewScale,
+      x: (e.clientX - rect.left) * sx,
+      y: (e.clientY - rect.top) * sy,
     }
   }
 
