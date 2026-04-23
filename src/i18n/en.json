@@ -450,6 +450,7 @@
       "blur": "Blur (px)",
       "tool": {
         "title": "Tool",
+        "none": "Select (no tool)",
         "rect": "Rectangle",
         "arrow": "Arrow",
         "text": "Text",
@@ -459,6 +460,10 @@
         "mask": "Mask"
       },
       "toolHint": "Drawing: {{tool}} — drag on the canvas; click the same tool again to deselect",
+      "adjust": "Adjust",
+      "noLayerSelected": "No layer selected",
+      "focusEnterHint": "Enter focus mode (F) — hides the toolbox chrome and gives the canvas the full viewport",
+      "focusExitHint": "Exit focus mode (F or Esc)",
       "style": "Style",
       "color": "Color",
       "strokeWidth": "Stroke width",

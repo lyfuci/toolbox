@@ -1,16 +1,12 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Redo2, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { AdjustPanel } from '@/components/image-editor/AdjustPanel'
-import { AnnotatePanel } from '@/components/image-editor/AnnotatePanel'
 import { Canvas, type CanvasHandle } from '@/components/image-editor/Canvas'
 import { DropZone } from '@/components/image-editor/DropZone'
-import { FullscreenToggle } from '@/components/image-editor/FullscreenToggle'
-import { LayersPanel } from '@/components/image-editor/LayersPanel'
-import { OutputPanel } from '@/components/image-editor/OutputPanel'
+import { RightSidebar } from '@/components/image-editor/RightSidebar'
+import { ToolsPalette } from '@/components/image-editor/ToolsPalette'
+import { TopActionBar } from '@/components/image-editor/TopActionBar'
+import { Workspace } from '@/components/image-editor/Workspace'
 import { initialState } from '@/lib/image-editor/defaults'
 import { useHistoryState } from '@/lib/image-editor/history'
 import {
@@ -39,27 +35,52 @@ export function ImageEditorPage() {
   const [tool, setTool] = useState<Tool>('none')
   const [color, setColor] = useState('#ef4444')
   const [strokeWidth, setStrokeWidth] = useState(4)
+  const [selectedLayerId, setSelectedLayerId] = useState<string>('image')
 
   const [outFormat, setOutFormat] = useState<OutputFormat>('png')
   const [outQuality, setOutQuality] = useState(92)
 
-  const [fullscreen, setFullscreen] = useState(false)
+  // Focus mode: editor takes over the viewport, hides toolbox chrome.
+  const [focused, setFocused] = useState(false)
   const canvasRef = useRef<CanvasHandle | null>(null)
 
-  // ── State helpers (all go through history) ────────────────────────────────
+  // ── Keyboard: F to toggle focus, Esc to exit ─────────────────────────────
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Don't steal keys typed into form fields.
+      const tag = (e.target as HTMLElement | null)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault()
+        setFocused((v) => !v)
+      } else if (e.key === 'Escape' && focused) {
+        e.preventDefault()
+        setFocused(false)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [focused])
+
+  // ── State helpers ────────────────────────────────────────────────────────
   const setLayers = useCallback(
     (layers: Layer[]) => history.set({ ...state, layers }),
     [history, state],
   )
   const commitLayer = useCallback(
-    (layer: Layer) => history.set({ ...state, layers: [...state.layers, layer] }),
+    (layer: Layer) => {
+      history.set({ ...state, layers: [...state.layers, layer] })
+      setSelectedLayerId(layer.id)
+    },
     [history, state],
   )
   const patchLayer = useCallback(
     (id: string, patch: Partial<Layer>) =>
       history.set({
         ...state,
-        layers: state.layers.map((l) => (l.id === id ? ({ ...l, ...patch } as Layer) : l)),
+        layers: state.layers.map((l) =>
+          l.id === id ? ({ ...l, ...patch } as Layer) : l,
+        ),
       }),
     [history, state],
   )
@@ -73,10 +94,9 @@ export function ImageEditorPage() {
     [history, state],
   )
 
-  // ── File handling ─────────────────────────────────────────────────────────
+  // ── File handling ────────────────────────────────────────────────────────
   const acceptFile = useCallback(
     async (file: File) => {
-      // Project file: restore full editor state.
       if (file.type === 'application/json' || /\.json$/i.test(file.name)) {
         try {
           const text = await file.text()
@@ -85,6 +105,7 @@ export function ImageEditorPage() {
           setImage(img)
           setFilename(project.source.name.replace(/\.[^./]+$/, ''))
           history.reset(project.state)
+          setSelectedLayerId('image')
           toast.success(t('pages.imageEditor.projectLoaded'))
         } catch {
           toast.error(t('pages.imageEditor.projectInvalid'))
@@ -101,6 +122,7 @@ export function ImageEditorPage() {
         setImage(img)
         setFilename(file.name.replace(/\.[^./]+$/, ''))
         history.reset(initialState())
+        setSelectedLayerId('image')
       } catch {
         toast.error(t('pages.imageEditor.errLoadFailed'))
       } finally {
@@ -109,6 +131,9 @@ export function ImageEditorPage() {
     },
     [history, t],
   )
+
+  // Hidden replace-image input triggered from the top action bar.
+  const replaceInputRef = useRef<HTMLInputElement | null>(null)
 
   // ── Download ─────────────────────────────────────────────────────────────
   const handleDownload = async () => {
@@ -138,142 +163,94 @@ export function ImageEditorPage() {
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
-  const containerClass = fullscreen
-    ? 'fixed inset-0 z-50 overflow-auto bg-background px-6 py-6'
-    : 'mx-auto max-w-7xl px-8 py-12'
+  // Focus mode: position:fixed over the entire viewport, hides toolbox chrome.
+  // Embedded mode: lives inside <main>, fills available height (the toolbox
+  // topbar is 3.5rem tall, so we subtract that to get a clean viewport fit).
+  const rootClass = focused
+    ? 'fixed inset-0 z-50 flex h-svh flex-col bg-background'
+    : 'flex h-[calc(100svh-3.5rem)] flex-col'
 
-  return (
-    <div className={containerClass}>
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
+  if (!image) {
+    return (
+      <div className="mx-auto max-w-5xl px-8 py-12">
+        <header className="mb-6">
           <h1 className="text-2xl font-semibold tracking-tight">
             {t('tools.image-editor.name')}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {t('pages.imageEditor.description')}
           </p>
-        </div>
-        {image && (
-          <div className="flex items-center gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={!history.canUndo}
-              onClick={history.undo}
-              title="Cmd/Ctrl+Z"
-            >
-              <Undo2 className="h-4 w-4" />
-              {t('pages.imageEditor.undo')}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={!history.canRedo}
-              onClick={history.redo}
-              title="Cmd/Ctrl+Shift+Z"
-            >
-              <Redo2 className="h-4 w-4" />
-              {t('pages.imageEditor.redo')}
-            </Button>
-            <FullscreenToggle
-              isFullscreen={fullscreen}
-              onToggle={() => setFullscreen((v) => !v)}
-            />
-          </div>
-        )}
-      </header>
-
-      {!image ? (
+        </header>
         <DropZone onFile={acceptFile} />
-      ) : (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
-          {/* LEFT: canvas + layers panel */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>
-                {image.naturalWidth} × {image.naturalHeight}px ·{' '}
-                <button
-                  onClick={() => {
-                    setImage(null)
-                    history.reset(initialState())
-                  }}
-                  className="underline decoration-dotted underline-offset-2 hover:text-foreground"
-                >
-                  {t('pages.imageEditor.replaceImage')}
-                </button>
-              </span>
-              {tool !== 'none' && (
-                <span className="text-amber-500">
-                  {t('pages.imageEditor.toolHint', {
-                    tool: t(`pages.imageEditor.tool.${tool}`),
-                  })}
-                </span>
-              )}
-            </div>
-            <div className="flex justify-center overflow-auto rounded-lg border border-border bg-card/30 p-3">
-              <Canvas
-                ref={canvasRef}
-                image={image}
-                state={state}
-                tool={tool}
-                toolColor={color}
-                toolStrokeWidth={strokeWidth}
-                onCommitLayer={commitLayer}
-              />
-            </div>
-            <LayersPanel
-              state={state}
-              setLayers={setLayers}
-              patchLayer={patchLayer}
-              patchImageLayer={patchImageLayer}
-              deleteLayer={deleteLayer}
-            />
-          </div>
+      </div>
+    )
+  }
 
-          {/* RIGHT: control tabs */}
-          <div>
-            <Tabs defaultValue="adjust">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="adjust">{t('pages.imageEditor.tabAdjust')}</TabsTrigger>
-                <TabsTrigger value="annotate">{t('pages.imageEditor.tabAnnotate')}</TabsTrigger>
-                <TabsTrigger value="output">{t('pages.imageEditor.tabOutput')}</TabsTrigger>
-              </TabsList>
+  return (
+    <div className={rootClass}>
+      <TopActionBar
+        canUndo={history.canUndo}
+        canRedo={history.canRedo}
+        onUndo={history.undo}
+        onRedo={history.redo}
+        format={outFormat}
+        setFormat={setOutFormat}
+        quality={outQuality}
+        setQuality={setOutQuality}
+        onDownload={handleDownload}
+        onSaveProject={handleSaveProject}
+        onLoadProject={acceptFile}
+        onReplaceImage={() => replaceInputRef.current?.click()}
+        focused={focused}
+        toggleFocus={() => setFocused((v) => !v)}
+      />
 
-              <TabsContent value="adjust" className="mt-4">
-                <AdjustPanel
-                  transforms={state.transforms}
-                  setTransforms={(transforms) => history.set({ ...state, transforms })}
-                  adjust={state.adjust}
-                  setAdjust={(adjust) => history.set({ ...state, adjust })}
-                />
-              </TabsContent>
+      <input
+        ref={replaceInputRef}
+        type="file"
+        accept="image/*,application/json,.json"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) acceptFile(f)
+          e.target.value = ''
+        }}
+      />
 
-              <TabsContent value="annotate" className="mt-4">
-                <AnnotatePanel
-                  tool={tool}
-                  setTool={setTool}
-                  color={color}
-                  setColor={setColor}
-                  strokeWidth={strokeWidth}
-                  setStrokeWidth={setStrokeWidth}
-                />
-              </TabsContent>
+      <div className="flex flex-1 overflow-hidden">
+        <ToolsPalette
+          tool={tool}
+          setTool={setTool}
+          color={color}
+          setColor={setColor}
+          strokeWidth={strokeWidth}
+          setStrokeWidth={setStrokeWidth}
+        />
 
-              <TabsContent value="output" className="mt-4">
-                <OutputPanel
-                  format={outFormat}
-                  setFormat={setOutFormat}
-                  quality={outQuality}
-                  setQuality={setOutQuality}
-                  onDownload={handleDownload}
-                  onSaveProject={handleSaveProject}
-                  onLoadProject={acceptFile}
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
-        </div>
-      )}
+        <Workspace>
+          <Canvas
+            ref={canvasRef}
+            image={image}
+            state={state}
+            tool={tool}
+            toolColor={color}
+            toolStrokeWidth={strokeWidth}
+            onCommitLayer={commitLayer}
+          />
+        </Workspace>
+
+        <RightSidebar
+          state={state}
+          selectedId={selectedLayerId}
+          onSelect={setSelectedLayerId}
+          setLayers={setLayers}
+          patchLayer={patchLayer}
+          patchImageLayer={patchImageLayer}
+          deleteLayer={deleteLayer}
+          setTransforms={(transforms) => history.set({ ...state, transforms })}
+          setAdjust={(adjust) => history.set({ ...state, adjust })}
+        />
+      </div>
     </div>
   )
 }
