@@ -1,6 +1,7 @@
 import type {
   ArrowShape,
   BrushShape,
+  ImageShape,
   MosaicShape,
   RectShape,
   Shape,
@@ -11,12 +12,17 @@ import type {
 // pipeline passes a `scale` factor that maps preview-px → target-px so the
 // same shape data renders at any zoom level (preview vs. export).
 
+export type ImageCache = Map<string, HTMLImageElement>
+
 export function drawShape(
   ctx: CanvasRenderingContext2D,
   shape: Shape,
   scale: number,
-  // Used only by mosaic, which needs to grab pixels from the underlying image.
+  // Used by mosaic (samples pixels from below).
   underlying: HTMLCanvasElement,
+  // Used by image shapes — cache of loaded HTMLImageElements keyed by dataUrl.
+  // If a referenced dataUrl isn't in the cache, the shape is skipped this frame.
+  imageCache?: ImageCache,
 ): void {
   switch (shape.kind) {
     case 'rect':
@@ -33,6 +39,9 @@ export function drawShape(
       break
     case 'brush':
       drawBrush(ctx, shape, scale)
+      break
+    case 'image':
+      drawImageShape(ctx, shape, scale, imageCache)
       break
   }
 }
@@ -76,6 +85,21 @@ function drawText(ctx: CanvasRenderingContext2D, s: TextShape, scale: number) {
   ctx.font = `${Math.round(s.fontSize * scale)}px sans-serif`
   ctx.textBaseline = 'top'
   ctx.fillText(s.text, s.x * scale, s.y * scale)
+}
+
+function drawImageShape(
+  ctx: CanvasRenderingContext2D,
+  s: ImageShape,
+  scale: number,
+  cache?: ImageCache,
+) {
+  const img = cache?.get(s.dataUrl)
+  if (!img || !img.complete || img.naturalWidth === 0) return
+  const x = s.w >= 0 ? s.x : s.x + s.w
+  const y = s.h >= 0 ? s.y : s.y + s.h
+  const w = Math.abs(s.w)
+  const h = Math.abs(s.h)
+  ctx.drawImage(img, x * scale, y * scale, w * scale, h * scale)
 }
 
 function drawBrush(ctx: CanvasRenderingContext2D, s: BrushShape, scale: number) {

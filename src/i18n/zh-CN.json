@@ -457,8 +457,16 @@
         "mosaic": "马赛克",
         "brush": "笔刷",
         "eraser": "橡皮",
-        "mask": "蒙版"
+        "mask": "蒙版",
+        "eyedropper": "吸管",
+        "zoom": "缩放"
       },
+      "colors": "前景色 / 背景色",
+      "fgColor": "前景色",
+      "bgColor": "背景色",
+      "swapColors": "切换前景/背景色",
+      "resetColors": "默认色（黑/白）",
+      "dropImageHint": "拖入图片以新增为图层",
       "toolHint": "绘制：{{tool}} — 在画布上拖拽；再次点击同一工具可取消选择",
       "adjust": "调整",
       "noLayerSelected": "未选中图层",
@@ -491,7 +499,8 @@
         "mosaic": "马赛克",
         "brush": "笔刷",
         "eraser": "橡皮",
-        "mask": "蒙版"
+        "mask": "蒙版",
+        "image": "图片"
       },
       "project": "项目",
       "projectSave": "保存项目 (.json)",

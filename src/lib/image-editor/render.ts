@@ -1,4 +1,4 @@
-import { drawShape } from './drawing'
+import { drawShape, type ImageCache } from './drawing'
 import { filterString } from './filters'
 import { getHandles, getLayerBBox, normalizeRect } from './hit'
 import type {
@@ -29,6 +29,8 @@ export type RenderInput = {
    * after all rendering is done. Live preview only — never set during export.
    */
   selection?: { layer: Layer }
+  /** Cache of HTMLImageElements keyed by dataUrl, for image-shape layers. */
+  imageCache?: ImageCache
 }
 
 export function dimsAfterRotation(
@@ -103,7 +105,7 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
       // Mosaic is the only shape that needs to read the underlying composite.
       const underlying =
         layer.shape.kind === 'mosaic' ? snapshotCanvas(canvas) : canvas
-      drawShape(ctx, layer.shape, annoScale, underlying)
+      drawShape(ctx, layer.shape, annoScale, underlying, input.imageCache)
       ctx.restore()
     } else if (layer.kind === 'mask') {
       applyMask(ctx, layer, annoScale, w, h)
@@ -119,7 +121,7 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
       ctx.globalCompositeOperation = blendModeToOp(layer.blend)
       const underlying =
         layer.shape.kind === 'mosaic' ? snapshotCanvas(canvas) : canvas
-      drawShape(ctx, layer.shape, annoScale, underlying)
+      drawShape(ctx, layer.shape, annoScale, underlying, input.imageCache)
       ctx.restore()
     } else if (layer.kind === 'mask') {
       applyMask(ctx, layer, annoScale, w, h)

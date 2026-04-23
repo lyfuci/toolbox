@@ -16,6 +16,7 @@ function translateShape(shape: Shape, dx: number, dy: number): Shape {
   switch (shape.kind) {
     case 'rect':
     case 'mosaic':
+    case 'image':
       return { ...shape, x: shape.x + dx, y: shape.y + dy }
     case 'arrow':
       return {
@@ -60,7 +61,8 @@ export function resizeLayer(
   const s = layer.shape
   switch (s.kind) {
     case 'rect':
-    case 'mosaic': {
+    case 'mosaic':
+    case 'image': {
       const next = resizeRect({ x: s.x, y: s.y, w: s.w, h: s.h }, handleId, newPoint)
       return { ...layer, shape: { ...s, ...next } }
     }

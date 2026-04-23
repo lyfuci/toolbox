@@ -6,6 +6,9 @@ import {
   Crop,
   Eraser,
   MousePointer2,
+  Pipette,
+  RotateCcw,
+  Search,
   Square,
   Squircle,
   Type,
@@ -21,27 +24,38 @@ const TOOLS: { tool: Tool; icon: ReactNode; labelKey: string; key?: string }[] =
   { tool: 'brush', icon: <Brush className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.brush', key: 'B' },
   { tool: 'eraser', icon: <Eraser className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.eraser', key: 'E' },
   { tool: 'mask', icon: <Crop className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.mask' },
+  { tool: 'eyedropper', icon: <Pipette className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.eyedropper', key: 'I' },
+  { tool: 'zoom', icon: <Search className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.zoom', key: 'Z' },
 ]
 
 type Props = {
   tool: Tool
   setTool: (t: Tool) => void
-  color: string
-  setColor: (c: string) => void
+  fgColor: string
+  bgColor: string
+  setFgColor: (c: string) => void
+  setBgColor: (c: string) => void
+  swapColors: () => void
+  resetColors: () => void
   strokeWidth: number
   setStrokeWidth: (n: number) => void
 }
 
 /**
  * Vertical PS-style tools palette: each tool is a 36px icon button.
- * Below the tools, the current color swatch (opens native color picker)
- * and the stroke-width control. Visually narrow (~64px wide).
+ * Below the tools: foreground/background color squares (PS-classic
+ * stacked layout — fg in front, bg behind), with X (swap) and D
+ * (reset to black/white) icon buttons. Then a stroke-width slider.
  */
 export function ToolsPalette({
   tool,
   setTool,
-  color,
-  setColor,
+  fgColor,
+  bgColor,
+  setFgColor,
+  setBgColor,
+  swapColors,
+  resetColors,
   strokeWidth,
   setStrokeWidth,
 }: Props) {
@@ -69,22 +83,56 @@ export function ToolsPalette({
 
       <div className="my-2 h-px w-8 bg-border" />
 
-      {/* Color swatch — uses native color picker */}
-      <label
-        title={t('pages.imageEditor.color')}
-        className="relative h-9 w-9 cursor-pointer overflow-hidden rounded border border-border"
-        style={{ backgroundColor: color }}
-      >
-        <input
-          type="color"
-          value={color}
-          onChange={(e) => setColor(e.target.value)}
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-        />
-      </label>
+      {/* PS-classic dual color swatch: bg in back, fg in front, slightly offset. */}
+      <div className="relative h-10 w-10" title={t('pages.imageEditor.colors')}>
+        <label
+          title={t('pages.imageEditor.bgColor')}
+          className="absolute right-0 bottom-0 h-7 w-7 cursor-pointer overflow-hidden rounded-sm border border-border shadow-sm"
+          style={{ backgroundColor: bgColor }}
+        >
+          <input
+            type="color"
+            value={bgColor}
+            onChange={(e) => setBgColor(e.target.value)}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          />
+        </label>
+        <label
+          title={t('pages.imageEditor.fgColor')}
+          className="absolute top-0 left-0 h-7 w-7 cursor-pointer overflow-hidden rounded-sm border border-border shadow-sm"
+          style={{ backgroundColor: fgColor }}
+        >
+          <input
+            type="color"
+            value={fgColor}
+            onChange={(e) => setFgColor(e.target.value)}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          />
+        </label>
+      </div>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={swapColors}
+          title={`${t('pages.imageEditor.swapColors')} (X)`}
+          className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+        >
+          <ArrowRight className="h-3 w-3" style={{ transform: 'rotate(-45deg)' }} />
+        </button>
+        <button
+          type="button"
+          onClick={resetColors}
+          title={`${t('pages.imageEditor.resetColors')} (D)`}
+          className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+        >
+          <RotateCcw className="h-3 w-3" />
+        </button>
+      </div>
+
+      <div className="my-2 h-px w-8 bg-border" />
 
       {/* Stroke width — vertical compact slider */}
-      <div className="mt-2 flex flex-col items-center gap-1">
+      <div className="mt-1 flex flex-col items-center gap-1">
         <span className="text-[10px] text-muted-foreground" title={t('pages.imageEditor.strokeWidth')}>
           {strokeWidth}
         </span>

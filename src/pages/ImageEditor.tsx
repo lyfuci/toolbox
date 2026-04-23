@@ -7,15 +7,17 @@ import { RightSidebar } from '@/components/image-editor/RightSidebar'
 import { StatusBar } from '@/components/image-editor/StatusBar'
 import { ToolsPalette } from '@/components/image-editor/ToolsPalette'
 import { TopActionBar } from '@/components/image-editor/TopActionBar'
-import { Workspace } from '@/components/image-editor/Workspace'
+import { Workspace, type WorkspaceHandle } from '@/components/image-editor/Workspace'
 import { initialState } from '@/lib/image-editor/defaults'
 import { useHistoryState } from '@/lib/image-editor/history'
+import { fileToDataUrl, useImageCache } from '@/lib/image-editor/image-cache'
 import {
   loadImageFromUrl,
   parseProject,
   serializeProject,
 } from '@/lib/image-editor/serialize'
 import type {
+  AnnotationLayer,
   EditorState,
   Layer,
   OutputFormat,
@@ -34,7 +36,15 @@ export function ImageEditorPage() {
   const [filename, setFilename] = useState('image')
 
   const [tool, setTool] = useState<Tool>('none')
-  const [color, setColor] = useState('#ef4444')
+  const [colors, setColors] = useState({ fg: '#ef4444', bg: '#ffffff' })
+  const swapColors = useCallback(
+    () => setColors((c) => ({ fg: c.bg, bg: c.fg })),
+    [],
+  )
+  const resetColors = useCallback(
+    () => setColors({ fg: '#000000', bg: '#ffffff' }),
+    [],
+  )
   const [strokeWidth, setStrokeWidth] = useState(4)
   const [selectedLayerId, setSelectedLayerId] = useState<string>('image')
 
@@ -44,6 +54,10 @@ export function ImageEditorPage() {
   // Focus mode: editor takes over the viewport, hides toolbox chrome.
   const [focused, setFocused] = useState(false)
   const canvasRef = useRef<CanvasHandle | null>(null)
+  const workspaceRef = useRef<WorkspaceHandle | null>(null)
+
+  // Cache of HTMLImageElements for image-shape layers (drag-drop'd images).
+  const { cache: imageCache, ensure: ensureImage } = useImageCache()
 
   // Zoom + pan + Space-held pan mode.
   const [zoom, setZoom] = useState(1)
@@ -60,6 +74,36 @@ export function ImageEditorPage() {
     setZoom(1)
     setPan({ x: 0, y: 0 })
   }, [])
+
+  /**
+   * Zoom by `factor` so the point under the cursor stays fixed on screen.
+   * Used by both the Z (zoom) tool click and Cmd/Ctrl+wheel.
+   *
+   * Math: the wrapper is rendered with `translate(pan) scale(zoom)` around its
+   * geometric centre. To keep the cursor anchored when zoom changes from z₀ to
+   * z₁, the new pan must satisfy:
+   *   panNew = pan + (cursor - wrapperCentre) * (1 - z₁/z₀)
+   */
+  const zoomAtPoint = useCallback(
+    (clientX: number, clientY: number, factor: number) => {
+      setZoom((z0) => {
+        const z1 = clampZoom(z0 * factor)
+        const realFactor = z1 / z0
+        if (realFactor === 1) return z0
+        const rect = workspaceRef.current?.getWrapperRect()
+        if (rect) {
+          const cx = rect.left + rect.width / 2
+          const cy = rect.top + rect.height / 2
+          setPan((p) => ({
+            x: p.x + (clientX - cx) * (1 - realFactor),
+            y: p.y + (clientY - cy) * (1 - realFactor),
+          }))
+        }
+        return z1
+      })
+    },
+    [],
+  )
 
   // ── Global keyboard shortcuts ────────────────────────────────────────────
   // F = focus toggle / Esc exit (existing).
@@ -117,23 +161,27 @@ export function ImageEditorPage() {
         setFocused(false)
         return
       }
-      if (e.key === 'z') {
+      // X = swap fg/bg. D = default colors (black/white). PS conventions.
+      if (e.key === 'x' || e.key === 'X') {
         e.preventDefault()
-        zoomIn()
+        swapColors()
         return
       }
-      if (e.key === 'Z') {
+      if (e.key === 'd' || e.key === 'D') {
         e.preventDefault()
-        zoomOut()
+        resetColors()
         return
       }
-      // Tool shortcuts (lowercase only, PS-style).
+      // Tool shortcuts (PS-style). Z is the zoom *tool* (click to zoom in,
+      // Alt+click to zoom out) — not a one-shot zoom action.
       if (e.key === 'v') { e.preventDefault(); setTool('none'); return }
       if (e.key === 'm') { e.preventDefault(); setTool('rect'); return }
       if (e.key === 'a') { e.preventDefault(); setTool('arrow'); return }
       if (e.key === 't') { e.preventDefault(); setTool('text'); return }
       if (e.key === 'b') { e.preventDefault(); setTool('brush'); return }
       if (e.key === 'e') { e.preventDefault(); setTool('eraser'); return }
+      if (e.key === 'i') { e.preventDefault(); setTool('eyedropper'); return }
+      if (e.key === 'z') { e.preventDefault(); setTool('zoom'); return }
     }
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
@@ -146,7 +194,7 @@ export function ImageEditorPage() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [focused, zoomIn, zoomOut, zoomReset])
+  }, [focused, zoomIn, zoomOut, zoomReset, swapColors, resetColors])
 
   // ── State helpers ────────────────────────────────────────────────────────
   const setLayers = useCallback(
@@ -229,6 +277,50 @@ export function ImageEditorPage() {
 
   // Hidden replace-image input triggered from the top action bar.
   const replaceInputRef = useRef<HTMLInputElement | null>(null)
+
+  // Drop an image file onto the workspace → add as a new image-shape layer
+  // centred on the canvas, sized to fit half the shorter canvas dimension.
+  const handleDropImage = useCallback(
+    async (file: File) => {
+      if (!file.type.startsWith('image/')) {
+        toast.error(t('pages.imageEditor.errNotImage'))
+        return
+      }
+      try {
+        const dataUrl = await fileToDataUrl(file)
+        const img = await ensureImage(dataUrl)
+        if (!image) return
+        // Place into preview-pixel space — same coord system shapes use.
+        const previewMax = Math.min(
+          image.naturalWidth,
+          image.naturalHeight,
+        ) / 2
+        const ratio = img.naturalWidth / img.naturalHeight
+        const w = previewMax
+        const h = previewMax / ratio
+        const x = image.naturalWidth / 2 - w / 2
+        const y = image.naturalHeight / 2 - h / 2
+        const layer: AnnotationLayer = {
+          id: crypto.randomUUID(),
+          name: file.name.replace(/\.[^./]+$/, '') || 'Image',
+          visible: true,
+          opacity: 100,
+          blend: 'normal',
+          kind: 'annotation',
+          shape: { kind: 'image', x, y, w, h, dataUrl },
+        }
+        commitLayer(layer)
+      } catch {
+        toast.error(t('pages.imageEditor.errLoadFailed'))
+      }
+    },
+    [ensureImage, image, commitLayer, t],
+  )
+
+  const handlePickColor = useCallback(
+    (hex: string) => setColors((c) => ({ ...c, fg: hex })),
+    [],
+  )
 
   // ── Download ─────────────────────────────────────────────────────────────
   const handleDownload = async () => {
@@ -316,25 +408,40 @@ export function ImageEditorPage() {
         <ToolsPalette
           tool={tool}
           setTool={setTool}
-          color={color}
-          setColor={setColor}
+          fgColor={colors.fg}
+          bgColor={colors.bg}
+          setFgColor={(c) => setColors((s) => ({ ...s, fg: c }))}
+          setBgColor={(c) => setColors((s) => ({ ...s, bg: c }))}
+          swapColors={swapColors}
+          resetColors={resetColors}
           strokeWidth={strokeWidth}
           setStrokeWidth={setStrokeWidth}
         />
 
-        <Workspace zoom={zoom} pan={pan} setPan={setPan} panMode={panMode}>
+        <Workspace
+          ref={workspaceRef}
+          zoom={zoom}
+          pan={pan}
+          setPan={setPan}
+          panMode={panMode}
+          onWheelZoom={zoomAtPoint}
+          onDropFile={handleDropImage}
+        >
           <Canvas
             ref={canvasRef}
             image={image}
             state={state}
             tool={tool}
-            toolColor={color}
+            toolColor={colors.fg}
             toolStrokeWidth={strokeWidth}
             selectedId={selectedLayerId}
             onSelect={setSelectedLayerId}
             onCommitLayer={commitLayer}
             onCommitLayerUpdate={commitLayerUpdate}
             panMode={panMode}
+            imageCache={imageCache}
+            onZoomAt={zoomAtPoint}
+            onPickColor={handlePickColor}
           />
         </Workspace>
 

@@ -457,8 +457,16 @@
         "mosaic": "Mosaic",
         "brush": "Brush",
         "eraser": "Eraser",
-        "mask": "Mask"
+        "mask": "Mask",
+        "eyedropper": "Eyedropper",
+        "zoom": "Zoom"
       },
+      "colors": "Foreground / background colors",
+      "fgColor": "Foreground color",
+      "bgColor": "Background color",
+      "swapColors": "Swap fg/bg",
+      "resetColors": "Default colors (black/white)",
+      "dropImageHint": "Drop image to add as a new layer",
       "toolHint": "Drawing: {{tool}} — drag on the canvas; click the same tool again to deselect",
       "adjust": "Adjust",
       "noLayerSelected": "No layer selected",
@@ -491,7 +499,8 @@
         "mosaic": "Mosaic",
         "brush": "Brush stroke",
         "eraser": "Eraser stroke",
-        "mask": "Mask"
+        "mask": "Mask",
+        "image": "Image"
       },
       "project": "Project",
       "projectSave": "Save project (.json)",

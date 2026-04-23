@@ -176,5 +176,7 @@ function layerLabelKey(layer: Layer): string {
       return layer.shape.eraser
         ? 'pages.imageEditor.annoLabel.eraser'
         : 'pages.imageEditor.annoLabel.brush'
+    case 'image':
+      return 'pages.imageEditor.annoLabel.image'
   }
 }
