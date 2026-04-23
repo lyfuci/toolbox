@@ -8,9 +8,10 @@ import { StatusBar } from '@/components/image-editor/StatusBar'
 import { ToolsPalette } from '@/components/image-editor/ToolsPalette'
 import { TopActionBar } from '@/components/image-editor/TopActionBar'
 import { Workspace, type WorkspaceHandle } from '@/components/image-editor/Workspace'
-import { initialState } from '@/lib/image-editor/defaults'
+import { initialState, PREVIEW_MAX } from '@/lib/image-editor/defaults'
 import { useHistoryState } from '@/lib/image-editor/history'
 import { fileToDataUrl, useImageCache } from '@/lib/image-editor/image-cache'
+import { dimsAfterRotation } from '@/lib/image-editor/render'
 import {
   loadImageFromUrl,
   parseProject,
@@ -290,16 +291,20 @@ export function ImageEditorPage() {
         const dataUrl = await fileToDataUrl(file)
         const img = await ensureImage(dataUrl)
         if (!image) return
-        // Place into preview-pixel space — same coord system shapes use.
-        const previewMax = Math.min(
-          image.naturalWidth,
-          image.naturalHeight,
-        ) / 2
-        const ratio = img.naturalWidth / img.naturalHeight
-        const w = previewMax
-        const h = previewMax / ratio
-        const x = image.naturalWidth / 2 - w / 2
-        const y = image.naturalHeight / 2 - h / 2
+        // Shape coords live in *preview-canvas pixel space* — same as
+        // eventToCanvasXY. previewScale converts source-image px → preview px,
+        // and is < 1 whenever the source exceeds PREVIEW_MAX. The dropped
+        // image is sized to ~half the canvas's shorter dim and centred.
+        const { baseW, baseH } = dimsAfterRotation(image, state)
+        const previewScale = Math.min(1, PREVIEW_MAX / Math.max(baseW, baseH, 1))
+        const previewW = baseW * previewScale
+        const previewH = baseH * previewScale
+        const target = Math.min(previewW, previewH) / 2
+        const ratio = img.naturalWidth / Math.max(img.naturalHeight, 1)
+        const w = ratio >= 1 ? target * ratio : target
+        const h = ratio >= 1 ? target : target / ratio
+        const x = previewW / 2 - w / 2
+        const y = previewH / 2 - h / 2
         const layer: AnnotationLayer = {
           id: crypto.randomUUID(),
           name: file.name.replace(/\.[^./]+$/, '') || 'Image',
@@ -314,7 +319,7 @@ export function ImageEditorPage() {
         toast.error(t('pages.imageEditor.errLoadFailed'))
       }
     },
-    [ensureImage, image, commitLayer, t],
+    [ensureImage, image, state, commitLayer, t],
   )
 
   const handlePickColor = useCallback(
