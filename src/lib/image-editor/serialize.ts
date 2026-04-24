@@ -45,6 +45,7 @@ export function parseProject(text: string): Project {
       layers: Array.isArray(obj.state.layers) ? obj.state.layers : [],
       transforms: { ...fallback.transforms, ...obj.state.transforms },
       adjust: { ...fallback.adjust, ...obj.state.adjust },
+      cropRect: obj.state.cropRect,
     },
   }
 }

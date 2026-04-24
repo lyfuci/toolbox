@@ -5,6 +5,7 @@ import {
   Brush,
   Crop,
   Eraser,
+  Frame,
   MousePointer2,
   Pipette,
   RotateCcw,
@@ -23,7 +24,8 @@ const TOOLS: { tool: Tool; icon: ReactNode; labelKey: string; key?: string }[] =
   { tool: 'mosaic', icon: <Squircle className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.mosaic' },
   { tool: 'brush', icon: <Brush className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.brush', key: 'B' },
   { tool: 'eraser', icon: <Eraser className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.eraser', key: 'E' },
-  { tool: 'mask', icon: <Crop className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.mask' },
+  { tool: 'mask', icon: <Frame className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.mask' },
+  { tool: 'crop', icon: <Crop className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.crop', key: 'C' },
   { tool: 'eyedropper', icon: <Pipette className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.eyedropper', key: 'I' },
   { tool: 'zoom', icon: <Search className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.zoom', key: 'Z' },
 ]

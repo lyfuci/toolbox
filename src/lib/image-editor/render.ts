@@ -1,6 +1,7 @@
 import { drawShape, type ImageCache } from './drawing'
 import { filterString } from './filters'
 import { getHandles, getLayerBBox, normalizeRect } from './hit'
+import { translateLayer } from './transform'
 import type {
   BlendMode,
   EditorState,
@@ -46,6 +47,31 @@ export function dimsAfterRotation(
 }
 
 /**
+ * Effective rendered dimensions in source-pixel space, after rotation AND any
+ * active crop. previewScale is the *original* fit (PREVIEW_MAX / max(baseW,
+ * baseH)) so coords stay stable across crop changes; the cropped canvas is just
+ * smaller.
+ */
+export function effectiveDims(
+  image: HTMLImageElement,
+  state: EditorState,
+  previewScale: number,
+): { effW: number; effH: number; cropX: number; cropY: number } {
+  const { baseW, baseH } = dimsAfterRotation(image, state)
+  if (!state.cropRect) {
+    return { effW: baseW, effH: baseH, cropX: 0, cropY: 0 }
+  }
+  // cropRect is in preview-pixel post-rotation space; convert to source pixels.
+  const c = state.cropRect
+  return {
+    effW: Math.abs(c.w) / previewScale,
+    effH: Math.abs(c.h) / previewScale,
+    cropX: (c.w >= 0 ? c.x : c.x + c.w) / previewScale,
+    cropY: (c.h >= 0 ? c.y : c.y + c.h) / previewScale,
+  }
+}
+
+/**
  * Render the full editor state (image background + layers + in-progress
  * preview) onto the given canvas at the given pixel scale.
  *
@@ -61,8 +87,9 @@ export function dimsAfterRotation(
 export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
   const { image, state, scale, previewScale, drawingPreview } = input
   const { baseW, baseH } = dimsAfterRotation(image, state)
-  const w = Math.max(1, Math.round(baseW * scale))
-  const h = Math.max(1, Math.round(baseH * scale))
+  const { effW, effH, cropX, cropY } = effectiveDims(image, state, previewScale)
+  const w = Math.max(1, Math.round(effW * scale))
+  const h = Math.max(1, Math.round(effH * scale))
   canvas.width = w
   canvas.height = h
   const ctx = canvas.getContext('2d')
@@ -73,19 +100,44 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
 
   // ── 1. Image background (with transforms + filters) ─────────────────────
   if (state.imageLayer.visible) {
-    ctx.save()
-    ctx.globalAlpha = state.imageLayer.opacity / 100
-    ctx.globalCompositeOperation = blendModeToOp(state.imageLayer.blend)
-    ctx.filter = filterString(state.adjust)
-    ctx.translate(w / 2, h / 2)
-    if (state.transforms.rotation !== 0) {
-      ctx.rotate((state.transforms.rotation * Math.PI) / 180)
+    if (state.cropRect) {
+      // Cropped path: render the full rotated/flipped image to a temp canvas
+      // sized to baseW×baseH, then blit the crop sub-rect into the destination.
+      const fullW = Math.max(1, Math.round(baseW * scale))
+      const fullH = Math.max(1, Math.round(baseH * scale))
+      const tmp = document.createElement('canvas')
+      tmp.width = fullW
+      tmp.height = fullH
+      const tctx = tmp.getContext('2d')
+      if (tctx) {
+        tctx.globalAlpha = state.imageLayer.opacity / 100
+        tctx.globalCompositeOperation = blendModeToOp(state.imageLayer.blend)
+        tctx.filter = filterString(state.adjust)
+        tctx.translate(fullW / 2, fullH / 2)
+        if (state.transforms.rotation !== 0) {
+          tctx.rotate((state.transforms.rotation * Math.PI) / 180)
+        }
+        tctx.scale(state.transforms.flipH ? -1 : 1, state.transforms.flipV ? -1 : 1)
+        const drawW = image.naturalWidth * scale
+        const drawH = image.naturalHeight * scale
+        tctx.drawImage(image, -drawW / 2, -drawH / 2, drawW, drawH)
+      }
+      ctx.drawImage(tmp, cropX * scale, cropY * scale, w, h, 0, 0, w, h)
+    } else {
+      ctx.save()
+      ctx.globalAlpha = state.imageLayer.opacity / 100
+      ctx.globalCompositeOperation = blendModeToOp(state.imageLayer.blend)
+      ctx.filter = filterString(state.adjust)
+      ctx.translate(w / 2, h / 2)
+      if (state.transforms.rotation !== 0) {
+        ctx.rotate((state.transforms.rotation * Math.PI) / 180)
+      }
+      ctx.scale(state.transforms.flipH ? -1 : 1, state.transforms.flipV ? -1 : 1)
+      const drawW = image.naturalWidth * scale
+      const drawH = image.naturalHeight * scale
+      ctx.drawImage(image, -drawW / 2, -drawH / 2, drawW, drawH)
+      ctx.restore()
     }
-    ctx.scale(state.transforms.flipH ? -1 : 1, state.transforms.flipV ? -1 : 1)
-    const drawW = image.naturalWidth * scale
-    const drawH = image.naturalHeight * scale
-    ctx.drawImage(image, -drawW / 2, -drawH / 2, drawW, drawH)
-    ctx.restore()
   }
 
   // Reset to identity for overlay rendering.
@@ -96,25 +148,39 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
   // the canvas before drawing each mosaic layer.
   const annoScale = scale / previewScale
 
+  // Crop offset applied to layer SHAPES (not the ctx) — keeps draw + sample
+  // coords in the same space, so mosaic samples the right pixels under crop.
+  // Shape coords live in original-image preview-pixel space; shifting by
+  // -cropOriginX/Y in preview pixels equals -cropX*scale in target pixels.
+  const cropOriginX = state.cropRect
+    ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w)
+    : 0
+  const cropOriginY = state.cropRect
+    ? Math.min(state.cropRect.y, state.cropRect.y + state.cropRect.h)
+    : 0
+  const shiftForCrop = (layer: Layer): Layer =>
+    state.cropRect ? translateLayer(layer, -cropOriginX, -cropOriginY) : layer
+
   for (const layer of state.layers) {
     if (!layer.visible) continue
-    if (layer.kind === 'annotation') {
+    const l = shiftForCrop(layer)
+    if (l.kind === 'annotation') {
       ctx.save()
-      ctx.globalAlpha = layer.opacity / 100
-      ctx.globalCompositeOperation = blendModeToOp(layer.blend)
+      ctx.globalAlpha = l.opacity / 100
+      ctx.globalCompositeOperation = blendModeToOp(l.blend)
       // Mosaic is the only shape that needs to read the underlying composite.
       const underlying =
-        layer.shape.kind === 'mosaic' ? snapshotCanvas(canvas) : canvas
-      drawShape(ctx, layer.shape, annoScale, underlying, input.imageCache)
+        l.shape.kind === 'mosaic' ? snapshotCanvas(canvas) : canvas
+      drawShape(ctx, l.shape, annoScale, underlying, input.imageCache)
       ctx.restore()
-    } else if (layer.kind === 'mask') {
-      applyMask(ctx, layer, annoScale, w, h)
+    } else if (l.kind === 'mask') {
+      applyMask(ctx, l, annoScale, w, h)
     }
   }
 
   // In-progress preview (a layer not yet committed to state.layers).
   if (drawingPreview) {
-    const layer = drawingPreview.layer
+    const layer = shiftForCrop(drawingPreview.layer)
     if (layer.kind === 'annotation') {
       ctx.save()
       ctx.globalAlpha = layer.opacity / 100
@@ -131,7 +197,7 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
   // Selection chrome — drawn last so it sits above all content. Skipped for
   // export renders (caller doesn't pass `selection`).
   if (input.selection) {
-    drawSelectionChrome(ctx, input.selection.layer, annoScale)
+    drawSelectionChrome(ctx, shiftForCrop(input.selection.layer), annoScale)
   }
 }
 
@@ -149,8 +215,8 @@ function drawSelectionChrome(
   const r = normalizeRect(bbox)
 
   // Dashed outline. Dashes scale with `scale` so they look the same in preview vs export.
+  // Inherits the caller's transform (so an active crop translation applies).
   ctx.save()
-  ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.strokeStyle = 'oklch(0.7 0.18 250)'
   ctx.lineWidth = Math.max(1, scale)
   ctx.setLineDash([6 * scale, 4 * scale])
