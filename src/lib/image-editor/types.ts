@@ -31,6 +31,8 @@ export type Tool =
   | 'brush'
   | 'eraser'
   | 'mask'
+  | 'zoom'
+  | 'eyedropper'
 
 export type Transforms = {
   rotation: Rotation
@@ -92,8 +94,27 @@ export type BrushShape = {
   strokeWidth: number
   eraser?: boolean
 }
+export type ImageShape = {
+  kind: 'image'
+  x: number
+  y: number
+  w: number
+  h: number
+  /**
+   * Source image as a data URL — keeps the layer self-contained and
+   * serializable (project files embed the dataUrl directly). The render
+   * pipeline holds an HTMLImageElement cache keyed by dataUrl.
+   */
+  dataUrl: string
+}
 
-export type Shape = RectShape | ArrowShape | TextShape | MosaicShape | BrushShape
+export type Shape =
+  | RectShape
+  | ArrowShape
+  | TextShape
+  | MosaicShape
+  | BrushShape
+  | ImageShape
 
 type LayerCommon = {
   id: string

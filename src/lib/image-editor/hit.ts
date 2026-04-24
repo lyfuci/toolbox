@@ -30,6 +30,7 @@ function getShapeBBox(shape: Shape): Rect {
   switch (shape.kind) {
     case 'rect':
     case 'mosaic':
+    case 'image':
       return normalizeRect({ x: shape.x, y: shape.y, w: shape.w, h: shape.h })
     case 'arrow': {
       const x = Math.min(shape.x1, shape.x2)
@@ -103,6 +104,7 @@ export function getHandles(layer: Layer): Handle[] {
   switch (layer.shape.kind) {
     case 'rect':
     case 'mosaic':
+    case 'image':
       return rectCornerHandles(
         normalizeRect({
           x: layer.shape.x,

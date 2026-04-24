@@ -17,6 +17,7 @@ import {
   type Handle,
   type HandleId,
 } from '@/lib/image-editor/hit'
+import type { ImageCache } from '@/lib/image-editor/drawing'
 import { dimsAfterRotation, renderTo } from '@/lib/image-editor/render'
 import { layerEquals, resizeLayer, translateLayer } from '@/lib/image-editor/transform'
 import type {
@@ -47,6 +48,12 @@ type Props = {
   onCommitLayerUpdate: (id: string, layer: Layer) => void
   /** When true (Space held), Canvas suppresses its mouse logic so Workspace can pan. */
   panMode: boolean
+  /** HTMLImageElement cache for image-shape layers, threaded through to the renderer. */
+  imageCache?: ImageCache
+  /** Called by the Z (zoom) tool — zooms by `factor` centred on the click point. */
+  onZoomAt?: (clientX: number, clientY: number, factor: number) => void
+  /** Called by the Eyedropper tool with a hex color picked from the canvas. */
+  onPickColor?: (hex: string) => void
 }
 
 type Interaction =
@@ -79,6 +86,9 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     onCommitLayer,
     onCommitLayerUpdate,
     panMode,
+    imageCache,
+    onZoomAt,
+    onPickColor,
   },
   ref,
 ) {
@@ -129,8 +139,9 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       drawingPreview:
         interaction.kind === 'drawing' ? { layer: interaction.layer } : undefined,
       selection: selectionLayer ? { layer: selectionLayer } : undefined,
+      imageCache,
     })
-  }, [image, effectiveState, interaction, selectionLayer, previewScale])
+  }, [image, effectiveState, interaction, selectionLayer, previewScale, imageCache])
 
   useImperativeHandle(
     ref,
@@ -143,10 +154,11 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
           state,
           scale: 1,
           previewScale,
+          imageCache,
         })
       },
     }),
-    [image, state, previewScale],
+    [image, state, previewScale, imageCache],
   )
 
   // ── Mouse handling ──────────────────────────────────────────────────────
@@ -173,7 +185,22 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     // Pan mode: yield to Workspace's drag handler.
     if (panMode) return
 
+    // Zoom tool: click zoom-in 2x at point, Alt+click zoom-out 0.5x at point.
+    if (tool === 'zoom') {
+      const factor = e.altKey ? 0.5 : 2
+      onZoomAt?.(e.clientX, e.clientY, factor)
+      return
+    }
+
     const p = eventToCanvasXY(e)
+
+    // Eyedropper: read pixel at click and emit color. The canvas bitmap is in
+    // preview-pixel space; (p.x, p.y) is already in that space.
+    if (tool === 'eyedropper') {
+      const hex = readPixelHex(canvasRef.current, p.x, p.y)
+      if (hex && onPickColor) onPickColor(hex)
+      return
+    }
 
     // Drawing tools take priority over selection.
     if (tool !== 'none') {
@@ -382,6 +409,16 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       setHoverCursor('inherit')
       return
     }
+    if (tool === 'zoom') {
+      // PS shows a magnifier with + / - depending on Alt — we approximate with
+      // standard CSS cursors for portability.
+      setHoverCursor(e.altKey ? 'zoom-out' : 'zoom-in')
+      return
+    }
+    if (tool === 'eyedropper') {
+      setHoverCursor('crosshair')
+      return
+    }
     if (tool !== 'none') {
       setHoverCursor('crosshair')
       return
@@ -466,4 +503,31 @@ function shouldDiscardDrawing(layer: Layer): boolean {
     }
   }
   return false
+}
+
+/**
+ * Read a single pixel from the canvas at the given bitmap coords and return
+ * its colour as #rrggbb. Out-of-bounds clicks return null.
+ */
+function readPixelHex(
+  canvas: HTMLCanvasElement | null,
+  x: number,
+  y: number,
+): string | null {
+  if (!canvas) return null
+  const ix = Math.max(0, Math.min(canvas.width - 1, Math.round(x)))
+  const iy = Math.max(0, Math.min(canvas.height - 1, Math.round(y)))
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  if (!ctx) return null
+  try {
+    const data = ctx.getImageData(ix, iy, 1, 1).data
+    return (
+      '#' +
+      [data[0], data[1], data[2]]
+        .map((c) => c.toString(16).padStart(2, '0'))
+        .join('')
+    )
+  } catch {
+    return null
+  }
 }
