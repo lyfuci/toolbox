@@ -17,8 +17,10 @@ function translateShape(shape: Shape, dx: number, dy: number): Shape {
     case 'rect':
     case 'mosaic':
     case 'image':
+    case 'ellipse':
       return { ...shape, x: shape.x + dx, y: shape.y + dy }
     case 'arrow':
+    case 'line':
       return {
         ...shape,
         x1: shape.x1 + dx,
@@ -62,11 +64,13 @@ export function resizeLayer(
   switch (s.kind) {
     case 'rect':
     case 'mosaic':
-    case 'image': {
+    case 'image':
+    case 'ellipse': {
       const next = resizeRect({ x: s.x, y: s.y, w: s.w, h: s.h }, handleId, newPoint)
       return { ...layer, shape: { ...s, ...next } }
     }
     case 'arrow':
+    case 'line':
       if (handleId === 'start') {
         return { ...layer, shape: { ...s, x1: newPoint.x, y1: newPoint.y } }
       }

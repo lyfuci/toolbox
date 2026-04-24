@@ -196,6 +196,8 @@ export function ImageEditorPage() {
       if (e.key === 'i') { e.preventDefault(); setTool('eyedropper'); return }
       if (e.key === 'z') { e.preventDefault(); setTool('zoom'); return }
       if (e.key === 'c') { e.preventDefault(); setTool('crop'); return }
+      if (e.key === 'o') { e.preventDefault(); setTool('ellipse'); return }
+      if (e.key === 'l') { e.preventDefault(); setTool('line'); return }
     }
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.code === 'Space') {

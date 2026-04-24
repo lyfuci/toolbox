@@ -1,7 +1,9 @@
 import type {
   ArrowShape,
   BrushShape,
+  EllipseShape,
   ImageShape,
+  LineShape,
   MosaicShape,
   RectShape,
   Shape,
@@ -43,7 +45,40 @@ export function drawShape(
     case 'image':
       drawImageShape(ctx, shape, scale, imageCache)
       break
+    case 'ellipse':
+      drawEllipse(ctx, shape, scale)
+      break
+    case 'line':
+      drawLine(ctx, shape, scale)
+      break
   }
+}
+
+function drawEllipse(ctx: CanvasRenderingContext2D, s: EllipseShape, scale: number) {
+  // Normalise so negative w/h drag (drag from BR to TL) still draws correctly.
+  const x = (s.w >= 0 ? s.x : s.x + s.w) * scale
+  const y = (s.h >= 0 ? s.y : s.y + s.h) * scale
+  const w = Math.abs(s.w) * scale
+  const h = Math.abs(s.h) * scale
+  ctx.beginPath()
+  ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2)
+  if (s.fill) {
+    ctx.fillStyle = s.fill
+    ctx.fill()
+  }
+  ctx.strokeStyle = s.color
+  ctx.lineWidth = s.strokeWidth * scale
+  ctx.stroke()
+}
+
+function drawLine(ctx: CanvasRenderingContext2D, s: LineShape, scale: number) {
+  ctx.strokeStyle = s.color
+  ctx.lineWidth = s.strokeWidth * scale
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  ctx.moveTo(s.x1 * scale, s.y1 * scale)
+  ctx.lineTo(s.x2 * scale, s.y2 * scale)
+  ctx.stroke()
 }
 
 function drawRect(ctx: CanvasRenderingContext2D, s: RectShape, scale: number) {

@@ -3,9 +3,11 @@ import { useTranslation } from 'react-i18next'
 import {
   ArrowRight,
   Brush,
+  Circle,
   Crop,
   Eraser,
   Frame,
+  Minus,
   MousePointer2,
   Pipette,
   RotateCcw,
@@ -19,6 +21,8 @@ import type { Tool } from '@/lib/image-editor/types'
 const TOOLS: { tool: Tool; icon: ReactNode; labelKey: string; key?: string }[] = [
   { tool: 'none', icon: <MousePointer2 className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.none', key: 'V' },
   { tool: 'rect', icon: <Square className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.rect', key: 'M' },
+  { tool: 'ellipse', icon: <Circle className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.ellipse', key: 'O' },
+  { tool: 'line', icon: <Minus className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.line', key: 'L' },
   { tool: 'arrow', icon: <ArrowRight className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.arrow', key: 'A' },
   { tool: 'text', icon: <Type className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.text', key: 'T' },
   { tool: 'mosaic', icon: <Squircle className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.mosaic' },

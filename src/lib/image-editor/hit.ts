@@ -31,8 +31,10 @@ function getShapeBBox(shape: Shape): Rect {
     case 'rect':
     case 'mosaic':
     case 'image':
+    case 'ellipse':
       return normalizeRect({ x: shape.x, y: shape.y, w: shape.w, h: shape.h })
-    case 'arrow': {
+    case 'arrow':
+    case 'line': {
       const x = Math.min(shape.x1, shape.x2)
       const y = Math.min(shape.y1, shape.y2)
       const w = Math.abs(shape.x2 - shape.x1)
@@ -105,6 +107,7 @@ export function getHandles(layer: Layer): Handle[] {
     case 'rect':
     case 'mosaic':
     case 'image':
+    case 'ellipse':
       return rectCornerHandles(
         normalizeRect({
           x: layer.shape.x,
@@ -114,6 +117,7 @@ export function getHandles(layer: Layer): Handle[] {
         }),
       )
     case 'arrow':
+    case 'line':
       return [
         { id: 'start', x: layer.shape.x1, y: layer.shape.y1 },
         { id: 'end', x: layer.shape.x2, y: layer.shape.y2 },

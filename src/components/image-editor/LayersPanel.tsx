@@ -178,5 +178,9 @@ function layerLabelKey(layer: Layer): string {
         : 'pages.imageEditor.annoLabel.brush'
     case 'image':
       return 'pages.imageEditor.annoLabel.image'
+    case 'ellipse':
+      return 'pages.imageEditor.annoLabel.ellipse'
+    case 'line':
+      return 'pages.imageEditor.annoLabel.line'
   }
 }
