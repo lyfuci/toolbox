@@ -408,6 +408,24 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
           shape: { kind: 'arrow', x1: p.x, y1: p.y, x2: p.x, y2: p.y, color: toolColor, strokeWidth: toolStrokeWidth },
         } as AnnotationLayer,
       })
+    } else if (tool === 'ellipse') {
+      setInteraction({
+        kind: 'drawing',
+        layer: {
+          ...baseLayer('Ellipse'),
+          kind: 'annotation',
+          shape: { kind: 'ellipse', x: p.x, y: p.y, w: 0, h: 0, color: toolColor, strokeWidth: toolStrokeWidth },
+        } as AnnotationLayer,
+      })
+    } else if (tool === 'line') {
+      setInteraction({
+        kind: 'drawing',
+        layer: {
+          ...baseLayer('Line'),
+          kind: 'annotation',
+          shape: { kind: 'line', x1: p.x, y1: p.y, x2: p.x, y2: p.y, color: toolColor, strokeWidth: toolStrokeWidth },
+        } as AnnotationLayer,
+      })
     } else if (tool === 'mosaic') {
       setInteraction({
         kind: 'drawing',
@@ -462,12 +480,12 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     const drawing = interaction.layer
     if (drawing.kind === 'annotation') {
       const s = drawing.shape
-      if (s.kind === 'rect' || s.kind === 'mosaic') {
+      if (s.kind === 'rect' || s.kind === 'mosaic' || s.kind === 'ellipse') {
         setInteraction({
           kind: 'drawing',
           layer: { ...drawing, shape: { ...s, w: p.x - s.x, h: p.y - s.y } } as AnnotationLayer,
         })
-      } else if (s.kind === 'arrow') {
+      } else if (s.kind === 'arrow' || s.kind === 'line') {
         setInteraction({
           kind: 'drawing',
           layer: { ...drawing, shape: { ...s, x2: p.x, y2: p.y } } as AnnotationLayer,
@@ -586,10 +604,10 @@ function shouldDiscardDrawing(layer: Layer): boolean {
   }
   if (layer.kind === 'annotation') {
     const s = layer.shape
-    if (s.kind === 'rect' || s.kind === 'mosaic') {
+    if (s.kind === 'rect' || s.kind === 'mosaic' || s.kind === 'ellipse') {
       return Math.abs(s.w) < 4 && Math.abs(s.h) < 4
     }
-    if (s.kind === 'arrow') {
+    if (s.kind === 'arrow' || s.kind === 'line') {
       return Math.abs(s.x2 - s.x1) < 4 && Math.abs(s.y2 - s.y1) < 4
     }
     if (s.kind === 'brush') {

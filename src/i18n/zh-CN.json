@@ -463,7 +463,9 @@
         "mask": "蒙版",
         "eyedropper": "吸管",
         "zoom": "缩放",
-        "crop": "裁剪"
+        "crop": "裁剪",
+        "ellipse": "椭圆",
+        "line": "直线"
       },
       "cropApply": "应用裁剪",
       "cropCancel": "取消",
@@ -515,7 +517,9 @@
         "brush": "笔刷",
         "eraser": "橡皮",
         "mask": "蒙版",
-        "image": "图片"
+        "image": "图片",
+        "ellipse": "椭圆",
+        "line": "直线"
       },
       "project": "项目",
       "projectSave": "保存项目 (.json)",

@@ -463,7 +463,9 @@
         "mask": "Mask",
         "eyedropper": "Eyedropper",
         "zoom": "Zoom",
-        "crop": "Crop"
+        "crop": "Crop",
+        "ellipse": "Ellipse",
+        "line": "Line"
       },
       "cropApply": "Apply crop",
       "cropCancel": "Cancel",
@@ -515,7 +517,9 @@
         "brush": "Brush stroke",
         "eraser": "Eraser stroke",
         "mask": "Mask",
-        "image": "Image"
+        "image": "Image",
+        "ellipse": "Ellipse",
+        "line": "Line"
       },
       "project": "Project",
       "projectSave": "Save project (.json)",

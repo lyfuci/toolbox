@@ -34,6 +34,8 @@ export type Tool =
   | 'zoom'
   | 'eyedropper'
   | 'crop'
+  | 'ellipse'
+  | 'line'
 
 export type Transforms = {
   rotation: Rotation
@@ -111,6 +113,25 @@ export type ImageShape = {
    */
   dataUrl: string
 }
+export type EllipseShape = {
+  kind: 'ellipse'
+  x: number
+  y: number
+  w: number
+  h: number
+  color: string
+  strokeWidth: number
+  fill?: string
+}
+export type LineShape = {
+  kind: 'line'
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  color: string
+  strokeWidth: number
+}
 
 export type Shape =
   | RectShape
@@ -119,6 +140,8 @@ export type Shape =
   | MosaicShape
   | BrushShape
   | ImageShape
+  | EllipseShape
+  | LineShape
 
 /** Drop shadow applied to a layer at render time via canvas shadow* properties. */
 export type Shadow = {
