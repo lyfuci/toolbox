@@ -163,6 +163,16 @@ export type LineShape = {
   color: string
   strokeWidth: number
 }
+/** Region-blur — drag a rect, area inside is blurred at render time. */
+export type BlurShape = {
+  kind: 'blur'
+  x: number
+  y: number
+  w: number
+  h: number
+  /** Blur radius in preview-canvas pixels. */
+  radius: number
+}
 
 export type Shape =
   | RectShape
@@ -173,6 +183,7 @@ export type Shape =
   | ImageShape
   | EllipseShape
   | LineShape
+  | BlurShape
 
 /** Drop shadow applied to a layer at render time via canvas shadow* properties. */
 export type Shadow = {

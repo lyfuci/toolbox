@@ -526,6 +526,7 @@
       "bucketEmpty": "Nothing to fill at that point — try a higher tolerance.",
       "errBucketRead": "Couldn't read pixels for fill (canvas tainted?).",
       "gradientHint": "Gradient (G): drag from start to end. Foreground at the start, background at the end. Result lands as a new layer.",
+      "blurHint": "Blur: drag a rect on the canvas — the area inside gets blurred at render time. Adjustable via the layer's bounds; default radius is 8 px.",
       "textToolHint": "Type (T): click on the canvas to add text.",
       "toolStubHint": "{{tool}} is a placeholder — the palette button is here for parity with Photoshop, but the tool isn't implemented yet.",
       "toolStubToast": "{{tool}} is not yet implemented.",
@@ -585,7 +586,8 @@
         "ellipse": "Ellipse",
         "line": "Line",
         "bucket": "Paint fill",
-        "gradient": "Gradient"
+        "gradient": "Gradient",
+        "blur": "Blur region"
       },
       "project": "Project",
       "projectSave": "Save project (.json)",

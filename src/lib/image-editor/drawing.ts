@@ -1,5 +1,6 @@
 import type {
   ArrowShape,
+  BlurShape,
   BrushShape,
   EllipseShape,
   ImageShape,
@@ -51,7 +52,41 @@ export function drawShape(
     case 'line':
       drawLine(ctx, shape, scale)
       break
+    case 'blur':
+      drawBlurRegion(ctx, shape, scale, underlying)
+      break
   }
+}
+
+/**
+ * Region blur — sample the underlying canvas under the rect, draw it back at
+ * the same place with `ctx.filter = blur(Npx)` applied. Same pattern as
+ * `drawMosaic` (snapshot the canvas before drawing, sample from it). Skipped
+ * for degenerate rects.
+ */
+function drawBlurRegion(
+  ctx: CanvasRenderingContext2D,
+  s: BlurShape,
+  scale: number,
+  underlying: HTMLCanvasElement,
+) {
+  const x = s.x * scale
+  const y = s.y * scale
+  const w = s.w * scale
+  const h = s.h * scale
+  const nx = w >= 0 ? x : x + w
+  const ny = h >= 0 ? y : y + h
+  const nw = Math.abs(w)
+  const nh = Math.abs(h)
+  if (nw < 2 || nh < 2) return
+  const r = Math.max(0.5, s.radius * scale)
+  ctx.save()
+  ctx.filter = `blur(${r}px)`
+  // The blur filter samples *outside* the source rect to fill its own edge,
+  // so artifacts at the rect's own border are minimal as long as we draw
+  // back into the same rect we sampled.
+  ctx.drawImage(underlying, nx, ny, nw, nh, nx, ny, nw, nh)
+  ctx.restore()
 }
 
 function drawEllipse(ctx: CanvasRenderingContext2D, s: EllipseShape, scale: number) {

@@ -526,6 +526,7 @@
       "bucketEmpty": "该位置无可填充区域 —— 试试调高容差。",
       "errBucketRead": "无法读取画布像素（可能跨域污染）。",
       "gradientHint": "渐变 (G)：从起点拖到终点，起点用前景色，终点用背景色，结果作为新图层。",
+      "blurHint": "模糊：在画布上拖出一个矩形 —— 渲染时该区域会被模糊。模糊半径默认 8 px，区域大小可拖角调整。",
       "textToolHint": "文字 (T)：在画布上单击以新增文字。",
       "toolStubHint": "{{tool}} 仅作占位 —— 工具栏按钮是为了对齐 Photoshop 而保留，但功能尚未实现。",
       "toolStubToast": "{{tool}} 暂未实现。",
@@ -585,7 +586,8 @@
         "ellipse": "椭圆",
         "line": "直线",
         "bucket": "油漆桶填充",
-        "gradient": "渐变"
+        "gradient": "渐变",
+        "blur": "模糊区域"
       },
       "project": "项目",
       "projectSave": "保存项目 (.json)",
