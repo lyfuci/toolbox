@@ -15,7 +15,6 @@ export const STUB_TOOLS: ReadonlySet<Tool> = new Set<Tool>([
   'spotHeal',
   'stamp',
   'historyBrush',
-  'gradient',
   'blur',
   'dodge',
   'pen',

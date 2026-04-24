@@ -107,7 +107,6 @@ const GROUPS: ToolDef[][] = [
       icon: <ScanLine className="h-4 w-4" />,
       labelKey: 'pages.imageEditor.tool.gradient',
       shortcut: 'G',
-      stub: true,
     },
     {
       id: 'bucket',

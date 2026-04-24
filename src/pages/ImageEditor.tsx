@@ -413,10 +413,6 @@ export function ImageEditorPage() {
    * the current editor state at source resolution, runs a 4-connected
    * scanline flood fill from the click point, builds an FG-coloured bitmap
    * of the matching region, and commits it as a new image-shape layer.
-   *
-   * The fill bitmap is stored at SOURCE resolution so exports stay sharp;
-   * the layer's preview-pixel rect spans the full canvas, so drawImage
-   * scales it down for the preview render.
    */
   const handleBucketFill = useCallback(
     async (previewPoint: { x: number; y: number }) => {
@@ -433,9 +429,8 @@ export function ImageEditorPage() {
       if (!ctx) return
 
       // Convert click from preview-pixel to source-pixel space. When a crop
-      // is active, the live canvas only spans the crop's preview region —
-      // shape coords are post-crop preview pixels, so we shift back by the
-      // crop origin (preview-pixel) and scale to source.
+      // is active, shape coords are post-crop preview pixels — shift back by
+      // the crop origin and scale to source.
       const cropOriginX = state.cropRect
         ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w)
         : 0
@@ -454,7 +449,6 @@ export function ImageEditorPage() {
       }
 
       const mask = floodFillMask(imageData, sx, sy, bucketTolerance)
-      // Empty mask → click was on a transparent edge or out of bounds.
       let any = false
       for (let i = 0; i < mask.length; i++) {
         if (mask[i]) {
@@ -471,8 +465,6 @@ export function ImageEditorPage() {
       if (!dataUrl) return
       await ensureImage(dataUrl)
 
-      // Layer rect spans the un-cropped preview canvas — image-shape coords
-      // are in original-image preview-pixel space (same as other shapes).
       const fullPreviewW = baseW * previewScale
       const fullPreviewH = baseH * previewScale
       const layer: AnnotationLayer = {
@@ -487,6 +479,56 @@ export function ImageEditorPage() {
       commitLayer(layer)
     },
     [image, state, imageCache, colors.fg, bucketTolerance, ensureImage, commitLayer, t],
+  )
+
+  /**
+   * Commit a gradient drag — paints a linear gradient from FG (at `start`)
+   * to BG (at `end`) onto a source-resolution canvas, then commits as a new
+   * image-shape layer covering the full preview canvas.
+   */
+  const handleCommitGradient = useCallback(
+    async (start: { x: number; y: number }, end: { x: number; y: number }) => {
+      if (!image) return
+      const { baseW, baseH } = dimsAfterRotation(image, state)
+      const previewScale = Math.min(1, PREVIEW_MAX / Math.max(baseW, baseH, 1))
+      const cropOriginX = state.cropRect
+        ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w)
+        : 0
+      const cropOriginY = state.cropRect
+        ? Math.min(state.cropRect.y, state.cropRect.y + state.cropRect.h)
+        : 0
+      const sx0 = (start.x + cropOriginX) / previewScale
+      const sy0 = (start.y + cropOriginY) / previewScale
+      const sx1 = (end.x + cropOriginX) / previewScale
+      const sy1 = (end.y + cropOriginY) / previewScale
+
+      const canvas = document.createElement('canvas')
+      canvas.width = baseW
+      canvas.height = baseH
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+      const grad = ctx.createLinearGradient(sx0, sy0, sx1, sy1)
+      grad.addColorStop(0, colors.fg)
+      grad.addColorStop(1, colors.bg)
+      ctx.fillStyle = grad
+      ctx.fillRect(0, 0, baseW, baseH)
+      const dataUrl = canvas.toDataURL('image/png')
+      await ensureImage(dataUrl)
+
+      const fullPreviewW = baseW * previewScale
+      const fullPreviewH = baseH * previewScale
+      const layer: AnnotationLayer = {
+        id: crypto.randomUUID(),
+        name: t('pages.imageEditor.annoLabel.gradient'),
+        visible: true,
+        opacity: 100,
+        blend: 'normal',
+        kind: 'annotation',
+        shape: { kind: 'image', x: 0, y: 0, w: fullPreviewW, h: fullPreviewH, dataUrl },
+      }
+      commitLayer(layer)
+    },
+    [image, state, colors.fg, colors.bg, ensureImage, commitLayer, t],
   )
 
   // ── Download / save ──────────────────────────────────────────────────────
@@ -603,6 +645,8 @@ export function ImageEditorPage() {
           tool={tool}
           fgColor={colors.fg}
           setFgColor={(c) => setColors((s) => ({ ...s, fg: c }))}
+          bgColor={colors.bg}
+          setBgColor={(c) => setColors((s) => ({ ...s, bg: c }))}
           strokeWidth={strokeWidth}
           setStrokeWidth={setStrokeWidth}
           bucketTolerance={bucketTolerance}
@@ -677,6 +721,7 @@ export function ImageEditorPage() {
               onCommitCrop={handleCommitCrop}
               onBucketClick={handleBucketFill}
               bucketTolerance={bucketTolerance}
+              onCommitGradient={handleCommitGradient}
             />
           </Workspace>
         </div>
