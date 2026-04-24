@@ -12,6 +12,9 @@ export const DEFAULT_ADJUST: Adjustments = {
   saturation: 100,
   grayscale: 0,
   blur: 0,
+  hue: 0,
+  sepia: 0,
+  invert: 0,
 }
 
 export const initialState = (): EditorState => ({
