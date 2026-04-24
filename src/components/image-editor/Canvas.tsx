@@ -512,6 +512,24 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
           },
         } as AnnotationLayer,
       })
+    } else if (tool === 'dodge') {
+      // Dodge layer defaults to 30% opacity so a single stroke gives a soft
+      // brightening — repeat strokes to build it up, just like PS.
+      setInteraction({
+        kind: 'drawing',
+        layer: {
+          ...baseLayer('Dodge'),
+          opacity: 30 as const,
+          kind: 'annotation',
+          shape: {
+            kind: 'brush',
+            points: [p],
+            color: '#ffffff',
+            strokeWidth: toolStrokeWidth,
+            mode: 'dodge',
+          },
+        } as AnnotationLayer,
+      })
     } else if (tool === 'mask') {
       setInteraction({
         kind: 'drawing',

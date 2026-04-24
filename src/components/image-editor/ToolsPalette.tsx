@@ -120,7 +120,6 @@ const GROUPS: ToolDef[][] = [
       icon: <Sun className="h-4 w-4" />,
       labelKey: 'pages.imageEditor.tool.dodge',
       shortcut: 'O',
-      stub: true,
     },
   ],
   // 3. Vector / type group

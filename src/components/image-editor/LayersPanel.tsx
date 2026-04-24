@@ -173,6 +173,8 @@ function layerLabelKey(layer: Layer): string {
     case 'mosaic':
       return 'pages.imageEditor.annoLabel.mosaic'
     case 'brush':
+      if (layer.shape.mode === 'dodge') return 'pages.imageEditor.annoLabel.dodge'
+      if (layer.shape.mode === 'burn') return 'pages.imageEditor.annoLabel.burn'
       return layer.shape.eraser
         ? 'pages.imageEditor.annoLabel.eraser'
         : 'pages.imageEditor.annoLabel.brush'
