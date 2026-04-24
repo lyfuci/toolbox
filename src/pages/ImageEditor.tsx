@@ -12,6 +12,7 @@ import { initialState, PREVIEW_MAX } from '@/lib/image-editor/defaults'
 import { useHistoryState } from '@/lib/image-editor/history'
 import { fileToDataUrl, useImageCache } from '@/lib/image-editor/image-cache'
 import { dimsAfterRotation } from '@/lib/image-editor/render'
+import { translateLayer } from '@/lib/image-editor/transform'
 import {
   loadImageFromUrl,
   parseProject,
@@ -59,6 +60,13 @@ export function ImageEditorPage() {
 
   // Cache of HTMLImageElements for image-shape layers (drag-drop'd images).
   const { cache: imageCache, ensure: ensureImage } = useImageCache()
+
+  // Refs hold the latest layer-op callbacks so the keyboard useEffect doesn't
+  // need them in deps (they're declared further down — TDZ otherwise). Each
+  // render updates the ref; the keyboard handler always reads the freshest fn.
+  const duplicateRef = useRef<() => void>(() => {})
+  const moveLayerRef = useRef<(d: 'forward' | 'backward' | 'front' | 'back') => void>(() => {})
+  const deleteLayerRef = useRef<() => void>(() => {})
 
   // Zoom + pan + Space-held pan mode.
   const [zoom, setZoom] = useState(1)
@@ -148,7 +156,34 @@ export function ImageEditorPage() {
           setPan({ x: 0, y: 0 })
           return
         }
+        // Cmd+J = duplicate selected layer (PS convention).
+        if (e.key === 'j' || e.key === 'J') {
+          e.preventDefault()
+          duplicateRef.current()
+          return
+        }
+        // Cmd+] / [ = bring forward / send backward. Add Shift for to-front /
+        // to-back.
+        if (e.key === ']') {
+          e.preventDefault()
+          moveLayerRef.current(e.shiftKey ? 'front' : 'forward')
+          return
+        }
+        if (e.key === '[') {
+          e.preventDefault()
+          moveLayerRef.current(e.shiftKey ? 'back' : 'backward')
+          return
+        }
         return
+      }
+
+      // Delete / Backspace = remove selected layer (image is protected).
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedLayerId && selectedLayerId !== 'image') {
+          e.preventDefault()
+          deleteLayerRef.current()
+          return
+        }
       }
 
       // No-modifier letter shortcuts.
@@ -208,7 +243,7 @@ export function ImageEditorPage() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [focused, zoomIn, zoomOut, zoomReset, swapColors, resetColors])
+  }, [focused, zoomIn, zoomOut, zoomReset, swapColors, resetColors, selectedLayerId])
 
   // ── State helpers ────────────────────────────────────────────────────────
   const setLayers = useCallback(
@@ -250,6 +285,50 @@ export function ImageEditorPage() {
       }),
     [history, state],
   )
+
+  // ── Layer keyboard ops (PS-style) ────────────────────────────────────────
+  // Cmd/Ctrl+J = duplicate selected layer (10px offset).
+  // Cmd+] / [ = bring forward / send backward (add Shift = to-front / to-back).
+  // Delete / Backspace = remove. All no-op when 'image' is selected.
+  // Stored on refs so the keyboard useEffect can reach them without re-binding
+  // every time state changes; useEffect updates the refs each render.
+  useEffect(() => {
+    duplicateRef.current = () => {
+      const orig = state.layers.find((l) => l.id === selectedLayerId)
+      if (!orig) return
+      const copy = JSON.parse(JSON.stringify(orig)) as Layer
+      copy.id = crypto.randomUUID()
+      copy.name = `${orig.name} copy`
+      const shifted = translateLayer(copy, 10, 10)
+      const idx = state.layers.findIndex((l) => l.id === selectedLayerId)
+      const next = [...state.layers]
+      next.splice(idx + 1, 0, shifted)
+      history.set({ ...state, layers: next })
+      setSelectedLayerId(shifted.id)
+    }
+    moveLayerRef.current = (direction) => {
+      const idx = state.layers.findIndex((l) => l.id === selectedLayerId)
+      if (idx === -1) return
+      const next = [...state.layers]
+      const [layer] = next.splice(idx, 1)
+      let newIdx: number
+      if (direction === 'forward') newIdx = Math.min(next.length, idx + 1)
+      else if (direction === 'backward') newIdx = Math.max(0, idx - 1)
+      else if (direction === 'front') newIdx = next.length
+      else newIdx = 0
+      if (newIdx === idx) return
+      next.splice(newIdx, 0, layer)
+      history.set({ ...state, layers: next })
+    }
+    deleteLayerRef.current = () => {
+      if (!selectedLayerId || selectedLayerId === 'image') return
+      history.set({
+        ...state,
+        layers: state.layers.filter((l) => l.id !== selectedLayerId),
+      })
+      setSelectedLayerId('image')
+    }
+  })
 
   // Crop commit → apply (or replace) state.cropRect. Rect is already in the
   // post-rotation preview-pixel space relative to the original image.
