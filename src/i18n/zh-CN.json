@@ -521,6 +521,10 @@
       "moveToolHint": "移动 (V)：拖动图层；Cmd/Ctrl+J 复制；Delete 删除。",
       "zoomToolHint": "缩放 (Z)：单击放大 2×，Alt 单击缩小。Cmd/Ctrl+滚轮在光标位置缩放。",
       "eyedropperHint": "吸管 (I)：在画布上单击以拾取前景色。",
+      "bucketTolerance": "容差",
+      "bucketHint": "油漆桶 (G)：单击以填充容差内的相连像素，结果作为新图层。",
+      "bucketEmpty": "该位置无可填充区域 —— 试试调高容差。",
+      "errBucketRead": "无法读取画布像素（可能跨域污染）。",
       "textToolHint": "文字 (T)：在画布上单击以新增文字。",
       "toolStubHint": "{{tool}} 仅作占位 —— 工具栏按钮是为了对齐 Photoshop 而保留，但功能尚未实现。",
       "toolStubToast": "{{tool}} 暂未实现。",
@@ -578,7 +582,8 @@
         "mask": "蒙版",
         "image": "图片",
         "ellipse": "椭圆",
-        "line": "直线"
+        "line": "直线",
+        "bucket": "油漆桶填充"
       },
       "project": "项目",
       "projectSave": "保存项目 (.json)",

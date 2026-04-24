@@ -12,9 +12,10 @@ import { STUB_TOOLS } from '@/components/image-editor/tool-meta'
 import { Workspace, type WorkspaceHandle } from '@/components/image-editor/Workspace'
 import '@/components/image-editor/pixelforge.css'
 import { initialState, PREVIEW_MAX } from '@/lib/image-editor/defaults'
+import { floodFillMask, maskToDataUrl } from '@/lib/image-editor/flood-fill'
 import { useHistoryState } from '@/lib/image-editor/history'
 import { fileToDataUrl, useImageCache } from '@/lib/image-editor/image-cache'
-import { dimsAfterRotation } from '@/lib/image-editor/render'
+import { dimsAfterRotation, renderTo } from '@/lib/image-editor/render'
 import { translateLayer } from '@/lib/image-editor/transform'
 import {
   loadImageFromUrl,
@@ -74,6 +75,7 @@ export function ImageEditorPage() {
     [],
   )
   const [strokeWidth, setStrokeWidth] = useState(4)
+  const [bucketTolerance, setBucketTolerance] = useState(32)
   const [selectedLayerId, setSelectedLayerId] = useState<string>('image')
 
   const [outFormat, setOutFormat] = useState<OutputFormat>('png')
@@ -406,6 +408,87 @@ export function ImageEditorPage() {
     [],
   )
 
+  /**
+   * Paint Bucket flood fill at `previewPoint` (preview-pixel space). Renders
+   * the current editor state at source resolution, runs a 4-connected
+   * scanline flood fill from the click point, builds an FG-coloured bitmap
+   * of the matching region, and commits it as a new image-shape layer.
+   *
+   * The fill bitmap is stored at SOURCE resolution so exports stay sharp;
+   * the layer's preview-pixel rect spans the full canvas, so drawImage
+   * scales it down for the preview render.
+   */
+  const handleBucketFill = useCallback(
+    async (previewPoint: { x: number; y: number }) => {
+      if (!image) return
+      const { baseW, baseH } = dimsAfterRotation(image, state)
+      const previewScale = Math.min(1, PREVIEW_MAX / Math.max(baseW, baseH, 1))
+
+      // The preview canvas is the cropped region's preview-pixel size when a
+      // crop is active. Re-render at source resolution (scale=1) so the
+      // flood fill operates on the true image.
+      const srcCanvas = document.createElement('canvas')
+      renderTo(srcCanvas, { image, state, scale: 1, previewScale, imageCache })
+      const ctx = srcCanvas.getContext('2d', { willReadFrequently: true })
+      if (!ctx) return
+
+      // Convert click from preview-pixel to source-pixel space. When a crop
+      // is active, the live canvas only spans the crop's preview region —
+      // shape coords are post-crop preview pixels, so we shift back by the
+      // crop origin (preview-pixel) and scale to source.
+      const cropOriginX = state.cropRect
+        ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w)
+        : 0
+      const cropOriginY = state.cropRect
+        ? Math.min(state.cropRect.y, state.cropRect.y + state.cropRect.h)
+        : 0
+      const sx = Math.round((previewPoint.x + cropOriginX) / previewScale)
+      const sy = Math.round((previewPoint.y + cropOriginY) / previewScale)
+
+      let imageData: ImageData
+      try {
+        imageData = ctx.getImageData(0, 0, srcCanvas.width, srcCanvas.height)
+      } catch {
+        toast.error(t('pages.imageEditor.errBucketRead'))
+        return
+      }
+
+      const mask = floodFillMask(imageData, sx, sy, bucketTolerance)
+      // Empty mask → click was on a transparent edge or out of bounds.
+      let any = false
+      for (let i = 0; i < mask.length; i++) {
+        if (mask[i]) {
+          any = true
+          break
+        }
+      }
+      if (!any) {
+        toast.message(t('pages.imageEditor.bucketEmpty'))
+        return
+      }
+
+      const dataUrl = maskToDataUrl(mask, srcCanvas.width, srcCanvas.height, colors.fg)
+      if (!dataUrl) return
+      await ensureImage(dataUrl)
+
+      // Layer rect spans the un-cropped preview canvas — image-shape coords
+      // are in original-image preview-pixel space (same as other shapes).
+      const fullPreviewW = baseW * previewScale
+      const fullPreviewH = baseH * previewScale
+      const layer: AnnotationLayer = {
+        id: crypto.randomUUID(),
+        name: t('pages.imageEditor.annoLabel.bucket'),
+        visible: true,
+        opacity: 100,
+        blend: 'normal',
+        kind: 'annotation',
+        shape: { kind: 'image', x: 0, y: 0, w: fullPreviewW, h: fullPreviewH, dataUrl },
+      }
+      commitLayer(layer)
+    },
+    [image, state, imageCache, colors.fg, bucketTolerance, ensureImage, commitLayer, t],
+  )
+
   // ── Download / save ──────────────────────────────────────────────────────
   /**
    * Render and download the current canvas in the requested format. If
@@ -522,6 +605,8 @@ export function ImageEditorPage() {
           setFgColor={(c) => setColors((s) => ({ ...s, fg: c }))}
           strokeWidth={strokeWidth}
           setStrokeWidth={setStrokeWidth}
+          bucketTolerance={bucketTolerance}
+          setBucketTolerance={setBucketTolerance}
           isStubTool={STUB_TOOLS.has(tool)}
           hasActiveCrop={!!state.cropRect}
           onClearCrop={handleClearCrop}
@@ -590,6 +675,8 @@ export function ImageEditorPage() {
               onZoomAt={zoomAtPoint}
               onPickColor={handlePickColor}
               onCommitCrop={handleCommitCrop}
+              onBucketClick={handleBucketFill}
+              bucketTolerance={bucketTolerance}
             />
           </Workspace>
         </div>

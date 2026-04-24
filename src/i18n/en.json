@@ -521,6 +521,10 @@
       "moveToolHint": "Move (V): drag layers; Cmd/Ctrl+J duplicate; Delete remove.",
       "zoomToolHint": "Zoom (Z): click to zoom in 2×, Alt-click to zoom out. Cmd/Ctrl+wheel zooms at cursor.",
       "eyedropperHint": "Eyedropper (I): click anywhere on the canvas to set the foreground color.",
+      "bucketTolerance": "Tolerance",
+      "bucketHint": "Paint Bucket (G): click to flood-fill connected pixels within tolerance. Result lands as a new layer.",
+      "bucketEmpty": "Nothing to fill at that point — try a higher tolerance.",
+      "errBucketRead": "Couldn't read pixels for fill (canvas tainted?).",
       "textToolHint": "Type (T): click on the canvas to add text.",
       "toolStubHint": "{{tool}} is a placeholder — the palette button is here for parity with Photoshop, but the tool isn't implemented yet.",
       "toolStubToast": "{{tool}} is not yet implemented.",
@@ -578,7 +582,8 @@
         "mask": "Mask",
         "image": "Image",
         "ellipse": "Ellipse",
-        "line": "Line"
+        "line": "Line",
+        "bucket": "Paint fill"
       },
       "project": "Project",
       "projectSave": "Save project (.json)",
