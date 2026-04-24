@@ -8,6 +8,7 @@ import type {
   Layer,
   MaskLayer,
   Rect,
+  Shadow,
 } from './types'
 
 export type RenderInput = {
@@ -168,6 +169,7 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
       ctx.save()
       ctx.globalAlpha = l.opacity / 100
       ctx.globalCompositeOperation = blendModeToOp(l.blend)
+      applyShadow(ctx, l.shadow, annoScale)
       // Mosaic is the only shape that needs to read the underlying composite.
       const underlying =
         l.shape.kind === 'mosaic' ? snapshotCanvas(canvas) : canvas
@@ -185,6 +187,7 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
       ctx.save()
       ctx.globalAlpha = layer.opacity / 100
       ctx.globalCompositeOperation = blendModeToOp(layer.blend)
+      applyShadow(ctx, layer.shadow, annoScale)
       const underlying =
         layer.shape.kind === 'mosaic' ? snapshotCanvas(canvas) : canvas
       drawShape(ctx, layer.shape, annoScale, underlying, input.imageCache)
@@ -236,6 +239,23 @@ function drawSelectionChrome(
     ctx.strokeRect(hx, hy, size, size)
   }
   ctx.restore()
+}
+
+/**
+ * Apply a layer's drop shadow to the canvas context. Shadow offsets are stored
+ * in preview-pixel space; multiply by `scale` to convert to target pixels.
+ * No-op when the shadow is undefined or disabled.
+ */
+function applyShadow(
+  ctx: CanvasRenderingContext2D,
+  shadow: Shadow | undefined,
+  scale: number,
+) {
+  if (!shadow || !shadow.enabled) return
+  ctx.shadowColor = shadow.color
+  ctx.shadowOffsetX = shadow.offsetX * scale
+  ctx.shadowOffsetY = shadow.offsetY * scale
+  ctx.shadowBlur = shadow.blur * scale
 }
 
 function blendModeToOp(b: BlendMode): GlobalCompositeOperation {

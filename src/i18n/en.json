@@ -491,6 +491,11 @@
       "layerProps": "Layer properties",
       "opacity": "Opacity",
       "blend": "Blend",
+      "dropShadow": "Drop shadow",
+      "shadowX": "Shadow X",
+      "shadowY": "Shadow Y",
+      "shadowBlur": "Shadow blur",
+      "shadowColor": "Color",
       "blendMode": {
         "normal": "Normal",
         "multiply": "Multiply",

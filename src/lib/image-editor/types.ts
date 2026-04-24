@@ -117,12 +117,22 @@ export type Shape =
   | BrushShape
   | ImageShape
 
+/** Drop shadow applied to a layer at render time via canvas shadow* properties. */
+export type Shadow = {
+  enabled: boolean
+  offsetX: number // preview-canvas pixels
+  offsetY: number
+  blur: number
+  color: string // any valid CSS color (we use rgba for opacity control)
+}
+
 type LayerCommon = {
   id: string
   name: string
   visible: boolean
   opacity: number // 0-100
   blend: BlendMode
+  shadow?: Shadow
 }
 
 export type ImageLayerProps = LayerCommon & { kind: 'image' }

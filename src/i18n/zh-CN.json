@@ -491,6 +491,11 @@
       "layerProps": "图层属性",
       "opacity": "不透明度",
       "blend": "混合模式",
+      "dropShadow": "投影",
+      "shadowX": "投影 X",
+      "shadowY": "投影 Y",
+      "shadowBlur": "投影模糊",
+      "shadowColor": "颜色",
       "blendMode": {
         "normal": "正常",
         "multiply": "正片叠底",
