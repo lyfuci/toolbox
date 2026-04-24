@@ -1,0 +1,441 @@
+/*
+ * PixelForge tokens — scoped to .pf-root so they don't leak into the rest of
+ * the toolbox. Mirrors the design handoff (PixelForge.html) so the editor has
+ * a distinct, denser, PS-style appearance regardless of the global theme.
+ */
+
+.pf-root {
+  --pf-hue: 220;
+  --pf-sat: 2%;
+  --pf-bg-0: hsl(var(--pf-hue), var(--pf-sat), 18%);
+  --pf-bg-1: hsl(var(--pf-hue), var(--pf-sat), 22%);
+  --pf-bg-2: hsl(var(--pf-hue), var(--pf-sat), 26%);
+  --pf-bg-3: hsl(var(--pf-hue), var(--pf-sat), 30%);
+  --pf-bg-4: hsl(var(--pf-hue), var(--pf-sat), 34%);
+  --pf-bg-canvas: hsl(var(--pf-hue), var(--pf-sat), 14%);
+  --pf-line: hsl(var(--pf-hue), var(--pf-sat), 10%);
+  --pf-line-soft: hsl(var(--pf-hue), var(--pf-sat), 38%);
+  --pf-fg: hsl(var(--pf-hue), 4%, 88%);
+  --pf-fg-mid: hsl(var(--pf-hue), 3%, 70%);
+  --pf-fg-dim: hsl(var(--pf-hue), 3%, 55%);
+  --pf-accent: #3a8cff;
+
+  --pf-row-h: 22px;
+  --pf-tool-w: 28px;
+  --pf-menu-h: 22px;
+  --pf-options-h: 32px;
+  --pf-tabs-h: 26px;
+  --pf-status-h: 22px;
+  --pf-right-w: 288px;
+  --pf-icon: 16px;
+  --pf-font-ui: 12px;
+  --pf-font-sm: 11px;
+  --pf-font-xs: 10px;
+
+  background: var(--pf-bg-1);
+  color: var(--pf-fg);
+  font-size: var(--pf-font-ui);
+  user-select: none;
+}
+
+.pf-root.pf-density-compact {
+  --pf-row-h: 19px;
+  --pf-menu-h: 20px;
+  --pf-options-h: 28px;
+  --pf-tabs-h: 22px;
+  --pf-status-h: 20px;
+  --pf-tool-w: 24px;
+  --pf-right-w: 260px;
+  --pf-font-ui: 11.5px;
+  --pf-font-sm: 10.5px;
+  --pf-icon: 14px;
+}
+
+.pf-shell {
+  display: grid;
+  grid-template-rows: var(--pf-menu-h) var(--pf-options-h) 1fr var(--pf-status-h);
+  grid-template-columns: var(--pf-tool-w) 1fr var(--pf-right-w);
+  grid-template-areas:
+    'menu menu menu'
+    'opts opts opts'
+    'tools canvas right'
+    'status status status';
+  height: 100%;
+  width: 100%;
+  background: var(--pf-bg-1);
+}
+
+.pf-menubar {
+  grid-area: menu;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 6px;
+  background: var(--pf-bg-2);
+  border-bottom: 1px solid var(--pf-line);
+  font-size: var(--pf-font-sm);
+}
+.pf-menubar-name {
+  font-size: var(--pf-font-sm);
+  color: var(--pf-fg-mid);
+  margin-right: 14px;
+  padding-left: 4px;
+  font-weight: 500;
+}
+.pf-menubar-name b {
+  color: var(--pf-fg);
+  font-weight: 600;
+}
+.pf-menu-item {
+  padding: 0 8px;
+  height: calc(var(--pf-menu-h) - 2px);
+  display: inline-flex;
+  align-items: center;
+  border-radius: 3px;
+  cursor: default;
+  color: var(--pf-fg);
+}
+.pf-menu-item:hover,
+.pf-menu-item.pf-open {
+  background: var(--pf-bg-4);
+}
+
+.pf-menu-dd {
+  position: absolute;
+  top: var(--pf-menu-h);
+  left: 0;
+  min-width: 240px;
+  background: var(--pf-bg-3);
+  border: 1px solid var(--pf-line);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  padding: 4px 0;
+  z-index: 50;
+  font-size: var(--pf-font-sm);
+}
+.pf-menu-dd .pf-mi {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: center;
+  padding: 0 10px;
+  height: 22px;
+  cursor: default;
+  color: var(--pf-fg);
+  gap: 8px;
+}
+.pf-menu-dd .pf-mi:hover:not(.pf-disabled):not(.pf-sep) {
+  background: var(--pf-accent);
+  color: #fff;
+}
+.pf-menu-dd .pf-mi.pf-disabled {
+  color: var(--pf-fg-dim);
+  pointer-events: none;
+}
+.pf-menu-dd .pf-mi.pf-sep {
+  height: 1px;
+  padding: 0;
+  margin: 4px 0;
+  background: var(--pf-line);
+}
+.pf-menu-dd .pf-kbd {
+  color: var(--pf-fg-dim);
+  font-size: 10.5px;
+  font-family: ui-monospace, Menlo, monospace;
+}
+.pf-menu-dd .pf-mi:hover:not(.pf-disabled):not(.pf-sep) .pf-kbd {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.pf-options {
+  grid-area: opts;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  background: var(--pf-bg-2);
+  border-bottom: 1px solid var(--pf-line);
+  font-size: var(--pf-font-sm);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.pf-opt-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  height: 22px;
+  border-right: 1px solid var(--pf-line-soft);
+}
+.pf-opt-group:last-child {
+  border-right: 0;
+}
+.pf-opt-label {
+  color: var(--pf-fg-mid);
+  margin-right: 4px;
+}
+.pf-opt-input {
+  height: 20px;
+  background: var(--pf-bg-1);
+  border: 1px solid var(--pf-line);
+  color: var(--pf-fg);
+  font: inherit;
+  padding: 0 6px;
+  border-radius: 2px;
+  width: 54px;
+  font-variant-numeric: tabular-nums;
+}
+.pf-opt-select {
+  height: 20px;
+  background: var(--pf-bg-1);
+  border: 1px solid var(--pf-line);
+  color: var(--pf-fg);
+  font: inherit;
+  padding: 0 16px 0 6px;
+  border-radius: 2px;
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'><path fill='%23888' d='M0 0h8L4 5z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 4px center;
+}
+.pf-opt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  background: var(--pf-bg-1);
+  border: 1px solid var(--pf-line);
+  color: var(--pf-fg);
+  cursor: default;
+}
+.pf-opt-btn:hover {
+  background: var(--pf-bg-3);
+}
+.pf-opt-btn.pf-active {
+  background: var(--pf-bg-4);
+  border-color: var(--pf-line-soft);
+}
+
+.pf-tools {
+  grid-area: tools;
+  background: var(--pf-bg-2);
+  border-right: 1px solid var(--pf-line);
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+.pf-tools::-webkit-scrollbar {
+  display: none;
+}
+.pf-tool-btn {
+  position: relative;
+  width: var(--pf-tool-w);
+  height: var(--pf-tool-w);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pf-fg-mid);
+  cursor: default;
+  flex-shrink: 0;
+}
+.pf-tool-btn:hover {
+  background: var(--pf-bg-3);
+  color: var(--pf-fg);
+}
+.pf-tool-btn.pf-active {
+  background: var(--pf-bg-4);
+  color: var(--pf-fg);
+}
+.pf-tool-btn.pf-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  background: var(--pf-accent);
+}
+.pf-tool-btn.pf-stub {
+  opacity: 0.55;
+}
+.pf-tool-btn.pf-stub:hover {
+  color: var(--pf-fg-mid);
+}
+.pf-tool-sep {
+  height: 1px;
+  background: var(--pf-line);
+  margin: 4px 4px;
+  flex-shrink: 0;
+}
+.pf-tool-colors {
+  position: relative;
+  width: var(--pf-tool-w);
+  height: 28px;
+  margin: 4px auto;
+  flex-shrink: 0;
+}
+.pf-tool-colors .pf-fg,
+.pf-tool-colors .pf-bg {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--pf-fg-dim);
+  cursor: pointer;
+  overflow: hidden;
+}
+.pf-tool-colors .pf-bg {
+  right: 2px;
+  bottom: 2px;
+}
+.pf-tool-colors .pf-fg {
+  left: 2px;
+  top: 2px;
+  z-index: 1;
+}
+.pf-tool-colors input[type='color'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+}
+.pf-tool-mode {
+  width: var(--pf-tool-w);
+  height: var(--pf-tool-w);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pf-fg-mid);
+  cursor: default;
+  flex-shrink: 0;
+}
+.pf-tool-mode:hover {
+  color: var(--pf-fg);
+}
+
+.pf-canvas-wrap {
+  grid-area: canvas;
+  display: grid;
+  grid-template-rows: var(--pf-tabs-h) 1fr;
+  background: var(--pf-bg-canvas);
+  min-width: 0;
+}
+.pf-tabs {
+  display: flex;
+  align-items: stretch;
+  background: var(--pf-bg-1);
+  border-bottom: 1px solid var(--pf-line);
+  overflow: hidden;
+}
+.pf-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  padding: 0 10px;
+  font-size: var(--pf-font-sm);
+  color: var(--pf-fg-mid);
+  border-right: 1px solid var(--pf-line);
+  background: var(--pf-bg-1);
+  cursor: default;
+  max-width: 320px;
+}
+.pf-tab.pf-active {
+  background: var(--pf-bg-canvas);
+  color: var(--pf-fg);
+}
+.pf-tab-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pf-canvas-area {
+  position: relative;
+  overflow: hidden;
+  background: var(--pf-bg-canvas);
+}
+
+.pf-right {
+  grid-area: right;
+  background: var(--pf-bg-2);
+  border-left: 1px solid var(--pf-line);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.pf-panel-group {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 2px solid var(--pf-bg-0);
+  flex-shrink: 0;
+}
+.pf-panel-group:last-child {
+  border-bottom: 0;
+}
+.pf-panel-tabs {
+  display: flex;
+  align-items: stretch;
+  background: var(--pf-bg-1);
+  border-bottom: 1px solid var(--pf-line);
+  min-height: 24px;
+}
+.pf-panel-tab {
+  padding: 0 10px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--pf-font-sm);
+  color: var(--pf-fg-mid);
+  border-right: 1px solid var(--pf-line);
+  cursor: default;
+}
+.pf-panel-tab.pf-active {
+  color: var(--pf-fg);
+  background: var(--pf-bg-2);
+}
+.pf-panel-tab:hover:not(.pf-active) {
+  color: var(--pf-fg);
+}
+.pf-panel-body {
+  padding: 6px 8px;
+  font-size: var(--pf-font-sm);
+}
+
+.pf-statusbar {
+  grid-area: status;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--pf-bg-2);
+  border-top: 1px solid var(--pf-line);
+  font-size: var(--pf-font-sm);
+  color: var(--pf-fg-mid);
+  padding: 0 8px;
+}
+.pf-zoom-input {
+  width: 54px;
+  height: 18px;
+  border: 1px solid var(--pf-line);
+  background: var(--pf-bg-1);
+  color: var(--pf-fg);
+  font: inherit;
+  padding: 0 4px;
+  border-radius: 2px;
+}
+
+/* Outside-click backdrop for menu dropdowns. */
+.pf-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}

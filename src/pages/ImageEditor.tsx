@@ -3,11 +3,14 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Canvas, type CanvasHandle } from '@/components/image-editor/Canvas'
 import { DropZone } from '@/components/image-editor/DropZone'
+import { MenuBar } from '@/components/image-editor/MenuBar'
+import { OptionsBar } from '@/components/image-editor/OptionsBar'
 import { RightSidebar } from '@/components/image-editor/RightSidebar'
 import { StatusBar } from '@/components/image-editor/StatusBar'
 import { ToolsPalette } from '@/components/image-editor/ToolsPalette'
-import { TopActionBar } from '@/components/image-editor/TopActionBar'
+import { STUB_TOOLS } from '@/components/image-editor/tool-meta'
 import { Workspace, type WorkspaceHandle } from '@/components/image-editor/Workspace'
+import '@/components/image-editor/pixelforge.css'
 import { initialState, PREVIEW_MAX } from '@/lib/image-editor/defaults'
 import { useHistoryState } from '@/lib/image-editor/history'
 import { fileToDataUrl, useImageCache } from '@/lib/image-editor/image-cache'
@@ -24,8 +27,31 @@ import type {
   Layer,
   OutputFormat,
   Tool,
+  Transforms,
 } from '@/lib/image-editor/types'
 
+/**
+ * Image editor page (PixelForge shell).
+ *
+ * Layout — a 4-row × 3-col CSS grid (`pf-shell`):
+ *
+ *   ┌──────────────────────────────────┐
+ *   │  menu bar                        │
+ *   ├──────────────────────────────────┤
+ *   │  options bar (context-sensitive) │
+ *   ├──────┬───────────────────┬───────┤
+ *   │tools │ tab strip + canvas│ panels│
+ *   │ rail │                   │ right │
+ *   ├──────┴───────────────────┴───────┤
+ *   │  status bar                      │
+ *   └──────────────────────────────────┘
+ *
+ * Drawing/state lives in the existing Canvas/Workspace; the new shell
+ * components (MenuBar, OptionsBar, ToolsPalette, RightSidebar, StatusBar)
+ * are pure presentational layers that wire into the same state. Tools that
+ * aren't yet implemented are rendered in the palette as "stub" buttons —
+ * they don't change tool state; clicking surfaces a toast.
+ */
 export function ImageEditorPage() {
   const { t } = useTranslation()
 
@@ -51,19 +77,14 @@ export function ImageEditorPage() {
   const [selectedLayerId, setSelectedLayerId] = useState<string>('image')
 
   const [outFormat, setOutFormat] = useState<OutputFormat>('png')
-  const [outQuality, setOutQuality] = useState(92)
+  const outQuality = 92
 
-  // Focus mode: editor takes over the viewport, hides toolbox chrome.
   const [focused, setFocused] = useState(false)
   const canvasRef = useRef<CanvasHandle | null>(null)
   const workspaceRef = useRef<WorkspaceHandle | null>(null)
 
-  // Cache of HTMLImageElements for image-shape layers (drag-drop'd images).
   const { cache: imageCache, ensure: ensureImage } = useImageCache()
 
-  // Refs hold the latest layer-op callbacks so the keyboard useEffect doesn't
-  // need them in deps (they're declared further down — TDZ otherwise). Each
-  // render updates the ref; the keyboard handler always reads the freshest fn.
   const duplicateRef = useRef<() => void>(() => {})
   const moveLayerRef = useRef<(d: 'forward' | 'backward' | 'front' | 'back') => void>(() => {})
   const deleteLayerRef = useRef<() => void>(() => {})
@@ -84,15 +105,6 @@ export function ImageEditorPage() {
     setPan({ x: 0, y: 0 })
   }, [])
 
-  /**
-   * Zoom by `factor` so the point under the cursor stays fixed on screen.
-   * Used by both the Z (zoom) tool click and Cmd/Ctrl+wheel.
-   *
-   * Math: the wrapper is rendered with `translate(pan) scale(zoom)` around its
-   * geometric centre. To keep the cursor anchored when zoom changes from z₀ to
-   * z₁, the new pan must satisfy:
-   *   panNew = pan + (cursor - wrapperCentre) * (1 - z₁/z₀)
-   */
   const zoomAtPoint = useCallback(
     (clientX: number, clientY: number, factor: number) => {
       setZoom((z0) => {
@@ -114,70 +126,49 @@ export function ImageEditorPage() {
     [],
   )
 
-  // ── Global keyboard shortcuts ────────────────────────────────────────────
-  // F = focus toggle / Esc exit (existing).
-  // Space-hold = pan tool override.
-  // Z / Shift+Z / Cmd+/-/0/1 = zoom.
-  // V / M / T / B / E / A = tool shortcuts (PS conventions).
-  // (Cmd+Z / Cmd+Shift+Z handled in useHistoryState.)
+  // Stub-tool toast — also surfaced when a stub-tool keyboard shortcut fires.
+  const stubMsg = useCallback(
+    (toolName: string) =>
+      toast.message(t('pages.imageEditor.toolStubToast', { tool: toolName })),
+    [t],
+  )
+
+  // Try to set tool; if it's in the stub set, show a toast and don't change state.
+  const trySetTool = useCallback(
+    (next: Tool) => {
+      if (STUB_TOOLS.has(next)) {
+        stubMsg(t(`pages.imageEditor.tool.${next}`))
+        return
+      }
+      setTool(next)
+    },
+    [stubMsg, t],
+  )
+
+  // ── Global keyboard shortcuts (PS-style) ────────────────────────────────
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
 
-      // Space → pan mode (no modifiers).
       if (e.code === 'Space' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
         e.preventDefault()
         setPanMode(true)
         return
       }
 
-      // Cmd/Ctrl combos.
       const mod = e.metaKey || e.ctrlKey
       if (mod) {
-        if (e.key === '+' || e.key === '=') {
-          e.preventDefault()
-          zoomIn()
-          return
-        }
-        if (e.key === '-' || e.key === '_') {
-          e.preventDefault()
-          zoomOut()
-          return
-        }
-        if (e.key === '0') {
-          e.preventDefault()
-          zoomReset()
-          return
-        }
-        if (e.key === '1') {
-          e.preventDefault()
-          setZoom(1)
-          setPan({ x: 0, y: 0 })
-          return
-        }
-        // Cmd+J = duplicate selected layer (PS convention).
-        if (e.key === 'j' || e.key === 'J') {
-          e.preventDefault()
-          duplicateRef.current()
-          return
-        }
-        // Cmd+] / [ = bring forward / send backward. Add Shift for to-front /
-        // to-back.
-        if (e.key === ']') {
-          e.preventDefault()
-          moveLayerRef.current(e.shiftKey ? 'front' : 'forward')
-          return
-        }
-        if (e.key === '[') {
-          e.preventDefault()
-          moveLayerRef.current(e.shiftKey ? 'back' : 'backward')
-          return
-        }
+        if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomIn(); return }
+        if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomOut(); return }
+        if (e.key === '0') { e.preventDefault(); zoomReset(); return }
+        if (e.key === '1') { e.preventDefault(); setZoom(1); setPan({ x: 0, y: 0 }); return }
+        if (e.key === 'j' || e.key === 'J') { e.preventDefault(); duplicateRef.current(); return }
+        if (e.key === ']') { e.preventDefault(); moveLayerRef.current(e.shiftKey ? 'front' : 'forward'); return }
+        if (e.key === '[') { e.preventDefault(); moveLayerRef.current(e.shiftKey ? 'back' : 'backward'); return }
         return
       }
 
-      // Delete / Backspace = remove selected layer (image is protected).
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedLayerId && selectedLayerId !== 'image') {
           e.preventDefault()
@@ -186,14 +177,7 @@ export function ImageEditorPage() {
         }
       }
 
-      // No-modifier letter shortcuts.
-      if (e.key === 'f' || e.key === 'F') {
-        e.preventDefault()
-        setFocused((v) => !v)
-        return
-      }
-      // Crop commit/cancel — Enter applies the pending drag, Escape cancels.
-      // Both no-op if no crop is pending. Escape also exits focus mode (below).
+      if (e.key === 'f' || e.key === 'F') { e.preventDefault(); setFocused((v) => !v); return }
       if (e.key === 'Enter' && canvasRef.current?.hasPendingCrop()) {
         e.preventDefault()
         canvasRef.current.commitPendingCrop()
@@ -204,40 +188,40 @@ export function ImageEditorPage() {
         canvasRef.current.cancelPendingCrop()
         return
       }
-      if (e.key === 'Escape' && focused) {
-        e.preventDefault()
-        setFocused(false)
-        return
+      if (e.key === 'Escape' && focused) { e.preventDefault(); setFocused(false); return }
+      if (e.key === 'x' || e.key === 'X') { e.preventDefault(); swapColors(); return }
+      if (e.key === 'd' || e.key === 'D') { e.preventDefault(); resetColors(); return }
+
+      // Tool shortcuts. PS-aligned: stub-tool shortcuts (M/L/W/J/S/Y/G/O/P/H)
+      // surface a toast via trySetTool rather than silently doing nothing.
+      const map: Record<string, Tool> = {
+        v: 'none',
+        m: 'marquee',
+        l: 'lasso',
+        w: 'wand',
+        c: 'crop',
+        i: 'eyedropper',
+        j: 'spotHeal',
+        b: 'brush',
+        s: 'stamp',
+        y: 'historyBrush',
+        e: 'eraser',
+        g: 'gradient',
+        o: 'dodge',
+        p: 'pen',
+        t: 'text',
+        u: 'rect',
+        h: 'hand',
+        z: 'zoom',
       }
-      // X = swap fg/bg. D = default colors (black/white). PS conventions.
-      if (e.key === 'x' || e.key === 'X') {
+      const next = map[e.key.toLowerCase()]
+      if (next) {
         e.preventDefault()
-        swapColors()
-        return
+        trySetTool(next)
       }
-      if (e.key === 'd' || e.key === 'D') {
-        e.preventDefault()
-        resetColors()
-        return
-      }
-      // Tool shortcuts (PS-style). Z is the zoom *tool* (click to zoom in,
-      // Alt+click to zoom out) — not a one-shot zoom action.
-      if (e.key === 'v') { e.preventDefault(); setTool('none'); return }
-      if (e.key === 'm') { e.preventDefault(); setTool('rect'); return }
-      if (e.key === 'a') { e.preventDefault(); setTool('arrow'); return }
-      if (e.key === 't') { e.preventDefault(); setTool('text'); return }
-      if (e.key === 'b') { e.preventDefault(); setTool('brush'); return }
-      if (e.key === 'e') { e.preventDefault(); setTool('eraser'); return }
-      if (e.key === 'i') { e.preventDefault(); setTool('eyedropper'); return }
-      if (e.key === 'z') { e.preventDefault(); setTool('zoom'); return }
-      if (e.key === 'c') { e.preventDefault(); setTool('crop'); return }
-      if (e.key === 'o') { e.preventDefault(); setTool('ellipse'); return }
-      if (e.key === 'l') { e.preventDefault(); setTool('line'); return }
     }
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        setPanMode(false)
-      }
+      if (e.code === 'Space') setPanMode(false)
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
@@ -245,9 +229,9 @@ export function ImageEditorPage() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [focused, zoomIn, zoomOut, zoomReset, swapColors, resetColors, selectedLayerId])
+  }, [focused, zoomIn, zoomOut, zoomReset, swapColors, resetColors, selectedLayerId, trySetTool])
 
-  // ── State helpers ────────────────────────────────────────────────────────
+  // ── Layer state helpers ──────────────────────────────────────────────────
   const setLayers = useCallback(
     (layers: Layer[]) => history.set({ ...state, layers }),
     [history, state],
@@ -278,7 +262,6 @@ export function ImageEditorPage() {
       history.set({ ...state, imageLayer: { ...state.imageLayer, ...patch } }),
     [history, state],
   )
-  // Replace a layer's full data — used by Canvas after a move/resize commits.
   const commitLayerUpdate = useCallback(
     (id: string, layer: Layer) =>
       history.set({
@@ -288,12 +271,6 @@ export function ImageEditorPage() {
     [history, state],
   )
 
-  // ── Layer keyboard ops (PS-style) ────────────────────────────────────────
-  // Cmd/Ctrl+J = duplicate selected layer (10px offset).
-  // Cmd+] / [ = bring forward / send backward (add Shift = to-front / to-back).
-  // Delete / Backspace = remove. All no-op when 'image' is selected.
-  // Stored on refs so the keyboard useEffect can reach them without re-binding
-  // every time state changes; useEffect updates the refs each render.
   useEffect(() => {
     duplicateRef.current = () => {
       const orig = state.layers.find((l) => l.id === selectedLayerId)
@@ -332,8 +309,7 @@ export function ImageEditorPage() {
     }
   })
 
-  // Crop commit → apply (or replace) state.cropRect. Rect is already in the
-  // post-rotation preview-pixel space relative to the original image.
+  // ── Crop ─────────────────────────────────────────────────────────────────
   const handleCommitCrop = useCallback(
     (rect: { x: number; y: number; w: number; h: number }) => {
       history.set({ ...state, cropRect: rect })
@@ -386,11 +362,8 @@ export function ImageEditorPage() {
     [history, t],
   )
 
-  // Hidden replace-image input triggered from the top action bar.
   const replaceInputRef = useRef<HTMLInputElement | null>(null)
 
-  // Drop an image file onto the workspace → add as a new image-shape layer
-  // centred on the canvas, sized to fit half the shorter canvas dimension.
   const handleDropImage = useCallback(
     async (file: File) => {
       if (!file.type.startsWith('image/')) {
@@ -401,10 +374,6 @@ export function ImageEditorPage() {
         const dataUrl = await fileToDataUrl(file)
         const img = await ensureImage(dataUrl)
         if (!image) return
-        // Shape coords live in *preview-canvas pixel space* — same as
-        // eventToCanvasXY. previewScale converts source-image px → preview px,
-        // and is < 1 whenever the source exceeds PREVIEW_MAX. The dropped
-        // image is sized to ~half the canvas's shorter dim and centred.
         const { baseW, baseH } = dimsAfterRotation(image, state)
         const previewScale = Math.min(1, PREVIEW_MAX / Math.max(baseW, baseH, 1))
         const previewW = baseW * previewScale
@@ -437,41 +406,51 @@ export function ImageEditorPage() {
     [],
   )
 
-  // ── Download ─────────────────────────────────────────────────────────────
-  const handleDownload = async () => {
-    if (!image || !canvasRef.current) return
-    const exportCanvas = document.createElement('canvas')
-    canvasRef.current.exportTo(exportCanvas)
-    const mime =
-      outFormat === 'png' ? 'image/png' : outFormat === 'jpeg' ? 'image/jpeg' : 'image/webp'
-    const ext = outFormat === 'jpeg' ? 'jpg' : outFormat
-    const quality = outFormat === 'png' ? undefined : outQuality / 100
-    const blob: Blob | null = await new Promise((resolve) =>
-      exportCanvas.toBlob((b) => resolve(b), mime, quality),
-    )
-    if (!blob) {
-      toast.error(t('pages.imageEditor.errExport'))
-      return
-    }
-    triggerDownload(blob, `${filename}_edited.${ext}`)
-    toast.success(t('pages.imageEditor.downloaded', { format: outFormat.toUpperCase() }))
-  }
+  // ── Download / save ──────────────────────────────────────────────────────
+  /**
+   * Render and download the current canvas in the requested format. If
+   * `format` is omitted, falls back to the most recently chosen format
+   * (defaults to PNG).
+   */
+  const exportImage = useCallback(
+    async (format?: OutputFormat) => {
+      if (!image || !canvasRef.current) return
+      const fmt = format ?? outFormat
+      if (format) setOutFormat(format)
+      const exportCanvas = document.createElement('canvas')
+      canvasRef.current.exportTo(exportCanvas)
+      const mime =
+        fmt === 'png' ? 'image/png' : fmt === 'jpeg' ? 'image/jpeg' : 'image/webp'
+      const ext = fmt === 'jpeg' ? 'jpg' : fmt
+      const quality = fmt === 'png' ? undefined : outQuality / 100
+      const blob: Blob | null = await new Promise((resolve) =>
+        exportCanvas.toBlob((b) => resolve(b), mime, quality),
+      )
+      if (!blob) {
+        toast.error(t('pages.imageEditor.errExport'))
+        return
+      }
+      triggerDownload(blob, `${filename}_edited.${ext}`)
+      toast.success(t('pages.imageEditor.downloaded', { format: fmt.toUpperCase() }))
+    },
+    [image, outFormat, outQuality, filename, t],
+  )
+  const handleDownload = useCallback(() => exportImage(), [exportImage])
 
-  const handleSaveProject = () => {
+  const handleSaveProject = useCallback(() => {
     if (!image) return
     const blob = serializeProject({ image, filename, state })
     triggerDownload(blob, `${filename}.toolbox-image.json`)
     toast.success(t('pages.imageEditor.projectSaved'))
-  }
+  }, [image, filename, state, t])
+
+  const setTransforms = useCallback(
+    (transforms: Transforms) => history.set({ ...state, transforms }),
+    [history, state],
+  )
 
   // ── Render ───────────────────────────────────────────────────────────────
-  // Focus mode: position:fixed over the entire viewport, hides toolbox chrome.
-  // Embedded mode: lives inside <main>, fills available height (the toolbox
-  // topbar is 3.5rem tall, so we subtract that to get a clean viewport fit).
-  const rootClass = focused
-    ? 'fixed inset-0 z-50 flex h-svh flex-col bg-background'
-    : 'flex h-[calc(100svh-3.5rem)] flex-col'
-
+  // Empty state — drop zone, no shell.
   if (!image) {
     return (
       <div className="mx-auto max-w-5xl px-8 py-12">
@@ -488,25 +467,14 @@ export function ImageEditorPage() {
     )
   }
 
+  const rootClass = focused
+    ? 'pf-root fixed inset-0 z-50 h-svh w-svw'
+    : 'pf-root h-[calc(100svh-3.5rem)] w-full'
+
+  // OptionsBar reflects whichever the user thinks the active tool is —
+  // if pan mode is on (Space held), keep showing the underlying tool.
   return (
     <div className={rootClass}>
-      <TopActionBar
-        canUndo={history.canUndo}
-        canRedo={history.canRedo}
-        onUndo={history.undo}
-        onRedo={history.redo}
-        format={outFormat}
-        setFormat={setOutFormat}
-        quality={outQuality}
-        setQuality={setOutQuality}
-        onDownload={handleDownload}
-        onSaveProject={handleSaveProject}
-        onLoadProject={acceptFile}
-        onReplaceImage={() => replaceInputRef.current?.click()}
-        focused={focused}
-        toggleFocus={() => setFocused((v) => !v)}
-      />
-
       <input
         ref={replaceInputRef}
         type="file"
@@ -519,65 +487,112 @@ export function ImageEditorPage() {
         }}
       />
 
-      {/* Contextual crop banner — shown when the crop tool is active or a
-          crop is already applied. Keyboard: Enter = apply pending, Esc =
-          cancel pending. Button: clear an applied crop. */}
-      {(tool === 'crop' || state.cropRect) && (
-        <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
-          <span>{t('pages.imageEditor.cropPendingHint')}</span>
-          {state.cropRect && (
-            <button
-              type="button"
-              onClick={handleClearCrop}
-              className="rounded border border-border bg-background px-2 py-0.5 text-foreground hover:bg-accent/40"
-            >
-              {t('pages.imageEditor.cropClear')}
-            </button>
-          )}
-        </div>
-      )}
+      <div className="pf-shell">
+        <MenuBar
+          handlers={{
+            open: () => replaceInputRef.current?.click(),
+            save: handleSaveProject,
+            download: handleDownload,
+            exportPng: () => exportImage('png'),
+            exportJpeg: () => exportImage('jpeg'),
+            exportWebp: () => exportImage('webp'),
+            undo: history.undo,
+            redo: history.redo,
+            canUndo: history.canUndo,
+            canRedo: history.canRedo,
+            rotate90: () =>
+              setTransforms({
+                ...state.transforms,
+                rotation: ((state.transforms.rotation + 90) % 360) as 0 | 90 | 180 | 270,
+              }),
+            flipH: () => setTransforms({ ...state.transforms, flipH: !state.transforms.flipH }),
+            flipV: () => setTransforms({ ...state.transforms, flipV: !state.transforms.flipV }),
+            duplicateLayer: () => duplicateRef.current(),
+            deleteLayer: () => deleteLayerRef.current(),
+            zoomIn,
+            zoomOut,
+            zoomFit: zoomReset,
+            toggleFocus: () => setFocused((v) => !v),
+          }}
+        />
 
-      <div className="flex flex-1 overflow-hidden">
+        <OptionsBar
+          tool={tool}
+          fgColor={colors.fg}
+          setFgColor={(c) => setColors((s) => ({ ...s, fg: c }))}
+          strokeWidth={strokeWidth}
+          setStrokeWidth={setStrokeWidth}
+          isStubTool={STUB_TOOLS.has(tool)}
+          hasActiveCrop={!!state.cropRect}
+          onClearCrop={handleClearCrop}
+        />
+
         <ToolsPalette
           tool={tool}
-          setTool={setTool}
+          setTool={trySetTool}
           fgColor={colors.fg}
           bgColor={colors.bg}
           setFgColor={(c) => setColors((s) => ({ ...s, fg: c }))}
           setBgColor={(c) => setColors((s) => ({ ...s, bg: c }))}
           swapColors={swapColors}
           resetColors={resetColors}
-          strokeWidth={strokeWidth}
-          setStrokeWidth={setStrokeWidth}
+          onStubClick={stubMsg}
         />
 
-        <Workspace
-          ref={workspaceRef}
-          zoom={zoom}
-          pan={pan}
-          setPan={setPan}
-          panMode={panMode}
-          onWheelZoom={zoomAtPoint}
-          onDropFile={handleDropImage}
-        >
-          <Canvas
-            ref={canvasRef}
-            image={image}
-            state={state}
-            tool={tool}
-            toolColor={colors.fg}
-            toolStrokeWidth={strokeWidth}
-            selectedId={selectedLayerId}
-            onSelect={setSelectedLayerId}
-            onCommitLayer={commitLayer}
-            onCommitLayerUpdate={commitLayerUpdate}
+        <div className="pf-canvas-wrap">
+          <div className="pf-tabs">
+            <div className="pf-tab pf-active">
+              <span className="pf-tab-title">{filename} · RGB/8</span>
+            </div>
+            {state.cropRect && (
+              <div
+                className="pf-tab"
+                onClick={handleClearCrop}
+                title={t('pages.imageEditor.cropClear')}
+                style={{ color: 'var(--pf-fg-mid)' }}
+              >
+                <span className="pf-tab-title">✕ {t('pages.imageEditor.cropClear')}</span>
+              </div>
+            )}
+            <div style={{ flex: 1, background: 'var(--pf-bg-1)' }} />
+            <div
+              className="pf-tab"
+              onClick={() => setFocused((v) => !v)}
+              title={t(focused ? 'pages.imageEditor.focusExitHint' : 'pages.imageEditor.focusEnterHint')}
+              style={{ color: 'var(--pf-fg-mid)' }}
+            >
+              <span className="pf-tab-title">⛶ F</span>
+            </div>
+          </div>
+
+          <Workspace
+            ref={workspaceRef}
+            zoom={zoom}
+            pan={pan}
+            setPan={setPan}
             panMode={panMode}
-            imageCache={imageCache}
-            onZoomAt={zoomAtPoint}
-            onPickColor={handlePickColor}
-            onCommitCrop={handleCommitCrop}
-          />
-        </Workspace>
+            onWheelZoom={zoomAtPoint}
+            onDropFile={handleDropImage}
+          >
+            <Canvas
+              ref={canvasRef}
+              image={image}
+              state={state}
+              tool={tool}
+              toolColor={colors.fg}
+              toolStrokeWidth={strokeWidth}
+              selectedId={selectedLayerId}
+              onSelect={setSelectedLayerId}
+              onCommitLayer={commitLayer}
+              onCommitLayerUpdate={commitLayerUpdate}
+              panMode={panMode}
+              imageCache={imageCache}
+              onZoomAt={zoomAtPoint}
+              onPickColor={handlePickColor}
+              onCommitCrop={handleCommitCrop}
+            />
+          </Workspace>
+        </div>
 
         <RightSidebar
           state={state}
@@ -587,20 +602,22 @@ export function ImageEditorPage() {
           patchLayer={patchLayer}
           patchImageLayer={patchImageLayer}
           deleteLayer={deleteLayer}
-          setTransforms={(transforms) => history.set({ ...state, transforms })}
+          setTransforms={setTransforms}
           setAdjust={(adjust) => history.set({ ...state, adjust })}
+          zoom={zoom}
+        />
+
+        <StatusBar
+          width={image.naturalWidth}
+          height={image.naturalHeight}
+          zoom={zoom}
+          onZoomIn={zoomIn}
+          onZoomOut={zoomOut}
+          onZoomReset={zoomReset}
+          tool={panMode ? 'none' : tool}
         />
       </div>
 
-      <StatusBar
-        width={image.naturalWidth}
-        height={image.naturalHeight}
-        zoom={zoom}
-        onZoomIn={zoomIn}
-        onZoomOut={zoomOut}
-        onZoomReset={zoomReset}
-        tool={panMode ? 'none' : tool}
-      />
     </div>
   )
 }
