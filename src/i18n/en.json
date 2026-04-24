@@ -521,6 +521,7 @@
       "moveToolHint": "Move (V): drag layers; Cmd/Ctrl+J duplicate; Delete remove.",
       "zoomToolHint": "Zoom (Z): click to zoom in 2×, Alt-click to zoom out. Cmd/Ctrl+wheel zooms at cursor.",
       "eyedropperHint": "Eyedropper (I): click anywhere on the canvas to set the foreground color.",
+      "handToolHint": "Hand (H): drag the canvas to pan. Hold Space to pan with any other tool.",
       "textToolHint": "Type (T): click on the canvas to add text.",
       "toolStubHint": "{{tool}} is a placeholder — the palette button is here for parity with Photoshop, but the tool isn't implemented yet.",
       "toolStubToast": "{{tool}} is not yet implemented.",

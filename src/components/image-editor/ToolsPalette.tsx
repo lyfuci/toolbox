@@ -160,7 +160,6 @@ const GROUPS: ToolDef[][] = [
       icon: <Hand className="h-4 w-4" />,
       labelKey: 'pages.imageEditor.tool.hand',
       shortcut: 'H',
-      stub: true,
     },
     { id: 'zoom', icon: <Search className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.zoom', shortcut: 'Z' },
   ],

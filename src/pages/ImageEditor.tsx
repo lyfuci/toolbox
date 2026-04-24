@@ -89,10 +89,14 @@ export function ImageEditorPage() {
   const moveLayerRef = useRef<(d: 'forward' | 'backward' | 'front' | 'back') => void>(() => {})
   const deleteLayerRef = useRef<() => void>(() => {})
 
-  // Zoom + pan + Space-held pan mode.
+  // Zoom + pan. Workspace enters pan mode when the user holds Space OR when
+  // the Hand tool is active — both treat the canvas as drag-to-pan instead
+  // of drag-to-draw.
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [panMode, setPanMode] = useState(false)
+  const [spaceHeld, setSpaceHeld] = useState(false)
+  const setPanMode = setSpaceHeld
+  const panMode = spaceHeld || tool === 'hand'
 
   const ZOOM_MIN = 0.1
   const ZOOM_MAX = 8
@@ -229,7 +233,7 @@ export function ImageEditorPage() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [focused, zoomIn, zoomOut, zoomReset, swapColors, resetColors, selectedLayerId, trySetTool])
+  }, [focused, zoomIn, zoomOut, zoomReset, swapColors, resetColors, selectedLayerId, trySetTool, setPanMode])
 
   // ── Layer state helpers ──────────────────────────────────────────────────
   const setLayers = useCallback(

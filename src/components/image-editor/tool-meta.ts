@@ -21,7 +21,6 @@ export const STUB_TOOLS: ReadonlySet<Tool> = new Set<Tool>([
   'dodge',
   'pen',
   'arrowPath',
-  'hand',
   'rotateView',
   'frame',
   'note',
