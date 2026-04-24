@@ -114,7 +114,6 @@ const GROUPS: ToolDef[][] = [
       icon: <PaintBucket className="h-4 w-4" />,
       labelKey: 'pages.imageEditor.tool.bucket',
       shortcut: 'G',
-      stub: true,
     },
     {
       id: 'dodge',

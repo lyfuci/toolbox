@@ -67,6 +67,15 @@ type Props = {
    * coords if a crop is currently active).
    */
   onCommitCrop?: (rect: { x: number; y: number; w: number; h: number }) => void
+  /**
+   * Called by the Paint Bucket tool with a click point in *preview-pixel
+   * space*. Paint bucket needs to render the canvas to read pixels, so the
+   * heavy lifting (re-rendering at source res, flood fill, layer commit)
+   * happens in the parent — Canvas just hands off the click coords.
+   */
+  onBucketClick?: (point: Point) => void
+  /** Tolerance for the Paint Bucket flood fill (0–128). */
+  bucketTolerance?: number
 }
 
 type Interaction =
@@ -107,6 +116,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     onZoomAt,
     onPickColor,
     onCommitCrop,
+    onBucketClick,
   },
   ref,
 ) {
@@ -271,6 +281,14 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     // pending crop on a fresh drag.
     if (tool === 'crop') {
       setInteraction({ kind: 'crop-drawing', rect: { x: p.x, y: p.y, w: 0, h: 0 } })
+      return
+    }
+
+    // Paint Bucket: hand the click off to the parent — flood fill needs to
+    // re-render the canvas at source resolution, which only the parent has
+    // the inputs for. (p.x, p.y) is in preview-pixel space.
+    if (tool === 'bucket') {
+      onBucketClick?.(p)
       return
     }
 
@@ -528,6 +546,10 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       return
     }
     if (tool === 'crop') {
+      setHoverCursor('crosshair')
+      return
+    }
+    if (tool === 'bucket') {
       setHoverCursor('crosshair')
       return
     }

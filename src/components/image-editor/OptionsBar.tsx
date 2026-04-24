@@ -7,6 +7,8 @@ type Props = {
   setFgColor: (c: string) => void
   strokeWidth: number
   setStrokeWidth: (n: number) => void
+  bucketTolerance: number
+  setBucketTolerance: (n: number) => void
   /** Show "applies to all in fly-out group" notice for stub tools. */
   isStubTool: boolean
   /** Re-fired with the toast pattern when a stub tool was clicked. */
@@ -29,6 +31,8 @@ export function OptionsBar({
   setFgColor,
   strokeWidth,
   setStrokeWidth,
+  bucketTolerance,
+  setBucketTolerance,
   isStubTool,
   stubMessage,
   hasActiveCrop,
@@ -153,6 +157,54 @@ export function OptionsBar({
         <div className="pf-opt-group" style={{ borderRight: 0 }}>
           <span className="pf-opt-label" style={{ marginRight: 0 }}>
             {t('pages.imageEditor.zoomToolHint')}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  if (tool === 'bucket') {
+    return (
+      <div className="pf-options">
+        <div className="pf-opt-group">
+          <span className="pf-opt-label">{t('pages.imageEditor.color')}:</span>
+          <input
+            type="color"
+            value={fgColor}
+            onChange={(e) => setFgColor(e.target.value)}
+            style={{
+              width: 22,
+              height: 22,
+              padding: 0,
+              border: '1px solid var(--pf-line)',
+              background: 'transparent',
+              borderRadius: 3,
+              cursor: 'pointer',
+            }}
+          />
+        </div>
+        <div className="pf-opt-group">
+          <span className="pf-opt-label">{t('pages.imageEditor.bucketTolerance')}:</span>
+          <input
+            className="pf-opt-input"
+            type="number"
+            min={0}
+            max={128}
+            value={bucketTolerance}
+            onChange={(e) => setBucketTolerance(Math.min(128, Math.max(0, Number(e.target.value) || 0)))}
+          />
+          <input
+            type="range"
+            min={0}
+            max={128}
+            value={bucketTolerance}
+            onChange={(e) => setBucketTolerance(Number(e.target.value))}
+            style={{ width: 120, accentColor: 'var(--pf-accent)' }}
+          />
+        </div>
+        <div className="pf-opt-group" style={{ borderRight: 0 }}>
+          <span className="pf-opt-label" style={{ marginRight: 0 }}>
+            {t('pages.imageEditor.bucketHint')}
           </span>
         </div>
       </div>
