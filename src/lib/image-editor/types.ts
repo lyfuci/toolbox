@@ -22,7 +22,20 @@ export const BLEND_MODES: BlendMode[] = [
   'lighten',
 ]
 
+/**
+ * Editor tool. Tools split into two camps:
+ *
+ * **Functional**: implemented and produce a real result on the canvas —
+ *   none, rect, ellipse, line, arrow, text, mosaic, brush, eraser, mask,
+ *   eyedropper, crop, zoom.
+ *
+ * **Stub** (palette button only, marked as not-yet-implemented in UI; chosen
+ * to round out the PS-aligned tool list): marquee, lasso, polyLasso, wand,
+ * spotHeal, stamp, historyBrush, gradient, bucket, blur, dodge, pen,
+ * arrowPath, hand, rotateView, frame, note.
+ */
 export type Tool =
+  // Functional
   | 'none'
   | 'rect'
   | 'arrow'
@@ -36,6 +49,24 @@ export type Tool =
   | 'crop'
   | 'ellipse'
   | 'line'
+  // Stub (PS palette completeness)
+  | 'marquee'
+  | 'lasso'
+  | 'polyLasso'
+  | 'wand'
+  | 'spotHeal'
+  | 'stamp'
+  | 'historyBrush'
+  | 'gradient'
+  | 'bucket'
+  | 'blur'
+  | 'dodge'
+  | 'pen'
+  | 'arrowPath'
+  | 'hand'
+  | 'rotateView'
+  | 'frame'
+  | 'note'
 
 export type Transforms = {
   rotation: Rotation
