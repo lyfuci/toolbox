@@ -5,6 +5,8 @@ type Props = {
   tool: Tool
   fgColor: string
   setFgColor: (c: string) => void
+  bgColor: string
+  setBgColor: (c: string) => void
   strokeWidth: number
   setStrokeWidth: (n: number) => void
   bucketTolerance: number
@@ -29,6 +31,8 @@ export function OptionsBar({
   tool,
   fgColor,
   setFgColor,
+  bgColor,
+  setBgColor,
   strokeWidth,
   setStrokeWidth,
   bucketTolerance,
@@ -164,6 +168,15 @@ export function OptionsBar({
   }
 
   if (tool === 'bucket') {
+    const swatch: React.CSSProperties = {
+      width: 22,
+      height: 22,
+      padding: 0,
+      border: '1px solid var(--pf-line)',
+      background: 'transparent',
+      borderRadius: 3,
+      cursor: 'pointer',
+    }
     return (
       <div className="pf-options">
         <div className="pf-opt-group">
@@ -172,15 +185,7 @@ export function OptionsBar({
             type="color"
             value={fgColor}
             onChange={(e) => setFgColor(e.target.value)}
-            style={{
-              width: 22,
-              height: 22,
-              padding: 0,
-              border: '1px solid var(--pf-line)',
-              background: 'transparent',
-              borderRadius: 3,
-              cursor: 'pointer',
-            }}
+            style={swatch}
           />
         </div>
         <div className="pf-opt-group">
@@ -205,6 +210,45 @@ export function OptionsBar({
         <div className="pf-opt-group" style={{ borderRight: 0 }}>
           <span className="pf-opt-label" style={{ marginRight: 0 }}>
             {t('pages.imageEditor.bucketHint')}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  if (tool === 'gradient') {
+    const swatch: React.CSSProperties = {
+      width: 22,
+      height: 22,
+      padding: 0,
+      border: '1px solid var(--pf-line)',
+      background: 'transparent',
+      borderRadius: 3,
+      cursor: 'pointer',
+    }
+    return (
+      <div className="pf-options">
+        <div className="pf-opt-group">
+          <span className="pf-opt-label">{t('pages.imageEditor.fgColor')}:</span>
+          <input
+            type="color"
+            value={fgColor}
+            onChange={(e) => setFgColor(e.target.value)}
+            style={swatch}
+          />
+        </div>
+        <div className="pf-opt-group">
+          <span className="pf-opt-label">{t('pages.imageEditor.bgColor')}:</span>
+          <input
+            type="color"
+            value={bgColor}
+            onChange={(e) => setBgColor(e.target.value)}
+            style={swatch}
+          />
+        </div>
+        <div className="pf-opt-group" style={{ borderRight: 0 }}>
+          <span className="pf-opt-label" style={{ marginRight: 0 }}>
+            {t('pages.imageEditor.gradientHint')}
           </span>
         </div>
       </div>

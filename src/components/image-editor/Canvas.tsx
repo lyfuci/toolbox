@@ -76,6 +76,12 @@ type Props = {
   onBucketClick?: (point: Point) => void
   /** Tolerance for the Paint Bucket flood fill (0–128). */
   bucketTolerance?: number
+  /**
+   * Called by the Gradient tool when the user releases the mouse with a
+   * non-trivial drag. Both points are in preview-pixel space (canvas
+   * pixels at scale=previewScale). Layer commit happens in the parent.
+   */
+  onCommitGradient?: (start: Point, end: Point) => void
 }
 
 type Interaction =
@@ -99,6 +105,8 @@ type Interaction =
   | { kind: 'crop-drawing'; rect: { x: number; y: number; w: number; h: number } }
   /** Crop drag finished, awaiting commit/cancel from caller. */
   | { kind: 'crop-pending'; rect: { x: number; y: number; w: number; h: number } }
+  /** Gradient drag in progress — start + current end point in canvas pixels. */
+  | { kind: 'gradient-drawing'; start: Point; end: Point }
 
 export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
   {
@@ -117,6 +125,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     onPickColor,
     onCommitCrop,
     onBucketClick,
+    onCommitGradient,
   },
   ref,
 ) {
@@ -184,6 +193,10 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     // call) never sees it.
     if (interaction.kind === 'crop-drawing' || interaction.kind === 'crop-pending') {
       drawCropOverlay(canvasRef.current, interaction.rect)
+    }
+    // Gradient preview line — start dot, end dot, dashed line between.
+    if (interaction.kind === 'gradient-drawing') {
+      drawGradientOverlay(canvasRef.current, interaction.start, interaction.end)
     }
   }, [image, effectiveState, interaction, selectionLayer, previewScale, imageCache])
 
@@ -292,6 +305,13 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       return
     }
 
+    // Gradient: drag from start to end; commit on mouseup. Both endpoints
+    // are tracked in canvas-pixel space (= preview-pixel space).
+    if (tool === 'gradient') {
+      setInteraction({ kind: 'gradient-drawing', start: p, end: p })
+      return
+    }
+
     // Drawing tools take priority over selection.
     if (tool !== 'none') {
       startDrawing(p)
@@ -347,6 +367,11 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       return
     }
 
+    if (interaction.kind === 'gradient-drawing') {
+      setInteraction({ kind: 'gradient-drawing', start: interaction.start, end: p })
+      return
+    }
+
     if (interaction.kind === 'drawing') {
       updateDrawing(p)
       return
@@ -378,6 +403,16 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       } else {
         setInteraction({ kind: 'crop-pending', rect: r })
       }
+      return
+    }
+    if (interaction.kind === 'gradient-drawing') {
+      const dx = interaction.end.x - interaction.start.x
+      const dy = interaction.end.y - interaction.start.y
+      // Discard near-zero drags (treat as no-op click).
+      if (Math.abs(dx) >= 4 || Math.abs(dy) >= 4) {
+        onCommitGradient?.(interaction.start, interaction.end)
+      }
+      setInteraction({ kind: 'idle' })
       return
     }
     if (interaction.kind === 'drawing') {
@@ -549,7 +584,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       setHoverCursor('crosshair')
       return
     }
-    if (tool === 'bucket') {
+    if (tool === 'bucket' || tool === 'gradient') {
       setHoverCursor('crosshair')
       return
     }
@@ -673,6 +708,42 @@ function drawCropOverlay(
   ctx.setLineDash([6, 4])
   ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1)
   ctx.setLineDash([])
+  ctx.restore()
+}
+
+/**
+ * Draw a gradient preview overlay — start point, end point, dashed line. All
+ * coords are in canvas-pixel space; identity transform ensures pixel-perfect
+ * placement.
+ */
+function drawGradientOverlay(
+  canvas: HTMLCanvasElement | null,
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+) {
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 1
+  ctx.setLineDash([6, 4])
+  ctx.beginPath()
+  ctx.moveTo(start.x, start.y)
+  ctx.lineTo(end.x, end.y)
+  ctx.stroke()
+  ctx.setLineDash([])
+  // Endpoint dots — outlined for legibility on any background.
+  for (const p of [start, end]) {
+    ctx.beginPath()
+    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2)
+    ctx.fillStyle = '#ffffff'
+    ctx.fill()
+    ctx.strokeStyle = '#000000'
+    ctx.lineWidth = 1
+    ctx.stroke()
+  }
   ctx.restore()
 }
 
