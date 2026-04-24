@@ -46,6 +46,7 @@ export function parseProject(text: string): Project {
       transforms: { ...fallback.transforms, ...obj.state.transforms },
       adjust: { ...fallback.adjust, ...obj.state.adjust },
       cropRect: obj.state.cropRect,
+      selection: obj.state.selection,
     },
   }
 }

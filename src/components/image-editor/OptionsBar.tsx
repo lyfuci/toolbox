@@ -18,6 +18,9 @@ type Props = {
   /** True when an applied crop is in state — surfaces "Clear crop" button. */
   hasActiveCrop?: boolean
   onClearCrop?: () => void
+  /** True when a marquee selection is active — surfaces "Deselect" button. */
+  hasSelection?: boolean
+  onClearSelection?: () => void
 }
 
 /**
@@ -41,6 +44,8 @@ export function OptionsBar({
   stubMessage,
   hasActiveCrop,
   onClearCrop,
+  hasSelection,
+  onClearSelection,
 }: Props) {
   const { t } = useTranslation()
 
@@ -56,9 +61,35 @@ export function OptionsBar({
     )
   }
 
-  // Brush / pencil / eraser / dodge — stroke width (+ color for brush only;
-  // dodge always paints white via 'lighter' composite, eraser cuts alpha).
-  if (tool === 'brush' || tool === 'eraser' || tool === 'dodge') {
+  // Marquee — show selection-state hint + "Deselect" button when active.
+  if (tool === 'marquee') {
+    return (
+      <div className="pf-options">
+        <div className="pf-opt-group">
+          <span className="pf-opt-label" style={{ marginRight: 0 }}>
+            {t('pages.imageEditor.marqueeHint')}
+          </span>
+        </div>
+        {hasSelection && (
+          <div className="pf-opt-group" style={{ borderRight: 0 }}>
+            <button
+              type="button"
+              className="pf-opt-btn"
+              onClick={onClearSelection}
+              style={{ width: 'auto', padding: '0 8px' }}
+              title={t('pages.imageEditor.deselect')}
+            >
+              {t('pages.imageEditor.deselect')}
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Brush / pencil / eraser / dodge / burn — stroke width (+ color for brush
+  // only; dodge/burn override via mode).
+  if (tool === 'brush' || tool === 'eraser' || tool === 'dodge' || tool === 'burn') {
     return (
       <div className="pf-options">
         <div className="pf-opt-group">
@@ -91,10 +122,12 @@ export function OptionsBar({
             />
           </div>
         )}
-        {tool === 'dodge' && (
+        {(tool === 'dodge' || tool === 'burn') && (
           <div className="pf-opt-group" style={{ borderRight: 0 }}>
             <span className="pf-opt-label" style={{ marginRight: 0 }}>
-              {t('pages.imageEditor.dodgeHint')}
+              {tool === 'burn'
+                ? t('pages.imageEditor.burnHint')
+                : t('pages.imageEditor.dodgeHint')}
             </span>
           </div>
         )}
