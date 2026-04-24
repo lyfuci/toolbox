@@ -11,10 +11,12 @@ import {
   Frame,
   Hand,
   Lasso,
+  Moon,
   MousePointer2,
   PaintBucket,
   PenTool,
   Pipette,
+  RefreshCw,
   RotateCw,
   Ruler,
   ScanLine,
@@ -54,7 +56,6 @@ const GROUPS: ToolDef[][] = [
       icon: <SquareDashed className="h-4 w-4" />,
       labelKey: 'pages.imageEditor.tool.marquee',
       shortcut: 'M',
-      stub: true,
     },
     {
       id: 'lasso',
@@ -121,6 +122,11 @@ const GROUPS: ToolDef[][] = [
       labelKey: 'pages.imageEditor.tool.dodge',
       shortcut: 'O',
     },
+    {
+      id: 'burn',
+      icon: <Moon className="h-4 w-4" />,
+      labelKey: 'pages.imageEditor.tool.burn',
+    },
   ],
   // 3. Vector / type group
   [
@@ -160,6 +166,12 @@ const GROUPS: ToolDef[][] = [
       labelKey: 'pages.imageEditor.tool.hand',
       shortcut: 'H',
       stub: true,
+    },
+    {
+      id: 'rotateView',
+      icon: <RefreshCw className="h-4 w-4" />,
+      labelKey: 'pages.imageEditor.tool.rotateView',
+      shortcut: 'R',
     },
     { id: 'zoom', icon: <Search className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.zoom', shortcut: 'Z' },
   ],

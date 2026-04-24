@@ -82,6 +82,13 @@ type Props = {
    * pixels at scale=previewScale). Layer commit happens in the parent.
    */
   onCommitGradient?: (start: Point, end: Point) => void
+  /**
+   * Called by the Marquee tool when a non-trivial drag commits. Rect is in
+   * cropped-canvas preview-pixel space; the parent shifts by the active
+   * crop origin to land in original-image preview-pixel space (matching how
+   * shape coords are stored).
+   */
+  onCommitSelection?: (rect: { x: number; y: number; w: number; h: number }) => void
 }
 
 type Interaction =
@@ -107,6 +114,8 @@ type Interaction =
   | { kind: 'crop-pending'; rect: { x: number; y: number; w: number; h: number } }
   /** Gradient drag in progress — start + current end point in canvas pixels. */
   | { kind: 'gradient-drawing'; start: Point; end: Point }
+  /** Marquee selection drag — rect in canvas-pixel space. */
+  | { kind: 'marquee-drawing'; rect: { x: number; y: number; w: number; h: number } }
 
 export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
   {
@@ -126,6 +135,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     onCommitCrop,
     onBucketClick,
     onCommitGradient,
+    onCommitSelection,
   },
   ref,
 ) {
@@ -187,6 +197,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
         interaction.kind === 'drawing' ? { layer: interaction.layer } : undefined,
       selection: selectionLayer ? { layer: selectionLayer } : undefined,
       imageCache,
+      liveCanvas: true,
     })
     // Crop preview overlay — drawn AFTER the image render so it sits on top.
     // Lives only on the live canvas; the export canvas (separate renderTo
@@ -197,6 +208,11 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     // Gradient preview line — start dot, end dot, dashed line between.
     if (interaction.kind === 'gradient-drawing') {
       drawGradientOverlay(canvasRef.current, interaction.start, interaction.end)
+    }
+    // Marquee preview rect — same look as the committed selection so the user
+    // sees the live shape they're drawing.
+    if (interaction.kind === 'marquee-drawing') {
+      drawMarqueePreview(canvasRef.current, interaction.rect)
     }
   }, [image, effectiveState, interaction, selectionLayer, previewScale, imageCache])
 
@@ -312,6 +328,12 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       return
     }
 
+    // Marquee: drag a rectangular selection. Commit on mouseup if non-trivial.
+    if (tool === 'marquee') {
+      setInteraction({ kind: 'marquee-drawing', rect: { x: p.x, y: p.y, w: 0, h: 0 } })
+      return
+    }
+
     // Drawing tools take priority over selection.
     if (tool !== 'none') {
       startDrawing(p)
@@ -372,6 +394,15 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       return
     }
 
+    if (interaction.kind === 'marquee-drawing') {
+      const r = interaction.rect
+      setInteraction({
+        kind: 'marquee-drawing',
+        rect: { x: r.x, y: r.y, w: p.x - r.x, h: p.y - r.y },
+      })
+      return
+    }
+
     if (interaction.kind === 'drawing') {
       updateDrawing(p)
       return
@@ -411,6 +442,14 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       // Discard near-zero drags (treat as no-op click).
       if (Math.abs(dx) >= 4 || Math.abs(dy) >= 4) {
         onCommitGradient?.(interaction.start, interaction.end)
+      }
+      setInteraction({ kind: 'idle' })
+      return
+    }
+    if (interaction.kind === 'marquee-drawing') {
+      const r = interaction.rect
+      if (Math.abs(r.w) >= 4 && Math.abs(r.h) >= 4) {
+        onCommitSelection?.(r)
       }
       setInteraction({ kind: 'idle' })
       return
@@ -512,21 +551,23 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
           },
         } as AnnotationLayer,
       })
-    } else if (tool === 'dodge') {
-      // Dodge layer defaults to 30% opacity so a single stroke gives a soft
-      // brightening — repeat strokes to build it up, just like PS.
+    } else if (tool === 'dodge' || tool === 'burn') {
+      // Dodge / Burn share the brush-stroke + low-opacity build-up pattern.
+      // Burn paints black with 'multiply' op for darkening; dodge paints
+      // white with 'lighter' for brightening.
+      const isBurn = tool === 'burn'
       setInteraction({
         kind: 'drawing',
         layer: {
-          ...baseLayer('Dodge'),
+          ...baseLayer(isBurn ? 'Burn' : 'Dodge'),
           opacity: 30 as const,
           kind: 'annotation',
           shape: {
             kind: 'brush',
             points: [p],
-            color: '#ffffff',
+            color: isBurn ? '#000000' : '#ffffff',
             strokeWidth: toolStrokeWidth,
-            mode: 'dodge',
+            mode: isBurn ? 'burn' : 'dodge',
           },
         } as AnnotationLayer,
       })
@@ -611,7 +652,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       setHoverCursor('crosshair')
       return
     }
-    if (tool === 'bucket' || tool === 'gradient') {
+    if (tool === 'bucket' || tool === 'gradient' || tool === 'marquee') {
       setHoverCursor('crosshair')
       return
     }
@@ -771,6 +812,35 @@ function drawGradientOverlay(
     ctx.lineWidth = 1
     ctx.stroke()
   }
+  ctx.restore()
+}
+
+/**
+ * In-progress marquee selection preview — same look as the committed selection
+ * (white dashes over a black halo). Coords in canvas-pixel space; identity
+ * transform keeps placement crisp.
+ */
+function drawMarqueePreview(
+  canvas: HTMLCanvasElement | null,
+  rect: { x: number; y: number; w: number; h: number },
+) {
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const rx = Math.min(rect.x, rect.x + rect.w)
+  const ry = Math.min(rect.y, rect.y + rect.h)
+  const rw = Math.abs(rect.w)
+  const rh = Math.abs(rect.h)
+  if (rw < 1 || rh < 1) return
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.strokeStyle = '#000000'
+  ctx.lineWidth = 1
+  ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1)
+  ctx.strokeStyle = '#ffffff'
+  ctx.setLineDash([4, 3])
+  ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1)
+  ctx.setLineDash([])
   ctx.restore()
 }
 

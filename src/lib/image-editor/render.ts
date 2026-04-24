@@ -33,6 +33,11 @@ export type RenderInput = {
   selection?: { layer: Layer }
   /** Cache of HTMLImageElements keyed by dataUrl, for image-shape layers. */
   imageCache?: ImageCache
+  /**
+   * True when rendering the live canvas (vs. export). Gates UI-only chrome
+   * like marching-ants marquee selection that shouldn't bake into exports.
+   */
+  liveCanvas?: boolean
 }
 
 export function dimsAfterRotation(
@@ -203,6 +208,44 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
   if (input.selection) {
     drawSelectionChrome(ctx, shiftForCrop(input.selection.layer), annoScale)
   }
+
+  // Marquee selection (state.selection) — UI affordance only, gated on
+  // `liveCanvas` so it never bakes into an export.
+  if (input.liveCanvas && state.selection) {
+    drawMarqueeChrome(ctx, state.selection, cropOriginX, cropOriginY, annoScale)
+  }
+}
+
+/**
+ * Draw the active marquee selection — a dashed white outline (with a thin
+ * black halo for legibility on any background). Coords are in original-image
+ * preview-pixel space; we shift by -cropOrigin to land in cropped-canvas
+ * coords, then scale.
+ */
+function drawMarqueeChrome(
+  ctx: CanvasRenderingContext2D,
+  sel: Rect,
+  cropOriginX: number,
+  cropOriginY: number,
+  scale: number,
+) {
+  const r = normalizeRect(sel)
+  const x = (r.x - cropOriginX) * scale
+  const y = (r.y - cropOriginY) * scale
+  const w = r.w * scale
+  const h = r.h * scale
+  ctx.save()
+  // Black halo
+  ctx.strokeStyle = '#000000'
+  ctx.lineWidth = Math.max(1, scale)
+  ctx.setLineDash([])
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
+  // White dashes on top
+  ctx.strokeStyle = '#ffffff'
+  ctx.setLineDash([4 * scale, 3 * scale])
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
+  ctx.setLineDash([])
+  ctx.restore()
 }
 
 /**

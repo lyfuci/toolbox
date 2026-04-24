@@ -67,6 +67,7 @@ export type Tool =
   | 'rotateView'
   | 'frame'
   | 'note'
+  | 'burn'
 
 export type Transforms = {
   rotation: Rotation
@@ -227,6 +228,14 @@ export type EditorState = {
   layers: Layer[] // ordered bottom→top
   transforms: Transforms
   adjust: Adjustments
+  /**
+   * Active marquee selection. Stored in the same coordinate space shape coords
+   * use (post-rotation preview-pixel space, relative to the original image).
+   * Other tools (bucket / brush / fill) can later restrict their effect to
+   * this rect. Cleared via Cmd+D, replaced via re-marquee, persisted through
+   * undo/redo + .json save.
+   */
+  selection?: Rect
   /**
    * Optional crop region. Stored in the same coordinate space shape coords use
    * (post-rotation preview-canvas pixels), so it's applied after transforms.

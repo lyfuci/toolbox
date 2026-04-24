@@ -95,6 +95,12 @@ export function ImageEditorPage() {
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [panMode, setPanMode] = useState(false)
+  /**
+   * View-only canvas rotation in degrees (0 / 90 / 180 / 270). Lives outside
+   * EditorState because it doesn't affect pixels — just how the canvas is
+   * displayed in the workspace. Cycled by the Rotate View tool (R).
+   */
+  const [viewRotation, setViewRotation] = useState<0 | 90 | 180 | 270>(0)
 
   const ZOOM_MIN = 0.1
   const ZOOM_MAX = 8
@@ -135,9 +141,15 @@ export function ImageEditorPage() {
     [t],
   )
 
-  // Try to set tool; if it's in the stub set, show a toast and don't change state.
+  // Try to set tool; if it's in the stub set, show a toast and don't change
+  // state. Rotate View doesn't have a tool mode — it's a one-shot action that
+  // cycles the workspace rotation 0 → 90 → 180 → 270 → 0 each time clicked.
   const trySetTool = useCallback(
     (next: Tool) => {
+      if (next === 'rotateView') {
+        setViewRotation((r) => ((r + 90) % 360) as 0 | 90 | 180 | 270)
+        return
+      }
       if (STUB_TOOLS.has(next)) {
         stubMsg(t(`pages.imageEditor.tool.${next}`))
         return
@@ -168,6 +180,25 @@ export function ImageEditorPage() {
         if (e.key === 'j' || e.key === 'J') { e.preventDefault(); duplicateRef.current(); return }
         if (e.key === ']') { e.preventDefault(); moveLayerRef.current(e.shiftKey ? 'front' : 'forward'); return }
         if (e.key === '[') { e.preventDefault(); moveLayerRef.current(e.shiftKey ? 'back' : 'backward'); return }
+        // Cmd+D = deselect, Cmd+A = select all (PS conventions). Both no-op
+        // when there's no image yet.
+        if (e.key === 'd' || e.key === 'D') {
+          e.preventDefault()
+          history.set({ ...state, selection: undefined })
+          return
+        }
+        if (e.key === 'a' || e.key === 'A') {
+          e.preventDefault()
+          if (image) {
+            const { baseW, baseH } = dimsAfterRotation(image, state)
+            const previewScale = Math.min(1, PREVIEW_MAX / Math.max(baseW, baseH, 1))
+            history.set({
+              ...state,
+              selection: { x: 0, y: 0, w: baseW * previewScale, h: baseH * previewScale },
+            })
+          }
+          return
+        }
         return
       }
 
@@ -180,6 +211,12 @@ export function ImageEditorPage() {
       }
 
       if (e.key === 'f' || e.key === 'F') { e.preventDefault(); setFocused((v) => !v); return }
+      // Rotate View — R cycles the workspace display rotation 0→90→180→270.
+      if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault()
+        setViewRotation((r) => ((r + 90) % 360) as 0 | 90 | 180 | 270)
+        return
+      }
       if (e.key === 'Enter' && canvasRef.current?.hasPendingCrop()) {
         e.preventDefault()
         canvasRef.current.commitPendingCrop()
@@ -231,7 +268,7 @@ export function ImageEditorPage() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [focused, zoomIn, zoomOut, zoomReset, swapColors, resetColors, selectedLayerId, trySetTool])
+  }, [focused, zoomIn, zoomOut, zoomReset, swapColors, resetColors, selectedLayerId, trySetTool, history, state, image])
 
   // ── Layer state helpers ──────────────────────────────────────────────────
   const setLayers = useCallback(
@@ -320,6 +357,28 @@ export function ImageEditorPage() {
     },
     [history, state, t],
   )
+  /**
+   * Commit a marquee selection — `rect` arrives in cropped-canvas
+   * preview-pixel space; we shift back by the crop origin to land in
+   * original-image preview-pixel space (where shape coords live).
+   */
+  const handleCommitSelection = useCallback(
+    (rect: { x: number; y: number; w: number; h: number }) => {
+      const cropOriginX = state.cropRect
+        ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w)
+        : 0
+      const cropOriginY = state.cropRect
+        ? Math.min(state.cropRect.y, state.cropRect.y + state.cropRect.h)
+        : 0
+      const x0 = Math.min(rect.x, rect.x + rect.w) + cropOriginX
+      const y0 = Math.min(rect.y, rect.y + rect.h) + cropOriginY
+      const w = Math.abs(rect.w)
+      const h = Math.abs(rect.h)
+      history.set({ ...state, selection: { x: x0, y: y0, w, h } })
+    },
+    [history, state],
+  )
+
   const handleClearCrop = useCallback(() => {
     if (!state.cropRect) return
     history.set({ ...state, cropRect: undefined })
@@ -654,6 +713,8 @@ export function ImageEditorPage() {
           isStubTool={STUB_TOOLS.has(tool)}
           hasActiveCrop={!!state.cropRect}
           onClearCrop={handleClearCrop}
+          hasSelection={!!state.selection}
+          onClearSelection={() => history.set({ ...state, selection: undefined })}
         />
 
         <ToolsPalette
@@ -700,6 +761,7 @@ export function ImageEditorPage() {
             pan={pan}
             setPan={setPan}
             panMode={panMode}
+            viewRotation={viewRotation}
             onWheelZoom={zoomAtPoint}
             onDropFile={handleDropImage}
           >
@@ -722,6 +784,7 @@ export function ImageEditorPage() {
               onBucketClick={handleBucketFill}
               bucketTolerance={bucketTolerance}
               onCommitGradient={handleCommitGradient}
+              onCommitSelection={handleCommitSelection}
             />
           </Workspace>
         </div>

@@ -20,6 +20,8 @@ type Props = {
   setPan: (pan: { x: number; y: number }) => void
   /** True while Space is held — workspace handles drag-to-pan. */
   panMode: boolean
+  /** View-only canvas rotation (degrees) — applied as CSS rotate to the wrapper. */
+  viewRotation?: 0 | 90 | 180 | 270
   /** Cmd/Ctrl + wheel callback. (clientX, clientY, factor). */
   onWheelZoom?: (clientX: number, clientY: number, factor: number) => void
   /** A file dragged into the workspace from the desktop. */
@@ -37,7 +39,7 @@ type Props = {
  * logic runs against the bubbled event.
  */
 export const Workspace = forwardRef<WorkspaceHandle, Props>(function Workspace(
-  { zoom, pan, setPan, panMode, onWheelZoom, onDropFile, children },
+  { zoom, pan, setPan, panMode, viewRotation = 0, onWheelZoom, onDropFile, children },
   ref,
 ) {
   const outerRef = useRef<HTMLDivElement | null>(null)
@@ -134,7 +136,7 @@ export const Workspace = forwardRef<WorkspaceHandle, Props>(function Workspace(
         ref={wrapperRef}
         className="rounded shadow-lg ring-1 ring-black/20"
         style={{
-          transform: `translate(${effectivePan.x}px, ${effectivePan.y}px) scale(${zoom})`,
+          transform: `translate(${effectivePan.x}px, ${effectivePan.y}px) scale(${zoom}) rotate(${viewRotation}deg)`,
           transformOrigin: 'center',
           transition: dragging ? 'none' : 'transform 90ms ease-out',
         }}
