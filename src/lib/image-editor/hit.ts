@@ -32,6 +32,7 @@ function getShapeBBox(shape: Shape): Rect {
     case 'mosaic':
     case 'image':
     case 'ellipse':
+    case 'blur':
       return normalizeRect({ x: shape.x, y: shape.y, w: shape.w, h: shape.h })
     case 'arrow':
     case 'line': {
@@ -108,6 +109,7 @@ export function getHandles(layer: Layer): Handle[] {
     case 'mosaic':
     case 'image':
     case 'ellipse':
+    case 'blur':
       return rectCornerHandles(
         normalizeRect({
           x: layer.shape.x,

@@ -296,12 +296,16 @@ export function OptionsBar({
     )
   }
 
-  if (tool === 'mask' || tool === 'mosaic') {
+  if (tool === 'mask' || tool === 'mosaic' || tool === 'blur') {
     return (
       <div className="pf-options">
         <div className="pf-opt-group" style={{ borderRight: 0 }}>
           <span className="pf-opt-label" style={{ marginRight: 0 }}>
-            {t('pages.imageEditor.toolHint', { tool: t(`pages.imageEditor.tool.${tool}`) })}
+            {tool === 'blur'
+              ? t('pages.imageEditor.blurHint')
+              : t('pages.imageEditor.toolHint', {
+                  tool: t(`pages.imageEditor.tool.${tool}`),
+                })}
           </span>
         </div>
       </div>

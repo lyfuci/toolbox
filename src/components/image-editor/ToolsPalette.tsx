@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  Aperture,
   ArrowRight,
   Brush,
   Circle,
@@ -150,6 +151,7 @@ const GROUPS: ToolDef[][] = [
   [
     { id: 'mask', icon: <Frame className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.mask' },
     { id: 'mosaic', icon: <Squircle className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.mosaic' },
+    { id: 'blur', icon: <Aperture className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.blur' },
   ],
   // 5. Navigation
   [

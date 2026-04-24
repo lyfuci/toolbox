@@ -488,6 +488,15 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
           shape: { kind: 'mosaic', x: p.x, y: p.y, w: 0, h: 0, cell: 12 },
         } as AnnotationLayer,
       })
+    } else if (tool === 'blur') {
+      setInteraction({
+        kind: 'drawing',
+        layer: {
+          ...baseLayer('Blur'),
+          kind: 'annotation',
+          shape: { kind: 'blur', x: p.x, y: p.y, w: 0, h: 0, radius: 8 },
+        } as AnnotationLayer,
+      })
     } else if (tool === 'brush' || tool === 'eraser') {
       setInteraction({
         kind: 'drawing',
@@ -533,7 +542,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     const drawing = interaction.layer
     if (drawing.kind === 'annotation') {
       const s = drawing.shape
-      if (s.kind === 'rect' || s.kind === 'mosaic' || s.kind === 'ellipse') {
+      if (s.kind === 'rect' || s.kind === 'mosaic' || s.kind === 'ellipse' || s.kind === 'blur') {
         setInteraction({
           kind: 'drawing',
           layer: { ...drawing, shape: { ...s, w: p.x - s.x, h: p.y - s.y } } as AnnotationLayer,
@@ -661,7 +670,7 @@ function shouldDiscardDrawing(layer: Layer): boolean {
   }
   if (layer.kind === 'annotation') {
     const s = layer.shape
-    if (s.kind === 'rect' || s.kind === 'mosaic' || s.kind === 'ellipse') {
+    if (s.kind === 'rect' || s.kind === 'mosaic' || s.kind === 'ellipse' || s.kind === 'blur') {
       return Math.abs(s.w) < 4 && Math.abs(s.h) < 4
     }
     if (s.kind === 'arrow' || s.kind === 'line') {

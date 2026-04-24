@@ -170,9 +170,10 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
       ctx.globalAlpha = l.opacity / 100
       ctx.globalCompositeOperation = blendModeToOp(l.blend)
       applyShadow(ctx, l.shadow, annoScale)
-      // Mosaic is the only shape that needs to read the underlying composite.
-      const underlying =
-        l.shape.kind === 'mosaic' ? snapshotCanvas(canvas) : canvas
+      // Mosaic + Blur both sample the underlying composite — snapshot first
+      // so they read pre-shape pixels rather than their own output.
+      const needsUnderlying = l.shape.kind === 'mosaic' || l.shape.kind === 'blur'
+      const underlying = needsUnderlying ? snapshotCanvas(canvas) : canvas
       drawShape(ctx, l.shape, annoScale, underlying, input.imageCache)
       ctx.restore()
     } else if (l.kind === 'mask') {
@@ -188,8 +189,8 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
       ctx.globalAlpha = layer.opacity / 100
       ctx.globalCompositeOperation = blendModeToOp(layer.blend)
       applyShadow(ctx, layer.shadow, annoScale)
-      const underlying =
-        layer.shape.kind === 'mosaic' ? snapshotCanvas(canvas) : canvas
+      const needsUnderlying = layer.shape.kind === 'mosaic' || layer.shape.kind === 'blur'
+      const underlying = needsUnderlying ? snapshotCanvas(canvas) : canvas
       drawShape(ctx, layer.shape, annoScale, underlying, input.imageCache)
       ctx.restore()
     } else if (layer.kind === 'mask') {

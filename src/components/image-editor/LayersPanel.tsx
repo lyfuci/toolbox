@@ -182,5 +182,7 @@ function layerLabelKey(layer: Layer): string {
       return 'pages.imageEditor.annoLabel.ellipse'
     case 'line':
       return 'pages.imageEditor.annoLabel.line'
+    case 'blur':
+      return 'pages.imageEditor.annoLabel.blur'
   }
 }
