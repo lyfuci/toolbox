@@ -157,6 +157,18 @@ export function ImageEditorPage() {
         setFocused((v) => !v)
         return
       }
+      // Crop commit/cancel — Enter applies the pending drag, Escape cancels.
+      // Both no-op if no crop is pending. Escape also exits focus mode (below).
+      if (e.key === 'Enter' && canvasRef.current?.hasPendingCrop()) {
+        e.preventDefault()
+        canvasRef.current.commitPendingCrop()
+        return
+      }
+      if (e.key === 'Escape' && canvasRef.current?.hasPendingCrop()) {
+        e.preventDefault()
+        canvasRef.current.cancelPendingCrop()
+        return
+      }
       if (e.key === 'Escape' && focused) {
         e.preventDefault()
         setFocused(false)
@@ -183,6 +195,7 @@ export function ImageEditorPage() {
       if (e.key === 'e') { e.preventDefault(); setTool('eraser'); return }
       if (e.key === 'i') { e.preventDefault(); setTool('eyedropper'); return }
       if (e.key === 'z') { e.preventDefault(); setTool('zoom'); return }
+      if (e.key === 'c') { e.preventDefault(); setTool('crop'); return }
     }
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
@@ -237,6 +250,22 @@ export function ImageEditorPage() {
       }),
     [history, state],
   )
+
+  // Crop commit → apply (or replace) state.cropRect. Rect is already in the
+  // post-rotation preview-pixel space relative to the original image.
+  const handleCommitCrop = useCallback(
+    (rect: { x: number; y: number; w: number; h: number }) => {
+      history.set({ ...state, cropRect: rect })
+      setTool('none')
+      toast.success(t('pages.imageEditor.cropApplied'))
+    },
+    [history, state, t],
+  )
+  const handleClearCrop = useCallback(() => {
+    if (!state.cropRect) return
+    history.set({ ...state, cropRect: undefined })
+    toast.success(t('pages.imageEditor.cropCleared'))
+  }, [history, state, t])
 
   // ── File handling ────────────────────────────────────────────────────────
   const acceptFile = useCallback(
@@ -409,6 +438,24 @@ export function ImageEditorPage() {
         }}
       />
 
+      {/* Contextual crop banner — shown when the crop tool is active or a
+          crop is already applied. Keyboard: Enter = apply pending, Esc =
+          cancel pending. Button: clear an applied crop. */}
+      {(tool === 'crop' || state.cropRect) && (
+        <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
+          <span>{t('pages.imageEditor.cropPendingHint')}</span>
+          {state.cropRect && (
+            <button
+              type="button"
+              onClick={handleClearCrop}
+              className="rounded border border-border bg-background px-2 py-0.5 text-foreground hover:bg-accent/40"
+            >
+              {t('pages.imageEditor.cropClear')}
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-1 overflow-hidden">
         <ToolsPalette
           tool={tool}
@@ -447,6 +494,7 @@ export function ImageEditorPage() {
             imageCache={imageCache}
             onZoomAt={zoomAtPoint}
             onPickColor={handlePickColor}
+            onCommitCrop={handleCommitCrop}
           />
         </Workspace>
 

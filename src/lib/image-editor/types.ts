@@ -33,6 +33,7 @@ export type Tool =
   | 'mask'
   | 'zoom'
   | 'eyedropper'
+  | 'crop'
 
 export type Transforms = {
   rotation: Rotation
@@ -46,6 +47,9 @@ export type Adjustments = {
   saturation: number
   grayscale: number // %
   blur: number // px
+  hue: number // degrees, 0 = identity, range -180..180
+  sepia: number // %, 0 = identity
+  invert: number // %, 0 = identity
 }
 
 export type Point = { x: number; y: number }
@@ -142,6 +146,14 @@ export type EditorState = {
   layers: Layer[] // ordered bottom→top
   transforms: Transforms
   adjust: Adjustments
+  /**
+   * Optional crop region. Stored in the same coordinate space shape coords use
+   * (post-rotation preview-canvas pixels), so it's applied after transforms.
+   * When set, the renderer crops the image to this rect AND translates layer
+   * shapes by -(cropRect.x, cropRect.y) so they stay anchored to image pixels.
+   * Set/cleared via the Crop tool; history-tracked → undo restores.
+   */
+  cropRect?: Rect
 }
 
 // Persisted project format (JSON sidecar).

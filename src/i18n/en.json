@@ -446,6 +446,9 @@
       "brightness": "Brightness",
       "contrast": "Contrast",
       "saturation": "Saturation",
+      "hue": "Hue rotate",
+      "sepia": "Sepia",
+      "invert": "Invert",
       "grayscale": "Grayscale",
       "blur": "Blur (px)",
       "tool": {
@@ -459,8 +462,15 @@
         "eraser": "Eraser",
         "mask": "Mask",
         "eyedropper": "Eyedropper",
-        "zoom": "Zoom"
+        "zoom": "Zoom",
+        "crop": "Crop"
       },
+      "cropApply": "Apply crop",
+      "cropCancel": "Cancel",
+      "cropClear": "Clear crop",
+      "cropPendingHint": "Press Enter to apply, Esc to cancel",
+      "cropApplied": "Crop applied",
+      "cropCleared": "Crop cleared",
       "colors": "Foreground / background colors",
       "fgColor": "Foreground color",
       "bgColor": "Background color",

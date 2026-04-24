@@ -31,6 +31,12 @@ import type {
 
 export type CanvasHandle = {
   exportTo: (canvas: HTMLCanvasElement) => void
+  /** Apply the user's pending crop drag (if any). No-op if nothing is pending. */
+  commitPendingCrop: () => void
+  /** Discard any pending crop drag without modifying state. */
+  cancelPendingCrop: () => void
+  /** True iff there's a pending (un-committed) crop drag waiting on user. */
+  hasPendingCrop: () => boolean
 }
 
 type Props = {
@@ -54,6 +60,13 @@ type Props = {
   onZoomAt?: (clientX: number, clientY: number, factor: number) => void
   /** Called by the Eyedropper tool with a hex color picked from the canvas. */
   onPickColor?: (hex: string) => void
+  /**
+   * Called when the user commits a crop. `rect` is in the same coordinate
+   * space as state.cropRect (post-rotation preview-pixel space, relative to
+   * the *original* image — Canvas already translates from the cropped-canvas
+   * coords if a crop is currently active).
+   */
+  onCommitCrop?: (rect: { x: number; y: number; w: number; h: number }) => void
 }
 
 type Interaction =
@@ -73,6 +86,10 @@ type Interaction =
       original: Layer
       preview: Layer
     }
+  /** Crop drag in progress (mouse held). Rect is in canvas-pixel space. */
+  | { kind: 'crop-drawing'; rect: { x: number; y: number; w: number; h: number } }
+  /** Crop drag finished, awaiting commit/cancel from caller. */
+  | { kind: 'crop-pending'; rect: { x: number; y: number; w: number; h: number } }
 
 export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
   {
@@ -89,6 +106,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     imageCache,
     onZoomAt,
     onPickColor,
+    onCommitCrop,
   },
   ref,
 ) {
@@ -128,6 +146,16 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     return effectiveState.layers.find((l) => l.id === selectedId) ?? null
   }, [interaction, selectedId, effectiveState])
 
+  // Switching off the crop tool clears any uncommitted crop preview — keeps
+  // the dim overlay from leaking into other tools' workflows.
+  useEffect(() => {
+    if (tool !== 'crop') {
+      setInteraction((i) =>
+        i.kind === 'crop-drawing' || i.kind === 'crop-pending' ? { kind: 'idle' } : i,
+      )
+    }
+  }, [tool])
+
   // Live preview render whenever any pixel-affecting input changes.
   useEffect(() => {
     if (!canvasRef.current) return
@@ -141,6 +169,12 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       selection: selectionLayer ? { layer: selectionLayer } : undefined,
       imageCache,
     })
+    // Crop preview overlay — drawn AFTER the image render so it sits on top.
+    // Lives only on the live canvas; the export canvas (separate renderTo
+    // call) never sees it.
+    if (interaction.kind === 'crop-drawing' || interaction.kind === 'crop-pending') {
+      drawCropOverlay(canvasRef.current, interaction.rect)
+    }
   }, [image, effectiveState, interaction, selectionLayer, previewScale, imageCache])
 
   useImperativeHandle(
@@ -157,8 +191,39 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
           imageCache,
         })
       },
+      commitPendingCrop: () => {
+        if (interaction.kind !== 'crop-pending' && interaction.kind !== 'crop-drawing') {
+          return
+        }
+        const r = interaction.rect
+        // Drag was drawn in canvas-pixel space. Canvas pixels equal preview
+        // pixels at scale=previewScale (since canvas.width = effW * scale).
+        // Translate from "cropped-canvas" space back to "original-image
+        // preview-pixel" space by adding the active crop's origin.
+        const baseX = state.cropRect ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w) : 0
+        const baseY = state.cropRect ? Math.min(state.cropRect.y, state.cropRect.y + state.cropRect.h) : 0
+        const finalRect = {
+          x: baseX + Math.min(r.x, r.x + r.w),
+          y: baseY + Math.min(r.y, r.y + r.h),
+          w: Math.abs(r.w),
+          h: Math.abs(r.h),
+        }
+        if (finalRect.w < 4 || finalRect.h < 4) {
+          setInteraction({ kind: 'idle' })
+          return
+        }
+        onCommitCrop?.(finalRect)
+        setInteraction({ kind: 'idle' })
+      },
+      cancelPendingCrop: () => {
+        if (interaction.kind === 'crop-pending' || interaction.kind === 'crop-drawing') {
+          setInteraction({ kind: 'idle' })
+        }
+      },
+      hasPendingCrop: () =>
+        interaction.kind === 'crop-pending' || interaction.kind === 'crop-drawing',
     }),
-    [image, state, previewScale, imageCache],
+    [image, state, previewScale, imageCache, interaction, onCommitCrop],
   )
 
   // ── Mouse handling ──────────────────────────────────────────────────────
@@ -199,6 +264,13 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     if (tool === 'eyedropper') {
       const hex = readPixelHex(canvasRef.current, p.x, p.y)
       if (hex && onPickColor) onPickColor(hex)
+      return
+    }
+
+    // Crop: drag to define a region within the current view. Replace any
+    // pending crop on a fresh drag.
+    if (tool === 'crop') {
+      setInteraction({ kind: 'crop-drawing', rect: { x: p.x, y: p.y, w: 0, h: 0 } })
       return
     }
 
@@ -248,6 +320,15 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     if (interaction.kind === 'idle') return
     const p = eventToCanvasXY(e)
 
+    if (interaction.kind === 'crop-drawing') {
+      const r = interaction.rect
+      setInteraction({
+        kind: 'crop-drawing',
+        rect: { x: r.x, y: r.y, w: p.x - r.x, h: p.y - r.y },
+      })
+      return
+    }
+
     if (interaction.kind === 'drawing') {
       updateDrawing(p)
       return
@@ -272,6 +353,15 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
 
   const handleMouseUp = () => {
     if (interaction.kind === 'idle') return
+    if (interaction.kind === 'crop-drawing') {
+      const r = interaction.rect
+      if (Math.abs(r.w) < 4 || Math.abs(r.h) < 4) {
+        setInteraction({ kind: 'idle' })
+      } else {
+        setInteraction({ kind: 'crop-pending', rect: r })
+      }
+      return
+    }
     if (interaction.kind === 'drawing') {
       if (!shouldDiscardDrawing(interaction.layer)) {
         onCommitLayer(interaction.layer)
@@ -419,6 +509,10 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       setHoverCursor('crosshair')
       return
     }
+    if (tool === 'crop') {
+      setHoverCursor('crosshair')
+      return
+    }
     if (tool !== 'none') {
       setHoverCursor('crosshair')
       return
@@ -503,6 +597,43 @@ function shouldDiscardDrawing(layer: Layer): boolean {
     }
   }
   return false
+}
+
+/**
+ * Draw a crop preview overlay onto the live canvas. Dim the area outside the
+ * crop rect (4 surrounding rectangles) and stroke a dashed bright outline
+ * around it. Coords are in canvas-pixel space (= preview-pixel space at
+ * preview scale).
+ */
+function drawCropOverlay(
+  canvas: HTMLCanvasElement | null,
+  rect: { x: number; y: number; w: number; h: number },
+) {
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const rx = Math.min(rect.x, rect.x + rect.w)
+  const ry = Math.min(rect.y, rect.y + rect.h)
+  const rw = Math.abs(rect.w)
+  const rh = Math.abs(rect.h)
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'
+  // Top
+  ctx.fillRect(0, 0, canvas.width, ry)
+  // Bottom
+  ctx.fillRect(0, ry + rh, canvas.width, canvas.height - (ry + rh))
+  // Left
+  ctx.fillRect(0, ry, rx, rh)
+  // Right
+  ctx.fillRect(rx + rw, ry, canvas.width - (rx + rw), rh)
+  // Outline
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 1
+  ctx.setLineDash([6, 4])
+  ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1)
+  ctx.setLineDash([])
+  ctx.restore()
 }
 
 /**

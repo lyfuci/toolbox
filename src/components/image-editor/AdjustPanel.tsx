@@ -86,6 +86,30 @@ export function AdjustPanel({
           onChange={(v) => setAdjust({ ...adjust, saturation: v })}
         />
         <Slider
+          label={t('pages.imageEditor.hue')}
+          value={adjust.hue}
+          min={-180}
+          max={180}
+          unit="°"
+          onChange={(v) => setAdjust({ ...adjust, hue: v })}
+        />
+        <Slider
+          label={t('pages.imageEditor.sepia')}
+          value={adjust.sepia}
+          min={0}
+          max={100}
+          unit="%"
+          onChange={(v) => setAdjust({ ...adjust, sepia: v })}
+        />
+        <Slider
+          label={t('pages.imageEditor.invert')}
+          value={adjust.invert}
+          min={0}
+          max={100}
+          unit="%"
+          onChange={(v) => setAdjust({ ...adjust, invert: v })}
+        />
+        <Slider
           label={t('pages.imageEditor.grayscale')}
           value={adjust.grayscale}
           min={0}
