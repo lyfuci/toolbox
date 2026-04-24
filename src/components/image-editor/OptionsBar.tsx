@@ -56,8 +56,9 @@ export function OptionsBar({
     )
   }
 
-  // Brush / pencil / eraser — stroke width + color.
-  if (tool === 'brush' || tool === 'eraser') {
+  // Brush / pencil / eraser / dodge — stroke width (+ color for brush only;
+  // dodge always paints white via 'lighter' composite, eraser cuts alpha).
+  if (tool === 'brush' || tool === 'eraser' || tool === 'dodge') {
     return (
       <div className="pf-options">
         <div className="pf-opt-group">
@@ -88,6 +89,13 @@ export function OptionsBar({
                 cursor: 'pointer',
               }}
             />
+          </div>
+        )}
+        {tool === 'dodge' && (
+          <div className="pf-opt-group" style={{ borderRight: 0 }}>
+            <span className="pf-opt-label" style={{ marginRight: 0 }}>
+              {t('pages.imageEditor.dodgeHint')}
+            </span>
           </div>
         )}
       </div>

@@ -527,6 +527,7 @@
       "errBucketRead": "Couldn't read pixels for fill (canvas tainted?).",
       "gradientHint": "Gradient (G): drag from start to end. Foreground at the start, background at the end. Result lands as a new layer.",
       "blurHint": "Blur: drag a rect on the canvas — the area inside gets blurred at render time. Adjustable via the layer's bounds; default radius is 8 px.",
+      "dodgeHint": "Dodge (O): drag to brighten — like PS, repeat strokes to build up the effect. Layer opacity controls intensity.",
       "textToolHint": "Type (T): click on the canvas to add text.",
       "toolStubHint": "{{tool}} is a placeholder — the palette button is here for parity with Photoshop, but the tool isn't implemented yet.",
       "toolStubToast": "{{tool}} is not yet implemented.",
@@ -587,7 +588,9 @@
         "line": "Line",
         "bucket": "Paint fill",
         "gradient": "Gradient",
-        "blur": "Blur region"
+        "blur": "Blur region",
+        "dodge": "Dodge stroke",
+        "burn": "Burn stroke"
       },
       "project": "Project",
       "projectSave": "Save project (.json)",

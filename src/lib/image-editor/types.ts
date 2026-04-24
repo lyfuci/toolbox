@@ -130,6 +130,12 @@ export type BrushShape = {
   color: string
   strokeWidth: number
   eraser?: boolean
+  /**
+   * Stroke mode. When set, the renderer ignores `color`/`eraser` and uses
+   * additive ('lighter') or multiplicative ('multiply') blending to brighten
+   * or darken the underlying pixels — same effect as PS's Dodge / Burn tools.
+   */
+  mode?: 'dodge' | 'burn'
 }
 export type ImageShape = {
   kind: 'image'

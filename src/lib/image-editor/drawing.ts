@@ -174,11 +174,23 @@ function drawImageShape(
 
 function drawBrush(ctx: CanvasRenderingContext2D, s: BrushShape, scale: number) {
   if (s.points.length === 0) return
-  ctx.strokeStyle = s.color
+  // Mode dispatch — dodge/burn override color + composite op; eraser cuts
+  // alpha; default is straight FG-coloured stroke.
+  if (s.mode === 'dodge') {
+    ctx.strokeStyle = '#ffffff'
+    ctx.globalCompositeOperation = 'lighter'
+  } else if (s.mode === 'burn') {
+    ctx.strokeStyle = '#000000'
+    ctx.globalCompositeOperation = 'multiply'
+  } else if (s.eraser) {
+    ctx.strokeStyle = s.color
+    ctx.globalCompositeOperation = 'destination-out'
+  } else {
+    ctx.strokeStyle = s.color
+  }
   ctx.lineWidth = s.strokeWidth * scale
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  if (s.eraser) ctx.globalCompositeOperation = 'destination-out'
   ctx.beginPath()
   ctx.moveTo(s.points[0].x * scale, s.points[0].y * scale)
   if (s.points.length === 1) {
@@ -190,7 +202,8 @@ function drawBrush(ctx: CanvasRenderingContext2D, s: BrushShape, scale: number) 
     }
   }
   ctx.stroke()
-  if (s.eraser) ctx.globalCompositeOperation = 'source-over'
+  // Render path uses ctx.save()/restore() per layer, so no need to reset
+  // composite/strokeStyle here.
 }
 
 function drawMosaic(
