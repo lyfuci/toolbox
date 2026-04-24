@@ -521,6 +521,7 @@
       "moveToolHint": "移动 (V)：拖动图层；Cmd/Ctrl+J 复制；Delete 删除。",
       "zoomToolHint": "缩放 (Z)：单击放大 2×，Alt 单击缩小。Cmd/Ctrl+滚轮在光标位置缩放。",
       "eyedropperHint": "吸管 (I)：在画布上单击以拾取前景色。",
+      "handToolHint": "抓手 (H)：拖动画布以平移。任何工具下按住空格也可临时平移。",
       "textToolHint": "文字 (T)：在画布上单击以新增文字。",
       "toolStubHint": "{{tool}} 仅作占位 —— 工具栏按钮是为了对齐 Photoshop 而保留，但功能尚未实现。",
       "toolStubToast": "{{tool}} 暂未实现。",
