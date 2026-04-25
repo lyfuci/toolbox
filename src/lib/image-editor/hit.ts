@@ -33,7 +33,12 @@ function getShapeBBox(shape: Shape): Rect {
     case 'image':
     case 'ellipse':
     case 'blur':
+    case 'frame':
       return normalizeRect({ x: shape.x, y: shape.y, w: shape.w, h: shape.h })
+    case 'note':
+      // Notes render as a 16-px sticky icon — bbox covers the icon so the
+      // user can click it to select / move.
+      return { x: shape.x, y: shape.y, w: 16, h: 16 }
     case 'arrow':
     case 'line': {
       const x = Math.min(shape.x1, shape.x2)
@@ -110,6 +115,7 @@ export function getHandles(layer: Layer): Handle[] {
     case 'image':
     case 'ellipse':
     case 'blur':
+    case 'frame':
       return rectCornerHandles(
         normalizeRect({
           x: layer.shape.x,
@@ -126,6 +132,8 @@ export function getHandles(layer: Layer): Handle[] {
       ]
     case 'text':
     case 'brush':
+    case 'note':
+      // Note is move-only; resizing it would just stretch a 16-px icon.
       return []
   }
 }

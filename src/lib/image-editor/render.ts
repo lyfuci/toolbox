@@ -170,6 +170,14 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
 
   for (const layer of state.layers) {
     if (!layer.visible) continue
+    // Notes are UI-only annotations — never bake into export.
+    if (
+      !input.liveCanvas &&
+      layer.kind === 'annotation' &&
+      layer.shape.kind === 'note'
+    ) {
+      continue
+    }
     const l = shiftForCrop(layer)
     if (l.kind === 'annotation') {
       ctx.save()

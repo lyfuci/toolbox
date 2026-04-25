@@ -415,8 +415,27 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       return
     }
 
+    // Note: click → prompt → commit a sticky-note marker. Empty text = no-op.
+    if (tool === 'note') {
+      const text = window.prompt(t('pages.imageEditor.notePrompt'), '') ?? ''
+      if (text.trim()) {
+        onCommitLayer({
+          id: crypto.randomUUID(),
+          name: 'Note',
+          visible: true,
+          opacity: 100,
+          blend: 'normal',
+          kind: 'annotation',
+          shape: { kind: 'note', x: p.x, y: p.y, text, color: '#fde047' },
+        } as AnnotationLayer)
+      }
+      return
+    }
+
+    // Path Selection (arrowPath) is the vector counterpart of Move — until Pen
+    // exists end-to-end, treat it identically to the no-tool selection arrow.
     // Drawing tools take priority over selection.
-    if (tool !== 'none') {
+    if (tool !== 'none' && tool !== 'arrowPath') {
       startDrawing(p)
       return
     }
@@ -643,6 +662,15 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
           shape: { kind: 'blur', x: p.x, y: p.y, w: 0, h: 0, radius: 8 },
         } as AnnotationLayer,
       })
+    } else if (tool === 'frame') {
+      setInteraction({
+        kind: 'drawing',
+        layer: {
+          ...baseLayer('Frame'),
+          kind: 'annotation',
+          shape: { kind: 'frame', x: p.x, y: p.y, w: 0, h: 0 },
+        } as AnnotationLayer,
+      })
     } else if (tool === 'brush' || tool === 'eraser') {
       setInteraction({
         kind: 'drawing',
@@ -708,7 +736,13 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     const drawing = interaction.layer
     if (drawing.kind === 'annotation') {
       const s = drawing.shape
-      if (s.kind === 'rect' || s.kind === 'mosaic' || s.kind === 'ellipse' || s.kind === 'blur') {
+      if (
+        s.kind === 'rect' ||
+        s.kind === 'mosaic' ||
+        s.kind === 'ellipse' ||
+        s.kind === 'blur' ||
+        s.kind === 'frame'
+      ) {
         setInteraction({
           kind: 'drawing',
           layer: { ...drawing, shape: { ...s, w: p.x - s.x, h: p.y - s.y } } as AnnotationLayer,
@@ -765,12 +799,16 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       tool === 'marquee' ||
       tool === 'lasso' ||
       tool === 'polyLasso' ||
-      tool === 'wand'
+      tool === 'wand' ||
+      tool === 'note' ||
+      tool === 'frame'
     ) {
       setHoverCursor('crosshair')
       return
     }
-    if (tool !== 'none') {
+    // Path Selection (arrowPath) shares the move/select cursor logic with
+    // 'none' — same hit-testing and resize-handle hover beneath.
+    if (tool !== 'none' && tool !== 'arrowPath') {
       setHoverCursor('crosshair')
       return
     }
@@ -843,7 +881,13 @@ function shouldDiscardDrawing(layer: Layer): boolean {
   }
   if (layer.kind === 'annotation') {
     const s = layer.shape
-    if (s.kind === 'rect' || s.kind === 'mosaic' || s.kind === 'ellipse' || s.kind === 'blur') {
+    if (
+      s.kind === 'rect' ||
+      s.kind === 'mosaic' ||
+      s.kind === 'ellipse' ||
+      s.kind === 'blur' ||
+      s.kind === 'frame'
+    ) {
       return Math.abs(s.w) < 4 && Math.abs(s.h) < 4
     }
     if (s.kind === 'arrow' || s.kind === 'line') {

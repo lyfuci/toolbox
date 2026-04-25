@@ -19,6 +19,8 @@ function translateShape(shape: Shape, dx: number, dy: number): Shape {
     case 'image':
     case 'ellipse':
     case 'blur':
+    case 'frame':
+    case 'note':
       return { ...shape, x: shape.x + dx, y: shape.y + dy }
     case 'arrow':
     case 'line':
@@ -67,7 +69,8 @@ export function resizeLayer(
     case 'mosaic':
     case 'image':
     case 'ellipse':
-    case 'blur': {
+    case 'blur':
+    case 'frame': {
       const next = resizeRect({ x: s.x, y: s.y, w: s.w, h: s.h }, handleId, newPoint)
       return { ...layer, shape: { ...s, ...next } }
     }

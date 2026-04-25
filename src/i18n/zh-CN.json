@@ -560,6 +560,10 @@
       "focusEnterHint": "全屏 —— 隐藏工具站界面，画布占满整个视口",
       "focusExitHint": "退出全屏（Esc）",
       "handHint": "抓手 (H)：拖动以平移画布，等同于按住空格 + 任意工具。",
+      "noteHint": "便签 (N)：单击在画布上放一个便签标记。便签只在屏幕上显示，不会写入导出图片。",
+      "notePrompt": "便签文字",
+      "frameHint": "画框：拖动绘制一个矩形占位框。",
+      "arrowPathHint": "路径选择 (A)：单击选中矢量图层，拖动移动。当前与移动工具行为一致 —— 完整的锚点选择需待钢笔工具上线。",
       "currentTool": "工具",
       "zoomFit": "适配 (Cmd/Ctrl+0)",
       "style": "样式",
@@ -600,7 +604,9 @@
         "gradient": "渐变",
         "blur": "模糊区域",
         "dodge": "减淡笔触",
-        "burn": "加深笔触"
+        "burn": "加深笔触",
+        "note": "便签",
+        "frame": "画框"
       },
       "project": "项目",
       "projectSave": "保存项目 (.json)",

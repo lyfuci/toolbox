@@ -186,5 +186,9 @@ function layerLabelKey(layer: Layer): string {
       return 'pages.imageEditor.annoLabel.line'
     case 'blur':
       return 'pages.imageEditor.annoLabel.blur'
+    case 'note':
+      return 'pages.imageEditor.annoLabel.note'
+    case 'frame':
+      return 'pages.imageEditor.annoLabel.frame'
   }
 }

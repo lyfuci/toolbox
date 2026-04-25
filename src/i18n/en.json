@@ -560,6 +560,10 @@
       "focusEnterHint": "Fullscreen — hide the toolbox chrome and give the canvas the full viewport",
       "focusExitHint": "Exit fullscreen (Esc)",
       "handHint": "Hand (H): drag to pan the canvas. Same as holding Space with any other tool.",
+      "noteHint": "Note (N): click to drop a sticky-note marker. Notes show on screen but never bake into export.",
+      "notePrompt": "Note text",
+      "frameHint": "Frame: drag to draw a rectangular placeholder frame.",
+      "arrowPathHint": "Path Selection (A): click to select a vector layer, drag to move. Behaves like the Move tool — full vector-anchor selection arrives with the Pen tool.",
       "currentTool": "Tool",
       "zoomFit": "Fit (Cmd/Ctrl+0)",
       "style": "Style",
@@ -600,7 +604,9 @@
         "gradient": "Gradient",
         "blur": "Blur region",
         "dodge": "Dodge stroke",
-        "burn": "Burn stroke"
+        "burn": "Burn stroke",
+        "note": "Note",
+        "frame": "Frame"
       },
       "project": "Project",
       "projectSave": "Save project (.json)",

@@ -265,6 +265,8 @@ export function ImageEditorPage() {
         u: 'rect',
         h: 'hand',
         z: 'zoom',
+        a: 'arrowPath',
+        n: 'note',
       }
       const next = map[e.key.toLowerCase()]
       if (next) {

@@ -3,9 +3,11 @@ import type {
   BlurShape,
   BrushShape,
   EllipseShape,
+  FrameShape,
   ImageShape,
   LineShape,
   MosaicShape,
+  NoteShape,
   RectShape,
   Shape,
   TextShape,
@@ -55,7 +57,88 @@ export function drawShape(
     case 'blur':
       drawBlurRegion(ctx, shape, scale, underlying)
       break
+    case 'note':
+      drawNote(ctx, shape, scale)
+      break
+    case 'frame':
+      drawFrame(ctx, shape, scale)
+      break
   }
+}
+
+/**
+ * Sticky-note marker. Rendered as a small folded-corner rectangle in the
+ * given colour with a 1-line text label below it. The full text is in the
+ * Properties panel on hover; the label is just a preview.
+ */
+function drawNote(ctx: CanvasRenderingContext2D, s: NoteShape, scale: number) {
+  const x = s.x * scale
+  const y = s.y * scale
+  const size = 16 * scale
+  const fold = size / 3
+  ctx.save()
+  // Note body (folded-corner pentagon)
+  ctx.fillStyle = s.color
+  ctx.strokeStyle = '#1a1a1a'
+  ctx.lineWidth = Math.max(1, scale)
+  ctx.beginPath()
+  ctx.moveTo(x, y)
+  ctx.lineTo(x + size - fold, y)
+  ctx.lineTo(x + size, y + fold)
+  ctx.lineTo(x + size, y + size)
+  ctx.lineTo(x, y + size)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+  // Folded-corner triangle
+  ctx.fillStyle = 'rgba(0,0,0,0.18)'
+  ctx.beginPath()
+  ctx.moveTo(x + size - fold, y)
+  ctx.lineTo(x + size - fold, y + fold)
+  ctx.lineTo(x + size, y + fold)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+  // 1-line preview label below
+  const label = s.text.split('\n')[0].slice(0, 24)
+  if (label) {
+    ctx.fillStyle = '#1a1a1a'
+    ctx.font = `${Math.round(11 * scale)}px sans-serif`
+    ctx.textBaseline = 'top'
+    ctx.fillText(label, x, y + size + 2 * scale)
+  }
+  ctx.restore()
+}
+
+/**
+ * Frame placeholder. Dashed grey rect with a diagonal X across — same visual
+ * convention PS uses for an empty Frame Tool layer.
+ */
+function drawFrame(ctx: CanvasRenderingContext2D, s: FrameShape, scale: number) {
+  const x = (s.w >= 0 ? s.x : s.x + s.w) * scale
+  const y = (s.h >= 0 ? s.y : s.y + s.h) * scale
+  const w = Math.abs(s.w) * scale
+  const h = Math.abs(s.h) * scale
+  if (w < 1 || h < 1) return
+  ctx.save()
+  ctx.strokeStyle = '#888'
+  ctx.lineWidth = Math.max(1, scale)
+  ctx.setLineDash([6 * scale, 4 * scale])
+  ctx.strokeRect(x, y, w, h)
+  ctx.setLineDash([])
+  ctx.beginPath()
+  ctx.moveTo(x, y)
+  ctx.lineTo(x + w, y + h)
+  ctx.moveTo(x + w, y)
+  ctx.lineTo(x, y + h)
+  ctx.stroke()
+  if (s.name) {
+    ctx.fillStyle = '#888'
+    ctx.font = `${Math.round(12 * scale)}px sans-serif`
+    ctx.textBaseline = 'top'
+    ctx.fillText(s.name, x + 4 * scale, y + 4 * scale)
+  }
+  ctx.restore()
 }
 
 /**
