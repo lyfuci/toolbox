@@ -190,5 +190,7 @@ function layerLabelKey(layer: Layer): string {
       return 'pages.imageEditor.annoLabel.note'
     case 'frame':
       return 'pages.imageEditor.annoLabel.frame'
+    case 'path':
+      return 'pages.imageEditor.annoLabel.path'
   }
 }

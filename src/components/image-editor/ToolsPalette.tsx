@@ -141,7 +141,6 @@ const GROUPS: ToolDef[][] = [
       icon: <PenTool className="h-4 w-4" />,
       labelKey: 'pages.imageEditor.tool.pen',
       shortcut: 'P',
-      stub: true,
     },
     {
       id: 'arrowPath',

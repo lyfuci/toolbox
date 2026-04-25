@@ -8,6 +8,7 @@ import type {
   LineShape,
   MosaicShape,
   NoteShape,
+  PathShape,
   RectShape,
   Shape,
   TextShape,
@@ -63,7 +64,74 @@ export function drawShape(
     case 'frame':
       drawFrame(ctx, shape, scale)
       break
+    case 'path':
+      drawPath(ctx, shape, scale)
+      break
   }
+}
+
+/**
+ * Vector path. Walks anchors, emitting bezierCurveTo / quadraticCurveTo /
+ * lineTo segments depending on which handles are present on each side. Closed
+ * paths add a final segment from the last anchor back to the first (using
+ * last.hout + first.hin).
+ */
+function drawPath(ctx: CanvasRenderingContext2D, s: PathShape, scale: number) {
+  if (s.anchors.length === 0) return
+  const k = (n: number) => n * scale
+  ctx.beginPath()
+  const a0 = s.anchors[0]
+  ctx.moveTo(k(a0.x), k(a0.y))
+  for (let i = 1; i < s.anchors.length; i++) {
+    drawSegment(ctx, s.anchors[i - 1], s.anchors[i], scale)
+  }
+  if (s.closed && s.anchors.length >= 2) {
+    drawSegment(ctx, s.anchors[s.anchors.length - 1], a0, scale)
+    ctx.closePath()
+  }
+  if (s.fill && s.closed) {
+    ctx.fillStyle = s.fill
+    ctx.fill()
+  }
+  ctx.strokeStyle = s.color
+  ctx.lineWidth = s.strokeWidth * scale
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.stroke()
+}
+
+function drawSegment(
+  ctx: CanvasRenderingContext2D,
+  prev: PathAnchorLike,
+  curr: PathAnchorLike,
+  scale: number,
+) {
+  const k = (n: number) => n * scale
+  const out = prev.hout
+  const inn = curr.hin
+  if (out && inn) {
+    ctx.bezierCurveTo(
+      k(prev.x + out.x),
+      k(prev.y + out.y),
+      k(curr.x + inn.x),
+      k(curr.y + inn.y),
+      k(curr.x),
+      k(curr.y),
+    )
+  } else if (out) {
+    ctx.quadraticCurveTo(k(prev.x + out.x), k(prev.y + out.y), k(curr.x), k(curr.y))
+  } else if (inn) {
+    ctx.quadraticCurveTo(k(curr.x + inn.x), k(curr.y + inn.y), k(curr.x), k(curr.y))
+  } else {
+    ctx.lineTo(k(curr.x), k(curr.y))
+  }
+}
+
+type PathAnchorLike = {
+  x: number
+  y: number
+  hin?: { x: number; y: number }
+  hout?: { x: number; y: number }
 }
 
 /**

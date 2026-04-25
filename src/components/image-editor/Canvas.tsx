@@ -25,6 +25,7 @@ import type {
   EditorState,
   Layer,
   MaskLayer,
+  PathAnchor,
   Point,
   Tool,
 } from '@/lib/image-editor/types'
@@ -41,6 +42,12 @@ export type CanvasHandle = {
   hasPendingPolyLasso: () => boolean
   /** Cancel an in-progress Polygonal Lasso chain (Esc binding). */
   cancelPendingPolyLasso: () => void
+  /** True iff a Pen tool path is being built. */
+  hasPendingPen: () => boolean
+  /** Commit the current open Pen path as a layer (Enter binding). */
+  commitPendingPen: () => void
+  /** Discard an in-progress Pen path (Esc binding). */
+  cancelPendingPen: () => void
 }
 
 type Props = {
@@ -142,6 +149,14 @@ type Interaction =
    * segment from the last committed point to the cursor.
    */
   | { kind: 'polylasso-drawing'; points: Point[]; cursor: Point }
+  /**
+   * Pen tool — click adds a corner anchor; click-and-drag turns it into a
+   * smooth anchor with symmetric handles. `pressed` is true between mousedown
+   * and mouseup on the current anchor (the window during which the drag sets
+   * the handles). Closing happens by clicking near the first anchor (handled
+   * in mousedown). Esc cancels; Enter commits the current path open.
+   */
+  | { kind: 'pen-drawing'; anchors: PathAnchor[]; pressed: boolean; cursor: Point }
 
 export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
   {
@@ -222,7 +237,11 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       scale: previewScale,
       previewScale,
       drawingPreview:
-        interaction.kind === 'drawing' ? { layer: interaction.layer } : undefined,
+        interaction.kind === 'drawing'
+          ? { layer: interaction.layer }
+          : interaction.kind === 'pen-drawing' && interaction.anchors.length >= 1
+            ? { layer: penPreviewLayer(interaction.anchors, toolColor, toolStrokeWidth) }
+            : undefined,
       selection: selectionLayer ? { layer: selectionLayer } : undefined,
       imageCache,
       liveCanvas: true,
@@ -249,7 +268,24 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       // Show committed segments + a "rubber band" line from last vertex to cursor.
       drawPolygonPreview(canvasRef.current, [...interaction.points, interaction.cursor], true)
     }
-  }, [image, effectiveState, interaction, selectionLayer, previewScale, imageCache])
+    if (interaction.kind === 'pen-drawing') {
+      drawPenPreview(
+        canvasRef.current,
+        interaction.anchors,
+        interaction.cursor,
+        interaction.pressed,
+      )
+    }
+  }, [
+    image,
+    effectiveState,
+    interaction,
+    selectionLayer,
+    previewScale,
+    imageCache,
+    toolColor,
+    toolStrokeWidth,
+  ])
 
   useImperativeHandle(
     ref,
@@ -302,8 +338,47 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
           setInteraction({ kind: 'idle' })
         }
       },
+      hasPendingPen: () => interaction.kind === 'pen-drawing',
+      commitPendingPen: () => {
+        if (interaction.kind !== 'pen-drawing') return
+        // Inlined to keep this function self-contained (no closed-over
+        // helper that the deps array would have to track).
+        if (interaction.anchors.length >= 2) {
+          onCommitLayer({
+            id: crypto.randomUUID(),
+            name: 'Path',
+            visible: true,
+            opacity: 100,
+            blend: 'normal',
+            kind: 'annotation',
+            shape: {
+              kind: 'path',
+              anchors: interaction.anchors,
+              closed: false,
+              color: toolColor,
+              strokeWidth: toolStrokeWidth,
+            },
+          } as AnnotationLayer)
+        }
+        setInteraction({ kind: 'idle' })
+      },
+      cancelPendingPen: () => {
+        if (interaction.kind === 'pen-drawing') {
+          setInteraction({ kind: 'idle' })
+        }
+      },
     }),
-    [image, state, previewScale, imageCache, interaction, onCommitCrop],
+    [
+      image,
+      state,
+      previewScale,
+      imageCache,
+      interaction,
+      onCommitCrop,
+      onCommitLayer,
+      toolColor,
+      toolStrokeWidth,
+    ],
   )
 
   // ── Mouse handling ──────────────────────────────────────────────────────
@@ -405,6 +480,38 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
         }
       } else {
         setInteraction({ kind: 'polylasso-drawing', points: [p], cursor: p })
+      }
+      return
+    }
+
+    // Pen tool — click adds an anchor; click+drag turns it into a smooth
+    // anchor (handles set on mousemove). Clicking near the first anchor with
+    // ≥2 anchors closes the path. Enter / Esc handled in the parent.
+    if (tool === 'pen') {
+      if (interaction.kind === 'pen-drawing') {
+        const first = interaction.anchors[0]
+        const closeToFirst =
+          interaction.anchors.length >= 2 &&
+          Math.abs(p.x - first.x) < 8 &&
+          Math.abs(p.y - first.y) < 8
+        if (closeToFirst) {
+          commitPenPath(interaction.anchors, true)
+          setInteraction({ kind: 'idle' })
+          return
+        }
+        setInteraction({
+          kind: 'pen-drawing',
+          anchors: [...interaction.anchors, { x: p.x, y: p.y }],
+          pressed: true,
+          cursor: p,
+        })
+      } else {
+        setInteraction({
+          kind: 'pen-drawing',
+          anchors: [{ x: p.x, y: p.y }],
+          pressed: true,
+          cursor: p,
+        })
       }
       return
     }
@@ -519,6 +626,26 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       return
     }
 
+    if (interaction.kind === 'pen-drawing') {
+      // While the mouse is held after a click, dragging sets the last
+      // anchor's symmetric handles based on the drag delta from the anchor.
+      // Without a press, just track cursor for rubber-band preview.
+      if (interaction.pressed && interaction.anchors.length >= 1) {
+        const idx = interaction.anchors.length - 1
+        const a = interaction.anchors[idx]
+        const dx = p.x - a.x
+        const dy = p.y - a.y
+        if (Math.abs(dx) >= 3 || Math.abs(dy) >= 3) {
+          const next = [...interaction.anchors]
+          next[idx] = { ...a, hout: { x: dx, y: dy }, hin: { x: -dx, y: -dy } }
+          setInteraction({ ...interaction, anchors: next, cursor: p })
+          return
+        }
+      }
+      setInteraction({ ...interaction, cursor: p })
+      return
+    }
+
     if (interaction.kind === 'drawing') {
       updateDrawing(p)
       return
@@ -580,6 +707,11 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     }
     // PolyLasso intentionally does NOT commit on mouseup — clicks add
     // vertices, double-click (handled in mousedown) closes.
+    if (interaction.kind === 'pen-drawing') {
+      // Just release the press — anchors stay; next mousedown adds another.
+      setInteraction({ ...interaction, pressed: false })
+      return
+    }
     if (interaction.kind === 'drawing') {
       if (!shouldDiscardDrawing(interaction.layer)) {
         onCommitLayer(interaction.layer)
@@ -598,6 +730,25 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
   }
 
   // ── Drawing-tool helpers ────────────────────────────────────────────────
+
+  function commitPenPath(anchors: PathAnchor[], closed: boolean) {
+    if (anchors.length < 2) return
+    onCommitLayer({
+      id: crypto.randomUUID(),
+      name: closed ? 'Closed Path' : 'Path',
+      visible: true,
+      opacity: 100,
+      blend: 'normal',
+      kind: 'annotation',
+      shape: {
+        kind: 'path',
+        anchors,
+        closed,
+        color: toolColor,
+        strokeWidth: toolStrokeWidth,
+      },
+    } as AnnotationLayer)
+  }
 
   function startDrawing(p: Point) {
     const id = crypto.randomUUID()
@@ -801,7 +952,8 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       tool === 'polyLasso' ||
       tool === 'wand' ||
       tool === 'note' ||
-      tool === 'frame'
+      tool === 'frame' ||
+      tool === 'pen'
     ) {
       setHoverCursor('crosshair')
       return
@@ -1031,6 +1183,112 @@ function drawPolygonPreview(
     ctx.stroke()
   }
   ctx.restore()
+}
+
+/**
+ * Build a temporary AnnotationLayer wrapping an in-progress pen path, so the
+ * standard render pipeline draws the curves (with crop translation, opacity,
+ * etc.) — Canvas overlays anchor markers + the rubber-band cursor segment on
+ * top via `drawPenPreview`.
+ */
+function penPreviewLayer(
+  anchors: PathAnchor[],
+  color: string,
+  strokeWidth: number,
+): AnnotationLayer {
+  return {
+    id: '__pen_preview__',
+    name: 'Pen Preview',
+    visible: true,
+    opacity: 100,
+    blend: 'normal',
+    kind: 'annotation',
+    shape: { kind: 'path', anchors, closed: false, color, strokeWidth },
+  }
+}
+
+/**
+ * In-progress pen overlay — anchor squares (orange first, white rest), handle
+ * lines + dots for smooth anchors, and a dashed rubber-band line previewing
+ * the next segment from the last anchor to the cursor.
+ */
+function drawPenPreview(
+  canvas: HTMLCanvasElement | null,
+  anchors: PathAnchor[],
+  cursor: Point,
+  pressed: boolean,
+) {
+  if (!canvas || anchors.length === 0) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+
+  // Rubber-band: show the next pending segment from last anchor to cursor.
+  // Skipped while pressed (the user is dragging handles, not aiming the next).
+  if (!pressed) {
+    const last = anchors[anchors.length - 1]
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'
+    ctx.lineWidth = 1
+    ctx.setLineDash([4, 3])
+    ctx.beginPath()
+    ctx.moveTo(last.x + 0.5, last.y + 0.5)
+    if (last.hout) {
+      ctx.quadraticCurveTo(
+        last.x + last.hout.x + 0.5,
+        last.y + last.hout.y + 0.5,
+        cursor.x + 0.5,
+        cursor.y + 0.5,
+      )
+    } else {
+      ctx.lineTo(cursor.x + 0.5, cursor.y + 0.5)
+    }
+    ctx.stroke()
+    ctx.setLineDash([])
+  }
+
+  // Handles: lines from anchor to control points, with small dots at endpoints.
+  for (const a of anchors) {
+    if (a.hin) drawHandle(ctx, a.x, a.y, a.x + a.hin.x, a.y + a.hin.y)
+    if (a.hout) drawHandle(ctx, a.x, a.y, a.x + a.hout.x, a.y + a.hout.y)
+  }
+
+  // Anchor squares — orange for the first (close-target hint), white otherwise.
+  for (let i = 0; i < anchors.length; i++) {
+    const a = anchors[i]
+    const size = 6
+    ctx.fillStyle = i === 0 ? '#ffaa00' : '#ffffff'
+    ctx.strokeStyle = '#000'
+    ctx.lineWidth = 1
+    ctx.fillRect(a.x - size / 2, a.y - size / 2, size, size)
+    ctx.strokeRect(a.x - size / 2, a.y - size / 2, size, size)
+  }
+
+  ctx.restore()
+}
+
+function drawHandle(
+  ctx: CanvasRenderingContext2D,
+  ax: number,
+  ay: number,
+  cx: number,
+  cy: number,
+) {
+  // Tether line
+  ctx.strokeStyle = 'rgba(96, 165, 250, 0.9)'
+  ctx.lineWidth = 1
+  ctx.setLineDash([])
+  ctx.beginPath()
+  ctx.moveTo(ax + 0.5, ay + 0.5)
+  ctx.lineTo(cx + 0.5, cy + 0.5)
+  ctx.stroke()
+  // Control-point dot
+  ctx.fillStyle = '#60a5fa'
+  ctx.beginPath()
+  ctx.arc(cx, cy, 3, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = '#000'
+  ctx.stroke()
 }
 
 /**
