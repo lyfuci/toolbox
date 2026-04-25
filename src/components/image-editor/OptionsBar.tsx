@@ -11,6 +11,8 @@ type Props = {
   setStrokeWidth: (n: number) => void
   bucketTolerance: number
   setBucketTolerance: (n: number) => void
+  wandTolerance: number
+  setWandTolerance: (n: number) => void
   /** Show "applies to all in fly-out group" notice for stub tools. */
   isStubTool: boolean
   /** Re-fired with the toast pattern when a stub tool was clicked. */
@@ -40,6 +42,8 @@ export function OptionsBar({
   setStrokeWidth,
   bucketTolerance,
   setBucketTolerance,
+  wandTolerance,
+  setWandTolerance,
   isStubTool,
   stubMessage,
   hasActiveCrop,
@@ -61,13 +65,66 @@ export function OptionsBar({
     )
   }
 
-  // Marquee — show selection-state hint + "Deselect" button when active.
-  if (tool === 'marquee') {
+  // Marquee / Lasso / Polygonal Lasso — same shell: hint + "Deselect" when active.
+  if (tool === 'marquee' || tool === 'lasso' || tool === 'polyLasso') {
+    const hintKey =
+      tool === 'lasso'
+        ? 'pages.imageEditor.lassoHint'
+        : tool === 'polyLasso'
+          ? 'pages.imageEditor.polyLassoHint'
+          : 'pages.imageEditor.marqueeHint'
     return (
       <div className="pf-options">
         <div className="pf-opt-group">
           <span className="pf-opt-label" style={{ marginRight: 0 }}>
-            {t('pages.imageEditor.marqueeHint')}
+            {t(hintKey)}
+          </span>
+        </div>
+        {hasSelection && (
+          <div className="pf-opt-group" style={{ borderRight: 0 }}>
+            <button
+              type="button"
+              className="pf-opt-btn"
+              onClick={onClearSelection}
+              style={{ width: 'auto', padding: '0 8px' }}
+              title={t('pages.imageEditor.deselect')}
+            >
+              {t('pages.imageEditor.deselect')}
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Magic Wand — tolerance slider + hint + Deselect button.
+  if (tool === 'wand') {
+    return (
+      <div className="pf-options">
+        <div className="pf-opt-group">
+          <span className="pf-opt-label">{t('pages.imageEditor.wandTolerance')}:</span>
+          <input
+            className="pf-opt-input"
+            type="number"
+            min={0}
+            max={128}
+            value={wandTolerance}
+            onChange={(e) =>
+              setWandTolerance(Math.min(128, Math.max(0, Number(e.target.value) || 0)))
+            }
+          />
+          <input
+            type="range"
+            min={0}
+            max={128}
+            value={wandTolerance}
+            onChange={(e) => setWandTolerance(Number(e.target.value))}
+            style={{ width: 120, accentColor: 'var(--pf-accent)' }}
+          />
+        </div>
+        <div className="pf-opt-group">
+          <span className="pf-opt-label" style={{ marginRight: 0 }}>
+            {t('pages.imageEditor.wandHint')}
           </span>
         </div>
         {hasSelection && (

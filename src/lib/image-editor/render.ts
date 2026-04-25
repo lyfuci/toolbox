@@ -7,6 +7,7 @@ import type {
   EditorState,
   Layer,
   MaskLayer,
+  Point,
   Rect,
   Shadow,
 } from './types'
@@ -210,10 +211,58 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
   }
 
   // Marquee selection (state.selection) — UI affordance only, gated on
-  // `liveCanvas` so it never bakes into an export.
+  // `liveCanvas` so it never bakes into an export. If `selectionPath` is set,
+  // draw a closed polygon outline (Lasso / Polygonal Lasso); otherwise the
+  // rect bbox (Marquee / Wand).
   if (input.liveCanvas && state.selection) {
-    drawMarqueeChrome(ctx, state.selection, cropOriginX, cropOriginY, annoScale)
+    if (state.selectionPath && state.selectionPath.length >= 3) {
+      drawSelectionPathChrome(ctx, state.selectionPath, cropOriginX, cropOriginY, annoScale)
+    } else {
+      drawMarqueeChrome(ctx, state.selection, cropOriginX, cropOriginY, annoScale)
+    }
   }
+}
+
+/**
+ * Polygon variant of the marching-ants selection chrome. Same white-on-black
+ * dashed look as `drawMarqueeChrome`, but along an arbitrary closed path —
+ * used for Lasso and Polygonal Lasso selections.
+ */
+function drawSelectionPathChrome(
+  ctx: CanvasRenderingContext2D,
+  path: Point[],
+  cropOriginX: number,
+  cropOriginY: number,
+  scale: number,
+) {
+  const tx = (p: Point) => ({
+    x: (p.x - cropOriginX) * scale,
+    y: (p.y - cropOriginY) * scale,
+  })
+  ctx.save()
+  const trace = () => {
+    ctx.beginPath()
+    const first = tx(path[0])
+    ctx.moveTo(first.x + 0.5, first.y + 0.5)
+    for (let i = 1; i < path.length; i++) {
+      const p = tx(path[i])
+      ctx.lineTo(p.x + 0.5, p.y + 0.5)
+    }
+    ctx.closePath()
+  }
+  // Black halo
+  ctx.strokeStyle = '#000000'
+  ctx.lineWidth = Math.max(1, scale)
+  ctx.setLineDash([])
+  trace()
+  ctx.stroke()
+  // White dashes
+  ctx.strokeStyle = '#ffffff'
+  ctx.setLineDash([4 * scale, 3 * scale])
+  trace()
+  ctx.stroke()
+  ctx.setLineDash([])
+  ctx.restore()
 }
 
 /**

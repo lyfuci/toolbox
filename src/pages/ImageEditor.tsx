@@ -27,6 +27,7 @@ import type {
   EditorState,
   Layer,
   OutputFormat,
+  Point,
   Tool,
   Transforms,
 } from '@/lib/image-editor/types'
@@ -76,6 +77,7 @@ export function ImageEditorPage() {
   )
   const [strokeWidth, setStrokeWidth] = useState(4)
   const [bucketTolerance, setBucketTolerance] = useState(32)
+  const [wandTolerance, setWandTolerance] = useState(32)
   const [selectedLayerId, setSelectedLayerId] = useState<string>('image')
 
   const [outFormat, setOutFormat] = useState<OutputFormat>('png')
@@ -184,7 +186,7 @@ export function ImageEditorPage() {
         // when there's no image yet.
         if (e.key === 'd' || e.key === 'D') {
           e.preventDefault()
-          history.set({ ...state, selection: undefined })
+          history.set({ ...state, selection: undefined, selectionPath: undefined })
           return
         }
         if (e.key === 'a' || e.key === 'A') {
@@ -195,6 +197,7 @@ export function ImageEditorPage() {
             history.set({
               ...state,
               selection: { x: 0, y: 0, w: baseW * previewScale, h: baseH * previewScale },
+              selectionPath: undefined,
             })
           }
           return
@@ -225,6 +228,11 @@ export function ImageEditorPage() {
       if (e.key === 'Escape' && canvasRef.current?.hasPendingCrop()) {
         e.preventDefault()
         canvasRef.current.cancelPendingCrop()
+        return
+      }
+      if (e.key === 'Escape' && canvasRef.current?.hasPendingPolyLasso()) {
+        e.preventDefault()
+        canvasRef.current.cancelPendingPolyLasso()
         return
       }
       if (e.key === 'Escape' && focused) { e.preventDefault(); setFocused(false); return }
@@ -374,9 +382,117 @@ export function ImageEditorPage() {
       const y0 = Math.min(rect.y, rect.y + rect.h) + cropOriginY
       const w = Math.abs(rect.w)
       const h = Math.abs(rect.h)
-      history.set({ ...state, selection: { x: x0, y: y0, w, h } })
+      history.set({ ...state, selection: { x: x0, y: y0, w, h }, selectionPath: undefined })
     },
     [history, state],
+  )
+
+  /**
+   * Commit a polygon selection from Lasso / Polygonal Lasso. Points arrive in
+   * cropped-canvas preview-pixel space; we shift each by the crop origin so
+   * both `selection` (bbox) and `selectionPath` (outline) live in
+   * original-image preview-pixel space — same convention as marquee.
+   */
+  const handleCommitPolygonSelection = useCallback(
+    (points: Point[]) => {
+      if (points.length < 3) return
+      const cropOriginX = state.cropRect
+        ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w)
+        : 0
+      const cropOriginY = state.cropRect
+        ? Math.min(state.cropRect.y, state.cropRect.y + state.cropRect.h)
+        : 0
+      const shifted = points.map((p) => ({ x: p.x + cropOriginX, y: p.y + cropOriginY }))
+      let minX = Infinity
+      let minY = Infinity
+      let maxX = -Infinity
+      let maxY = -Infinity
+      for (const p of shifted) {
+        if (p.x < minX) minX = p.x
+        if (p.y < minY) minY = p.y
+        if (p.x > maxX) maxX = p.x
+        if (p.y > maxY) maxY = p.y
+      }
+      history.set({
+        ...state,
+        selection: { x: minX, y: minY, w: maxX - minX, h: maxY - minY },
+        selectionPath: shifted,
+      })
+    },
+    [history, state],
+  )
+
+  /**
+   * Magic Wand click. Renders the canvas at source resolution, runs the same
+   * scanline flood fill the Paint Bucket uses, and stores the bbox of the
+   * matching region as a rectangular selection (no polygon path — wand
+   * regions are already implied by their bbox + contents).
+   */
+  const handleWandClick = useCallback(
+    async (point: Point) => {
+      if (!image) return
+      const { baseW, baseH } = dimsAfterRotation(image, state)
+      const previewScale = Math.min(1, PREVIEW_MAX / Math.max(baseW, baseH, 1))
+      const srcCanvas = document.createElement('canvas')
+      renderTo(srcCanvas, { image, state, scale: 1, previewScale, imageCache })
+      const ctx = srcCanvas.getContext('2d', { willReadFrequently: true })
+      if (!ctx) return
+
+      const cropOriginX = state.cropRect
+        ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w)
+        : 0
+      const cropOriginY = state.cropRect
+        ? Math.min(state.cropRect.y, state.cropRect.y + state.cropRect.h)
+        : 0
+      const sx = Math.round((point.x + cropOriginX) / previewScale)
+      const sy = Math.round((point.y + cropOriginY) / previewScale)
+
+      let imageData: ImageData
+      try {
+        imageData = ctx.getImageData(0, 0, srcCanvas.width, srcCanvas.height)
+      } catch {
+        toast.error(t('pages.imageEditor.errBucketRead'))
+        return
+      }
+
+      const mask = floodFillMask(imageData, sx, sy, wandTolerance)
+      let minX = Infinity
+      let minY = Infinity
+      let maxX = -Infinity
+      let maxY = -Infinity
+      let any = false
+      const w = srcCanvas.width
+      const h = srcCanvas.height
+      for (let y = 0; y < h; y++) {
+        const row = y * w
+        for (let x = 0; x < w; x++) {
+          if (mask[row + x]) {
+            any = true
+            if (x < minX) minX = x
+            if (y < minY) minY = y
+            if (x > maxX) maxX = x
+            if (y > maxY) maxY = y
+          }
+        }
+      }
+      if (!any) {
+        toast.message(t('pages.imageEditor.wandEmpty'))
+        return
+      }
+      // bbox is in source-pixel space; convert to original-image preview
+      // pixel space (where selection coords live) by multiplying by previewScale.
+      history.set({
+        ...state,
+        selection: {
+          x: minX * previewScale,
+          y: minY * previewScale,
+          w: (maxX - minX + 1) * previewScale,
+          h: (maxY - minY + 1) * previewScale,
+        },
+        selectionPath: undefined,
+      })
+    },
+    [image, state, imageCache, wandTolerance, history, t],
   )
 
   const handleClearCrop = useCallback(() => {
@@ -710,11 +826,15 @@ export function ImageEditorPage() {
           setStrokeWidth={setStrokeWidth}
           bucketTolerance={bucketTolerance}
           setBucketTolerance={setBucketTolerance}
+          wandTolerance={wandTolerance}
+          setWandTolerance={setWandTolerance}
           isStubTool={STUB_TOOLS.has(tool)}
           hasActiveCrop={!!state.cropRect}
           onClearCrop={handleClearCrop}
           hasSelection={!!state.selection}
-          onClearSelection={() => history.set({ ...state, selection: undefined })}
+          onClearSelection={() =>
+            history.set({ ...state, selection: undefined, selectionPath: undefined })
+          }
         />
 
         <ToolsPalette
@@ -785,6 +905,9 @@ export function ImageEditorPage() {
               bucketTolerance={bucketTolerance}
               onCommitGradient={handleCommitGradient}
               onCommitSelection={handleCommitSelection}
+              onCommitPolygonSelection={handleCommitPolygonSelection}
+              onWandClick={handleWandClick}
+              wandTolerance={wandTolerance}
             />
           </Workspace>
         </div>

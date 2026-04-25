@@ -229,13 +229,15 @@ export type EditorState = {
   transforms: Transforms
   adjust: Adjustments
   /**
-   * Active marquee selection. Stored in the same coordinate space shape coords
-   * use (post-rotation preview-pixel space, relative to the original image).
-   * Other tools (bucket / brush / fill) can later restrict their effect to
-   * this rect. Cleared via Cmd+D, replaced via re-marquee, persisted through
-   * undo/redo + .json save.
+   * Active selection. `selection` is the bounding rect (always set when a
+   * selection exists); `selectionPath`, when present, refines the visible
+   * outline to a polygon — used by the Lasso / Polygonal Lasso tools.
+   * Coords are in post-rotation preview-pixel space, relative to the original
+   * image. Persisted through undo/redo + .json save. Other tools can read
+   * `selection` (and optionally `selectionPath`) to restrict their effect.
    */
   selection?: Rect
+  selectionPath?: Point[]
   /**
    * Optional crop region. Stored in the same coordinate space shape coords use
    * (post-rotation preview-canvas pixels), so it's applied after transforms.
