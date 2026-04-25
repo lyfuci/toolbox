@@ -442,6 +442,46 @@ export function OptionsBar({
     )
   }
 
+  if (tool === 'pen') {
+    return (
+      <div className="pf-options">
+        <div className="pf-opt-group">
+          <span className="pf-opt-label">{t('pages.imageEditor.strokeWidth')}:</span>
+          <input
+            className="pf-opt-input"
+            type="number"
+            min={1}
+            max={200}
+            value={strokeWidth}
+            onChange={(e) => setStrokeWidth(Number(e.target.value) || 1)}
+          />
+        </div>
+        <div className="pf-opt-group">
+          <span className="pf-opt-label">{t('pages.imageEditor.color')}:</span>
+          <input
+            type="color"
+            value={fgColor}
+            onChange={(e) => setFgColor(e.target.value)}
+            style={{
+              width: 22,
+              height: 22,
+              padding: 0,
+              border: '1px solid var(--pf-line)',
+              background: 'transparent',
+              borderRadius: 3,
+              cursor: 'pointer',
+            }}
+          />
+        </div>
+        <div className="pf-opt-group" style={{ borderRight: 0 }}>
+          <span className="pf-opt-label" style={{ marginRight: 0 }}>
+            {t('pages.imageEditor.penHint')}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
   if (tool === 'mask' || tool === 'mosaic' || tool === 'blur') {
     return (
       <div className="pf-options">

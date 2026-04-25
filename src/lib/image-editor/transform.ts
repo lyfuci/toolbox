@@ -38,6 +38,13 @@ function translateShape(shape: Shape, dx: number, dy: number): Shape {
         ...shape,
         points: shape.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
       }
+    case 'path':
+      // Anchor handles are stored RELATIVE to their anchor — only the anchor
+      // positions move on translation.
+      return {
+        ...shape,
+        anchors: shape.anchors.map((a) => ({ ...a, x: a.x + dx, y: a.y + dy })),
+      }
   }
 }
 

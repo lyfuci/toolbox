@@ -11,6 +11,5 @@ export const STUB_TOOLS: ReadonlySet<Tool> = new Set<Tool>([
   'spotHeal',
   'stamp',
   'historyBrush',
-  'pen',
-  // hand, arrowPath, frame, note are functional — see ImageEditor / Canvas.
+  // hand, arrowPath, frame, note, pen are functional — see ImageEditor / Canvas.
 ])

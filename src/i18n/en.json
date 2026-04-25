@@ -564,6 +564,7 @@
       "notePrompt": "Note text",
       "frameHint": "Frame: drag to draw a rectangular placeholder frame.",
       "arrowPathHint": "Path Selection (A): click to select a vector layer, drag to move. Behaves like the Move tool — full vector-anchor selection arrives with the Pen tool.",
+      "penHint": "Pen (P): click to add corner anchors, click+drag to add smooth anchors with handles. Click the first anchor to close · Enter to commit open · Esc to cancel.",
       "currentTool": "Tool",
       "zoomFit": "Fit (Cmd/Ctrl+0)",
       "style": "Style",
@@ -606,7 +607,8 @@
         "dodge": "Dodge stroke",
         "burn": "Burn stroke",
         "note": "Note",
-        "frame": "Frame"
+        "frame": "Frame",
+        "path": "Path"
       },
       "project": "Project",
       "projectSave": "Save project (.json)",

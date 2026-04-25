@@ -230,6 +230,11 @@ export function ImageEditorPage() {
         canvasRef.current.commitPendingCrop()
         return
       }
+      if (e.key === 'Enter' && canvasRef.current?.hasPendingPen()) {
+        e.preventDefault()
+        canvasRef.current.commitPendingPen()
+        return
+      }
       if (e.key === 'Escape' && canvasRef.current?.hasPendingCrop()) {
         e.preventDefault()
         canvasRef.current.cancelPendingCrop()
@@ -238,6 +243,11 @@ export function ImageEditorPage() {
       if (e.key === 'Escape' && canvasRef.current?.hasPendingPolyLasso()) {
         e.preventDefault()
         canvasRef.current.cancelPendingPolyLasso()
+        return
+      }
+      if (e.key === 'Escape' && canvasRef.current?.hasPendingPen()) {
+        e.preventDefault()
+        canvasRef.current.cancelPendingPen()
         return
       }
       if (e.key === 'Escape' && focused) { e.preventDefault(); setFocused(false); return }

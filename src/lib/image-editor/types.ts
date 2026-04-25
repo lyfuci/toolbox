@@ -205,6 +205,32 @@ export type FrameShape = {
   name?: string
 }
 
+/**
+ * One anchor on a vector path. `hin` / `hout` are control-handle offsets
+ * RELATIVE to the anchor (i.e. the absolute control point is `anchor + hin`).
+ * Missing handles imply a corner anchor on that side; both missing = the
+ * segment to/from this anchor degrades to a straight line.
+ */
+export type PathAnchor = {
+  x: number
+  y: number
+  hin?: { x: number; y: number }
+  hout?: { x: number; y: number }
+}
+/**
+ * Vector path made of cubic-bezier (or straight) segments between anchors.
+ * Open paths render as an unfilled polyline-ish curve; closed paths can
+ * optionally be filled.
+ */
+export type PathShape = {
+  kind: 'path'
+  anchors: PathAnchor[]
+  closed: boolean
+  color: string
+  strokeWidth: number
+  fill?: string
+}
+
 export type Shape =
   | RectShape
   | ArrowShape
@@ -217,6 +243,7 @@ export type Shape =
   | BlurShape
   | NoteShape
   | FrameShape
+  | PathShape
 
 /** Drop shadow applied to a layer at render time via canvas shadow* properties. */
 export type Shadow = {

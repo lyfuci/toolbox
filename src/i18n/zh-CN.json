@@ -564,6 +564,7 @@
       "notePrompt": "便签文字",
       "frameHint": "画框：拖动绘制一个矩形占位框。",
       "arrowPathHint": "路径选择 (A)：单击选中矢量图层，拖动移动。当前与移动工具行为一致 —— 完整的锚点选择需待钢笔工具上线。",
+      "penHint": "钢笔 (P)：单击添加角点，单击拖动添加带手柄的平滑点。点击第一个锚点闭合 · Enter 提交开放路径 · Esc 取消。",
       "currentTool": "工具",
       "zoomFit": "适配 (Cmd/Ctrl+0)",
       "style": "样式",
@@ -606,7 +607,8 @@
         "dodge": "减淡笔触",
         "burn": "加深笔触",
         "note": "便签",
-        "frame": "画框"
+        "frame": "画框",
+        "path": "路径"
       },
       "project": "项目",
       "projectSave": "保存项目 (.json)",

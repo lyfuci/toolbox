@@ -69,6 +69,27 @@ function getShapeBBox(shape: Shape): Rect {
       const pad = shape.strokeWidth / 2 + 2
       return { x: minX - pad, y: minY - pad, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2 }
     }
+    case 'path': {
+      if (shape.anchors.length === 0) return { x: 0, y: 0, w: 0, h: 0 }
+      let minX = Infinity
+      let minY = Infinity
+      let maxX = -Infinity
+      let maxY = -Infinity
+      for (const a of shape.anchors) {
+        const xs = [a.x, a.hin && a.x + a.hin.x, a.hout && a.x + a.hout.x]
+        const ys = [a.y, a.hin && a.y + a.hin.y, a.hout && a.y + a.hout.y]
+        for (const v of xs) if (v !== undefined) {
+          if (v < minX) minX = v
+          if (v > maxX) maxX = v
+        }
+        for (const v of ys) if (v !== undefined) {
+          if (v < minY) minY = v
+          if (v > maxY) maxY = v
+        }
+      }
+      const pad = shape.strokeWidth / 2 + 2
+      return { x: minX - pad, y: minY - pad, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2 }
+    }
   }
 }
 
@@ -133,7 +154,10 @@ export function getHandles(layer: Layer): Handle[] {
     case 'text':
     case 'brush':
     case 'note':
-      // Note is move-only; resizing it would just stretch a 16-px icon.
+    case 'path':
+      // Path: per-anchor handles arrive when full vector editing lands; v1
+      // is move-only. Note: move-only by design (resizing a 16-px icon makes
+      // little sense).
       return []
   }
 }
