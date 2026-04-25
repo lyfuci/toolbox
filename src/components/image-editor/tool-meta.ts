@@ -8,9 +8,6 @@ import type { Tool } from '@/lib/image-editor/types'
  * duplication isn't worth a build-time dance.
  */
 export const STUB_TOOLS: ReadonlySet<Tool> = new Set<Tool>([
-  'lasso',
-  'polyLasso',
-  'wand',
   'spotHeal',
   'stamp',
   'historyBrush',

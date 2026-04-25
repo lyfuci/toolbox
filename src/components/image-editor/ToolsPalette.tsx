@@ -62,14 +62,17 @@ const GROUPS: ToolDef[][] = [
       icon: <Lasso className="h-4 w-4" />,
       labelKey: 'pages.imageEditor.tool.lasso',
       shortcut: 'L',
-      stub: true,
+    },
+    {
+      id: 'polyLasso',
+      icon: <PenTool className="h-4 w-4" />,
+      labelKey: 'pages.imageEditor.tool.polyLasso',
     },
     {
       id: 'wand',
       icon: <Wand2 className="h-4 w-4" />,
       labelKey: 'pages.imageEditor.tool.wand',
       shortcut: 'W',
-      stub: true,
     },
     { id: 'crop', icon: <Crop className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.crop', shortcut: 'C' },
     {

@@ -37,6 +37,10 @@ export type CanvasHandle = {
   cancelPendingCrop: () => void
   /** True iff there's a pending (un-committed) crop drag waiting on user. */
   hasPendingCrop: () => boolean
+  /** True iff a Polygonal Lasso vertex chain is in progress. */
+  hasPendingPolyLasso: () => boolean
+  /** Cancel an in-progress Polygonal Lasso chain (Esc binding). */
+  cancelPendingPolyLasso: () => void
 }
 
 type Props = {
@@ -89,6 +93,20 @@ type Props = {
    * shape coords are stored).
    */
   onCommitSelection?: (rect: { x: number; y: number; w: number; h: number }) => void
+  /**
+   * Called by Lasso / Polygonal Lasso when the user closes a non-trivial
+   * polygon. Points are in canvas-pixel space; the parent shifts by the
+   * crop origin and stores both the bbox and the polygon.
+   */
+  onCommitPolygonSelection?: (points: Point[]) => void
+  /**
+   * Called by the Magic Wand on click. Point is in canvas-pixel space; the
+   * parent runs the flood fill and stores the bbox of the matching region
+   * as the rect selection.
+   */
+  onWandClick?: (point: Point) => void
+  /** Tolerance for the Magic Wand flood fill (0–128). */
+  wandTolerance?: number
 }
 
 type Interaction =
@@ -116,6 +134,14 @@ type Interaction =
   | { kind: 'gradient-drawing'; start: Point; end: Point }
   /** Marquee selection drag — rect in canvas-pixel space. */
   | { kind: 'marquee-drawing'; rect: { x: number; y: number; w: number; h: number } }
+  /** Lasso freeform drag — accumulating points in canvas-pixel space. */
+  | { kind: 'lasso-drawing'; points: Point[] }
+  /**
+   * Polygonal Lasso click-by-click. `points` are committed; `cursor` is the
+   * current mouse position so the live preview can show the next pending
+   * segment from the last committed point to the cursor.
+   */
+  | { kind: 'polylasso-drawing'; points: Point[]; cursor: Point }
 
 export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
   {
@@ -136,6 +162,8 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     onBucketClick,
     onCommitGradient,
     onCommitSelection,
+    onCommitPolygonSelection,
+    onWandClick,
   },
   ref,
 ) {
@@ -214,6 +242,13 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     if (interaction.kind === 'marquee-drawing') {
       drawMarqueePreview(canvasRef.current, interaction.rect)
     }
+    if (interaction.kind === 'lasso-drawing') {
+      drawPolygonPreview(canvasRef.current, interaction.points, false)
+    }
+    if (interaction.kind === 'polylasso-drawing') {
+      // Show committed segments + a "rubber band" line from last vertex to cursor.
+      drawPolygonPreview(canvasRef.current, [...interaction.points, interaction.cursor], true)
+    }
   }, [image, effectiveState, interaction, selectionLayer, previewScale, imageCache])
 
   useImperativeHandle(
@@ -261,6 +296,12 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       },
       hasPendingCrop: () =>
         interaction.kind === 'crop-pending' || interaction.kind === 'crop-drawing',
+      hasPendingPolyLasso: () => interaction.kind === 'polylasso-drawing',
+      cancelPendingPolyLasso: () => {
+        if (interaction.kind === 'polylasso-drawing') {
+          setInteraction({ kind: 'idle' })
+        }
+      },
     }),
     [image, state, previewScale, imageCache, interaction, onCommitCrop],
   )
@@ -334,6 +375,46 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       return
     }
 
+    // Lasso: drag-to-trace a freeform polygon. mousedown starts; mousemove
+    // appends points; mouseup closes + commits.
+    if (tool === 'lasso') {
+      setInteraction({ kind: 'lasso-drawing', points: [p] })
+      return
+    }
+
+    // Polygonal Lasso: each click adds a vertex; double-click closes. Esc
+    // cancels (handled below in the keydown path).
+    if (tool === 'polyLasso') {
+      if (interaction.kind === 'polylasso-drawing') {
+        // Double-click detection: if click is within ~6 px of the first point
+        // AND there are ≥3 vertices, close the polygon.
+        const first = interaction.points[0]
+        const closeToFirst =
+          interaction.points.length >= 3 &&
+          Math.abs(p.x - first.x) < 8 &&
+          Math.abs(p.y - first.y) < 8
+        if (closeToFirst) {
+          onCommitPolygonSelection?.(interaction.points)
+          setInteraction({ kind: 'idle' })
+        } else {
+          setInteraction({
+            kind: 'polylasso-drawing',
+            points: [...interaction.points, p],
+            cursor: p,
+          })
+        }
+      } else {
+        setInteraction({ kind: 'polylasso-drawing', points: [p], cursor: p })
+      }
+      return
+    }
+
+    // Magic Wand: click → flood fill bbox handled by parent.
+    if (tool === 'wand') {
+      onWandClick?.(p)
+      return
+    }
+
     // Drawing tools take priority over selection.
     if (tool !== 'none') {
       startDrawing(p)
@@ -403,6 +484,22 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       return
     }
 
+    if (interaction.kind === 'lasso-drawing') {
+      // Subsample: only append if at least 2 px from the last point, so the
+      // path doesn't bloat at slow drags.
+      const last = interaction.points[interaction.points.length - 1]
+      if (Math.abs(p.x - last.x) >= 2 || Math.abs(p.y - last.y) >= 2) {
+        setInteraction({ kind: 'lasso-drawing', points: [...interaction.points, p] })
+      }
+      return
+    }
+
+    if (interaction.kind === 'polylasso-drawing') {
+      // Just update cursor — no point committed until next click.
+      setInteraction({ ...interaction, cursor: p })
+      return
+    }
+
     if (interaction.kind === 'drawing') {
       updateDrawing(p)
       return
@@ -454,6 +551,16 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       setInteraction({ kind: 'idle' })
       return
     }
+    if (interaction.kind === 'lasso-drawing') {
+      // Need ≥3 distinct points to make a polygon. Otherwise drop.
+      if (interaction.points.length >= 3) {
+        onCommitPolygonSelection?.(interaction.points)
+      }
+      setInteraction({ kind: 'idle' })
+      return
+    }
+    // PolyLasso intentionally does NOT commit on mouseup — clicks add
+    // vertices, double-click (handled in mousedown) closes.
     if (interaction.kind === 'drawing') {
       if (!shouldDiscardDrawing(interaction.layer)) {
         onCommitLayer(interaction.layer)
@@ -652,7 +759,14 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       setHoverCursor('crosshair')
       return
     }
-    if (tool === 'bucket' || tool === 'gradient' || tool === 'marquee') {
+    if (
+      tool === 'bucket' ||
+      tool === 'gradient' ||
+      tool === 'marquee' ||
+      tool === 'lasso' ||
+      tool === 'polyLasso' ||
+      tool === 'wand'
+    ) {
       setHoverCursor('crosshair')
       return
     }
@@ -807,6 +921,66 @@ function drawGradientOverlay(
     ctx.beginPath()
     ctx.arc(p.x, p.y, 4, 0, Math.PI * 2)
     ctx.fillStyle = '#ffffff'
+    ctx.fill()
+    ctx.strokeStyle = '#000000'
+    ctx.lineWidth = 1
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
+/**
+ * In-progress lasso/polyLasso preview — open polyline (or open with rubber-
+ * band cursor segment for polyLasso). Same white-dashes-over-black look as
+ * the committed marching-ants. `rubberBand=true` draws the last segment in
+ * a slightly different style to hint that it's not yet committed.
+ */
+function drawPolygonPreview(
+  canvas: HTMLCanvasElement | null,
+  points: Point[],
+  rubberBand: boolean,
+) {
+  if (!canvas || points.length < 2) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  const trace = (n: number) => {
+    ctx.beginPath()
+    ctx.moveTo(points[0].x + 0.5, points[0].y + 0.5)
+    for (let i = 1; i < n; i++) ctx.lineTo(points[i].x + 0.5, points[i].y + 0.5)
+  }
+  // Black halo for committed segments (all but last when rubber-banding).
+  const committedCount = rubberBand ? points.length - 1 : points.length
+  if (committedCount >= 2) {
+    ctx.strokeStyle = '#000000'
+    ctx.lineWidth = 1
+    ctx.setLineDash([])
+    trace(committedCount)
+    ctx.stroke()
+    ctx.strokeStyle = '#ffffff'
+    ctx.setLineDash([4, 3])
+    trace(committedCount)
+    ctx.stroke()
+  }
+  // Rubber-band segment: dashed grey, less prominent.
+  if (rubberBand && committedCount >= 1) {
+    const a = points[committedCount - 1]
+    const b = points[committedCount]
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)'
+    ctx.setLineDash([2, 3])
+    ctx.beginPath()
+    ctx.moveTo(a.x + 0.5, a.y + 0.5)
+    ctx.lineTo(b.x + 0.5, b.y + 0.5)
+    ctx.stroke()
+  }
+  ctx.setLineDash([])
+  // Vertex dots — useful for polyLasso to see where you've clicked.
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i]
+    ctx.beginPath()
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2)
+    ctx.fillStyle = i === 0 ? '#ffaa00' : '#ffffff'
     ctx.fill()
     ctx.strokeStyle = '#000000'
     ctx.lineWidth = 1
