@@ -15,4 +15,5 @@ export const STUB_TOOLS: ReadonlySet<Tool> = new Set<Tool>([
   'arrowPath',
   'frame',
   'note',
+  // hand is functional — see ImageEditor's `effectivePanMode` derivation.
 ])
