@@ -92,7 +92,6 @@ const GROUPS: ToolDef[][] = [
       icon: <Droplet className="h-4 w-4" />,
       labelKey: 'pages.imageEditor.tool.spotHeal',
       shortcut: 'J',
-      stub: true,
     },
     { id: 'brush', icon: <Brush className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.brush', shortcut: 'B' },
     {
@@ -100,14 +99,12 @@ const GROUPS: ToolDef[][] = [
       icon: <Ruler className="h-4 w-4" />,
       labelKey: 'pages.imageEditor.tool.stamp',
       shortcut: 'S',
-      stub: true,
     },
     {
       id: 'historyBrush',
       icon: <RotateCw className="h-4 w-4" />,
       labelKey: 'pages.imageEditor.tool.historyBrush',
       shortcut: 'Y',
-      stub: true,
     },
     { id: 'eraser', icon: <Eraser className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.eraser', shortcut: 'E' },
     {

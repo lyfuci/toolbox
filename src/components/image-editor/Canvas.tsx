@@ -114,6 +114,20 @@ type Props = {
   onWandClick?: (point: Point) => void
   /** Tolerance for the Magic Wand flood fill (0–128). */
   wandTolerance?: number
+  /** Spot Healing Brush — single click → patch sampled from a nearby offset
+   * stamps over the click area. Coords in cropped-canvas preview-pixel space. */
+  onSpotHealClick?: (point: Point) => void
+  /** Clone Stamp Alt+click sets the source point (also cropped-canvas preview
+   * pixels); subsequent clicks stamp from there. */
+  onCloneSetSource?: (point: Point) => void
+  /** Clone Stamp regular click — stamp from the previously-set source. */
+  onCloneStamp?: (point: Point) => void
+  /** Live cloneSource — when set, Canvas renders a small crosshair marker so
+   * the user can see what they're sampling. */
+  cloneSource?: Point | null
+  /** History Brush — click → patch sampled from the ORIGINAL (no-annotations)
+   * canvas is stamped at the click location, painting back the original. */
+  onHistoryBrushClick?: (point: Point) => void
 }
 
 type Interaction =
@@ -179,6 +193,11 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     onCommitSelection,
     onCommitPolygonSelection,
     onWandClick,
+    onSpotHealClick,
+    onCloneSetSource,
+    onCloneStamp,
+    cloneSource,
+    onHistoryBrushClick,
   },
   ref,
 ) {
@@ -276,6 +295,11 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
         interaction.pressed,
       )
     }
+    // Clone Stamp source marker — small crosshair so the user knows what
+    // they're sampling. Only shown while the Clone Stamp tool is active.
+    if (tool === 'stamp' && cloneSource) {
+      drawCloneSourceMarker(canvasRef.current, cloneSource)
+    }
   }, [
     image,
     effectiveState,
@@ -285,6 +309,8 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     imageCache,
     toolColor,
     toolStrokeWidth,
+    tool,
+    cloneSource,
   ])
 
   useImperativeHandle(
@@ -519,6 +545,27 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     // Magic Wand: click → flood fill bbox handled by parent.
     if (tool === 'wand') {
       onWandClick?.(p)
+      return
+    }
+
+    // Spot Healing Brush: single click → parent samples a nearby patch and
+    // commits it as an image layer over the click area.
+    if (tool === 'spotHeal') {
+      onSpotHealClick?.(p)
+      return
+    }
+
+    // Clone Stamp: Alt+click sets source; regular click stamps from source.
+    if (tool === 'stamp') {
+      if (e.altKey) onCloneSetSource?.(p)
+      else onCloneStamp?.(p)
+      return
+    }
+
+    // History Brush: click → parent samples original image at click and
+    // commits as image layer (revealing the original under annotations).
+    if (tool === 'historyBrush') {
+      onHistoryBrushClick?.(p)
       return
     }
 
@@ -953,7 +1000,10 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       tool === 'wand' ||
       tool === 'note' ||
       tool === 'frame' ||
-      tool === 'pen'
+      tool === 'pen' ||
+      tool === 'spotHeal' ||
+      tool === 'stamp' ||
+      tool === 'historyBrush'
     ) {
       setHoverCursor('crosshair')
       return
@@ -1264,6 +1314,42 @@ function drawPenPreview(
     ctx.strokeRect(a.x - size / 2, a.y - size / 2, size, size)
   }
 
+  ctx.restore()
+}
+
+/**
+ * Crosshair marker showing the active Clone Stamp source point on the live
+ * canvas. White cross with a black halo — visible on any background.
+ */
+function drawCloneSourceMarker(canvas: HTMLCanvasElement | null, p: Point) {
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  const arm = 8
+  // Halo
+  ctx.strokeStyle = '#000'
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.moveTo(p.x - arm, p.y); ctx.lineTo(p.x + arm, p.y)
+  ctx.moveTo(p.x, p.y - arm); ctx.lineTo(p.x, p.y + arm)
+  ctx.stroke()
+  // Cross
+  ctx.strokeStyle = '#fff'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(p.x - arm, p.y); ctx.lineTo(p.x + arm, p.y)
+  ctx.moveTo(p.x, p.y - arm); ctx.lineTo(p.x, p.y + arm)
+  ctx.stroke()
+  // Tiny circle at center
+  ctx.beginPath()
+  ctx.arc(p.x, p.y, 2, 0, Math.PI * 2)
+  ctx.fillStyle = '#fff'
+  ctx.fill()
+  ctx.strokeStyle = '#000'
+  ctx.lineWidth = 1
+  ctx.stroke()
   ctx.restore()
 }
 

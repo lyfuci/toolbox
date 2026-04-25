@@ -482,6 +482,38 @@ export function OptionsBar({
     )
   }
 
+  // Sample-pixel tools (Spot Heal / Clone Stamp / History Brush) — all share
+  // the same shell: brush size + a tool-specific hint. Stamp additionally
+  // surfaces whether a clone source has been set.
+  if (tool === 'spotHeal' || tool === 'stamp' || tool === 'historyBrush') {
+    const hintKey =
+      tool === 'spotHeal'
+        ? 'pages.imageEditor.spotHealHint'
+        : tool === 'stamp'
+          ? 'pages.imageEditor.cloneStampHint'
+          : 'pages.imageEditor.historyBrushHint'
+    return (
+      <div className="pf-options">
+        <div className="pf-opt-group">
+          <span className="pf-opt-label">{t('pages.imageEditor.strokeWidth')}:</span>
+          <input
+            className="pf-opt-input"
+            type="number"
+            min={1}
+            max={200}
+            value={strokeWidth}
+            onChange={(e) => setStrokeWidth(Number(e.target.value) || 1)}
+          />
+        </div>
+        <div className="pf-opt-group" style={{ borderRight: 0 }}>
+          <span className="pf-opt-label" style={{ marginRight: 0 }}>
+            {t(hintKey)}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
   if (tool === 'mask' || tool === 'mosaic' || tool === 'blur') {
     return (
       <div className="pf-options">
