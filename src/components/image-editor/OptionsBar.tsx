@@ -394,6 +394,18 @@ export function OptionsBar({
     )
   }
 
+  if (tool === 'hand') {
+    return (
+      <div className="pf-options">
+        <div className="pf-opt-group" style={{ borderRight: 0 }}>
+          <span className="pf-opt-label" style={{ marginRight: 0 }}>
+            {t('pages.imageEditor.handHint')}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
   if (tool === 'mask' || tool === 'mosaic' || tool === 'blur') {
     return (
       <div className="pf-options">

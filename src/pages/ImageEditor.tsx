@@ -97,6 +97,9 @@ export function ImageEditorPage() {
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [panMode, setPanMode] = useState(false)
+  // Effective pan: Space held OR Hand tool active. Workspace + Canvas both
+  // route mouse drags to panning when this is true.
+  const effectivePanMode = panMode || tool === 'hand'
   /**
    * View-only canvas rotation in degrees (0 / 90 / 180 / 270). Lives outside
    * EditorState because it doesn't affect pixels — just how the canvas is
@@ -213,7 +216,9 @@ export function ImageEditorPage() {
         }
       }
 
-      if (e.key === 'f' || e.key === 'F') { e.preventDefault(); setFocused((v) => !v); return }
+      // F intentionally NOT bound — Photoshop's F cycles screen modes; we leave
+      // the key free for future PS-aligned behaviour. Focus mode is now toggled
+      // via the green Fullscreen button in the top-right of the tab strip.
       // Rotate View — R cycles the workspace display rotation 0→90→180→270.
       if (e.key === 'r' || e.key === 'R') {
         e.preventDefault()
@@ -869,9 +874,16 @@ export function ImageEditorPage() {
               className="pf-tab"
               onClick={() => setFocused((v) => !v)}
               title={t(focused ? 'pages.imageEditor.focusExitHint' : 'pages.imageEditor.focusEnterHint')}
-              style={{ color: 'var(--pf-fg-mid)' }}
+              style={{
+                color: '#fff',
+                background: focused ? '#dc2626' : '#16a34a',
+                fontWeight: 600,
+                padding: '0 10px',
+              }}
             >
-              <span className="pf-tab-title">⛶ F</span>
+              <span className="pf-tab-title">
+                ⛶ {t(focused ? 'pages.imageEditor.exitFullscreen' : 'pages.imageEditor.fullscreen')}
+              </span>
             </div>
           </div>
 
@@ -880,7 +892,7 @@ export function ImageEditorPage() {
             zoom={zoom}
             pan={pan}
             setPan={setPan}
-            panMode={panMode}
+            panMode={effectivePanMode}
             viewRotation={viewRotation}
             onWheelZoom={zoomAtPoint}
             onDropFile={handleDropImage}
@@ -896,7 +908,7 @@ export function ImageEditorPage() {
               onSelect={setSelectedLayerId}
               onCommitLayer={commitLayer}
               onCommitLayerUpdate={commitLayerUpdate}
-              panMode={panMode}
+              panMode={effectivePanMode}
               imageCache={imageCache}
               onZoomAt={zoomAtPoint}
               onPickColor={handlePickColor}
