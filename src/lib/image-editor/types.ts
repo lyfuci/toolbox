@@ -180,6 +180,30 @@ export type BlurShape = {
   /** Blur radius in preview-canvas pixels. */
   radius: number
 }
+/**
+ * Sticky-note marker — non-printing annotation with a small icon on the
+ * canvas. Renderer skips notes when not on the live canvas, so they never
+ * bake into export.
+ */
+export type NoteShape = {
+  kind: 'note'
+  x: number
+  y: number
+  text: string
+  color: string
+}
+/**
+ * Frame placeholder — a rectangular container. Renders as a dashed outline
+ * with a diagonal X (PS Frame Tool's empty-frame visual). Visible in export.
+ */
+export type FrameShape = {
+  kind: 'frame'
+  x: number
+  y: number
+  w: number
+  h: number
+  name?: string
+}
 
 export type Shape =
   | RectShape
@@ -191,6 +215,8 @@ export type Shape =
   | EllipseShape
   | LineShape
   | BlurShape
+  | NoteShape
+  | FrameShape
 
 /** Drop shadow applied to a layer at render time via canvas shadow* properties. */
 export type Shadow = {

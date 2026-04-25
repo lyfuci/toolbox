@@ -12,7 +12,5 @@ export const STUB_TOOLS: ReadonlySet<Tool> = new Set<Tool>([
   'stamp',
   'historyBrush',
   'pen',
-  'arrowPath',
-  'frame',
-  'note',
+  // hand, arrowPath, frame, note are functional — see ImageEditor / Canvas.
 ])

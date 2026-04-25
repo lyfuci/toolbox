@@ -11,7 +11,9 @@ import {
   Frame,
   Hand,
   Lasso,
+  LayoutTemplate,
   Moon,
+  MousePointer,
   MousePointer2,
   PaintBucket,
   PenTool,
@@ -25,6 +27,7 @@ import {
   Square,
   SquareDashed,
   Squircle,
+  StickyNote,
   Sun,
   Type,
   Wand2,
@@ -140,6 +143,12 @@ const GROUPS: ToolDef[][] = [
       shortcut: 'P',
       stub: true,
     },
+    {
+      id: 'arrowPath',
+      icon: <MousePointer className="h-4 w-4" />,
+      labelKey: 'pages.imageEditor.tool.arrowPath',
+      shortcut: 'A',
+    },
     { id: 'text', icon: <Type className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.text', shortcut: 'T' },
     { id: 'rect', icon: <Square className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.rect', shortcut: 'U' },
     { id: 'ellipse', icon: <Circle className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.ellipse', shortcut: 'U' },
@@ -158,6 +167,16 @@ const GROUPS: ToolDef[][] = [
   // 4. Annotation / mask
   [
     { id: 'mask', icon: <Frame className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.mask' },
+    {
+      id: 'frame',
+      icon: <LayoutTemplate className="h-4 w-4" />,
+      labelKey: 'pages.imageEditor.tool.frame',
+    },
+    {
+      id: 'note',
+      icon: <StickyNote className="h-4 w-4" />,
+      labelKey: 'pages.imageEditor.tool.note',
+    },
     { id: 'mosaic', icon: <Squircle className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.mosaic' },
     { id: 'blur', icon: <Aperture className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.blur' },
   ],
@@ -168,7 +187,6 @@ const GROUPS: ToolDef[][] = [
       icon: <Hand className="h-4 w-4" />,
       labelKey: 'pages.imageEditor.tool.hand',
       shortcut: 'H',
-      stub: true,
     },
     {
       id: 'rotateView',
