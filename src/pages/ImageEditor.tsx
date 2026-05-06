@@ -78,6 +78,10 @@ export function ImageEditorPage() {
   const [strokeWidth, setStrokeWidth] = useState(4)
   const [bucketTolerance, setBucketTolerance] = useState(32)
   const [wandTolerance, setWandTolerance] = useState(32)
+  // Clone Stamp source point — set by Alt+click while the Stamp tool is
+  // active, cleared whenever the user switches away from Stamp (handled in
+  // trySetTool). Lives outside EditorState because it's transient UI state.
+  const [cloneSource, setCloneSource] = useState<Point | null>(null)
   const [selectedLayerId, setSelectedLayerId] = useState<string>('image')
 
   const [outFormat, setOutFormat] = useState<OutputFormat>('png')
@@ -160,6 +164,9 @@ export function ImageEditorPage() {
         return
       }
       setTool(next)
+      // Leaving the Clone Stamp tool drops any stale source so re-entering
+      // doesn't surprise the user with a sample point from minutes ago.
+      if (next !== 'stamp') setCloneSource(null)
     },
     [stubMsg, t],
   )
@@ -517,6 +524,202 @@ export function ImageEditorPage() {
     history.set({ ...state, cropRect: undefined })
     toast.success(t('pages.imageEditor.cropCleared'))
   }, [history, state, t])
+
+  // ── Sample-pixel tools (Spot Heal / Clone Stamp / History Brush) ──────
+  // All three commit a small image-shape layer composed of pixels sampled
+  // from a source canvas (the live composite, or the original image with
+  // annotations skipped). Click-based — drag-paint support is a future PR.
+  // (cloneSource state is declared above near the other tool-state hooks.)
+
+  /**
+   * Sample a circular patch of `srcCanvas` centred at (srcX, srcY) in source
+   * pixels and commit it as an image-shape annotation layer centred at
+   * `destPoint` (cropped-canvas preview-pixel coords). The resulting layer
+   * uses the current brush stroke width as the stamp diameter.
+   */
+  const commitSampleStamp = useCallback(
+    async (opts: {
+      srcCanvas: HTMLCanvasElement
+      srcX: number
+      srcY: number
+      destPoint: Point
+      previewScale: number
+      layerName: string
+    }) => {
+      const cropOriginX = state.cropRect
+        ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w)
+        : 0
+      const cropOriginY = state.cropRect
+        ? Math.min(state.cropRect.y, state.cropRect.y + state.cropRect.h)
+        : 0
+      const destX = opts.destPoint.x + cropOriginX
+      const destY = opts.destPoint.y + cropOriginY
+      const srcRadius = Math.max(2, Math.round(strokeWidth / 2 / opts.previewScale))
+      const sz = srcRadius * 2 + 4
+      const out = document.createElement('canvas')
+      out.width = sz
+      out.height = sz
+      const octx = out.getContext('2d')
+      if (!octx) return
+      // Blit the patch from the source.
+      octx.drawImage(
+        opts.srcCanvas,
+        Math.round(opts.srcX - sz / 2),
+        Math.round(opts.srcY - sz / 2),
+        sz,
+        sz,
+        0,
+        0,
+        sz,
+        sz,
+      )
+      // Mask to a circle with a slightly soft edge.
+      octx.globalCompositeOperation = 'destination-in'
+      const grad = octx.createRadialGradient(sz / 2, sz / 2, srcRadius * 0.7, sz / 2, sz / 2, srcRadius)
+      grad.addColorStop(0, 'rgba(0,0,0,1)')
+      grad.addColorStop(1, 'rgba(0,0,0,0)')
+      octx.fillStyle = grad
+      octx.fillRect(0, 0, sz, sz)
+      const dataUrl = out.toDataURL('image/png')
+      const wPreview = sz * opts.previewScale
+      const hPreview = sz * opts.previewScale
+      const newLayer: AnnotationLayer = {
+        id: crypto.randomUUID(),
+        name: opts.layerName,
+        visible: true,
+        opacity: 100,
+        blend: 'normal',
+        kind: 'annotation',
+        shape: {
+          kind: 'image',
+          x: destX - wPreview / 2,
+          y: destY - hPreview / 2,
+          w: wPreview,
+          h: hPreview,
+          dataUrl,
+        },
+      }
+      // Pre-warm the image cache so the new layer renders on the next tick.
+      try {
+        await ensureImage(dataUrl)
+      } catch {
+        /* render will retry */
+      }
+      history.set({ ...state, layers: [...state.layers, newLayer] })
+    },
+    [state, history, strokeWidth, ensureImage],
+  )
+
+  const handleSpotHeal = useCallback(
+    async (p: Point) => {
+      if (!image) return
+      const { baseW, baseH } = dimsAfterRotation(image, state)
+      const previewScale = Math.min(1, PREVIEW_MAX / Math.max(baseW, baseH, 1))
+      const srcCanvas = document.createElement('canvas')
+      renderTo(srcCanvas, { image, state, scale: 1, previewScale, imageCache })
+      const cropOriginX = state.cropRect
+        ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w)
+        : 0
+      const cropOriginY = state.cropRect
+        ? Math.min(state.cropRect.y, state.cropRect.y + state.cropRect.h)
+        : 0
+      // Sample patch from a couple of brush-radii to the right of the click.
+      // PS uses content-aware fill; this is a simpler "copy nearby pixels"
+      // approach that visually heals small spots.
+      const srcRadius = Math.max(2, Math.round(strokeWidth / 2 / previewScale))
+      const sx = (p.x + cropOriginX) / previewScale
+      const sy = (p.y + cropOriginY) / previewScale
+      let sampleX = sx + srcRadius * 2.5
+      let sampleY = sy
+      // If the offset would land outside the image, mirror to the left.
+      if (sampleX + srcRadius >= srcCanvas.width) sampleX = sx - srcRadius * 2.5
+      if (sampleY + srcRadius >= srcCanvas.height) sampleY = sy - srcRadius * 2.5
+      await commitSampleStamp({
+        srcCanvas,
+        srcX: sampleX,
+        srcY: sampleY,
+        destPoint: p,
+        previewScale,
+        layerName: 'Spot Heal',
+      })
+    },
+    [image, state, imageCache, strokeWidth, commitSampleStamp],
+  )
+
+  const handleSetCloneSource = useCallback(
+    (p: Point) => {
+      setCloneSource(p)
+      toast.message(t('pages.imageEditor.cloneSourceSet'))
+    },
+    [t],
+  )
+
+  const handleCloneStamp = useCallback(
+    async (p: Point) => {
+      if (!image) return
+      if (!cloneSource) {
+        toast.message(t('pages.imageEditor.cloneNeedSource'))
+        return
+      }
+      const { baseW, baseH } = dimsAfterRotation(image, state)
+      const previewScale = Math.min(1, PREVIEW_MAX / Math.max(baseW, baseH, 1))
+      const srcCanvas = document.createElement('canvas')
+      renderTo(srcCanvas, { image, state, scale: 1, previewScale, imageCache })
+      const cropOriginX = state.cropRect
+        ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w)
+        : 0
+      const cropOriginY = state.cropRect
+        ? Math.min(state.cropRect.y, state.cropRect.y + state.cropRect.h)
+        : 0
+      const sourceX = (cloneSource.x + cropOriginX) / previewScale
+      const sourceY = (cloneSource.y + cropOriginY) / previewScale
+      await commitSampleStamp({
+        srcCanvas,
+        srcX: sourceX,
+        srcY: sourceY,
+        destPoint: p,
+        previewScale,
+        layerName: 'Clone Stamp',
+      })
+    },
+    [image, state, imageCache, cloneSource, t, commitSampleStamp],
+  )
+
+  const handleHistoryBrush = useCallback(
+    async (p: Point) => {
+      if (!image) return
+      const { baseW, baseH } = dimsAfterRotation(image, state)
+      const previewScale = Math.min(1, PREVIEW_MAX / Math.max(baseW, baseH, 1))
+      // Render a copy WITHOUT the user-added layers — that's the "history
+      // baseline" we paint back. Image transforms + adjustments still apply
+      // (Photoshop's History Brush respects the snapshot you choose).
+      const srcCanvas = document.createElement('canvas')
+      renderTo(srcCanvas, {
+        image,
+        state: { ...state, layers: [] },
+        scale: 1,
+        previewScale,
+        imageCache,
+      })
+      const cropOriginX = state.cropRect
+        ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w)
+        : 0
+      const cropOriginY = state.cropRect
+        ? Math.min(state.cropRect.y, state.cropRect.y + state.cropRect.h)
+        : 0
+      const sx = (p.x + cropOriginX) / previewScale
+      const sy = (p.y + cropOriginY) / previewScale
+      await commitSampleStamp({
+        srcCanvas,
+        srcX: sx,
+        srcY: sy,
+        destPoint: p,
+        previewScale,
+        layerName: 'History Brush',
+      })
+    },
+    [image, state, imageCache, commitSampleStamp],
+  )
 
   // ── File handling ────────────────────────────────────────────────────────
   const acceptFile = useCallback(
@@ -932,6 +1135,11 @@ export function ImageEditorPage() {
               onCommitPolygonSelection={handleCommitPolygonSelection}
               onWandClick={handleWandClick}
               wandTolerance={wandTolerance}
+              onSpotHealClick={handleSpotHeal}
+              onCloneSetSource={handleSetCloneSource}
+              onCloneStamp={handleCloneStamp}
+              cloneSource={cloneSource}
+              onHistoryBrushClick={handleHistoryBrush}
             />
           </Workspace>
         </div>

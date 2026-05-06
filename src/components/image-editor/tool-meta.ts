@@ -8,8 +8,7 @@ import type { Tool } from '@/lib/image-editor/types'
  * duplication isn't worth a build-time dance.
  */
 export const STUB_TOOLS: ReadonlySet<Tool> = new Set<Tool>([
-  'spotHeal',
-  'stamp',
-  'historyBrush',
-  // hand, arrowPath, frame, note, pen are functional — see ImageEditor / Canvas.
+  // All PS-aligned tools are functional end-to-end. Kept as an empty set so
+  // future palette additions have an opt-in stub mechanism without a churn
+  // on the OptionsBar / palette wiring.
 ])
