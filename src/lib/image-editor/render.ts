@@ -40,6 +40,15 @@ export type RenderInput = {
    * like marching-ants marquee selection that shouldn't bake into exports.
    */
   liveCanvas?: boolean
+  /**
+   * In-progress overlay canvas drawn on top of all layers, gated on
+   * `liveCanvas`. Used by drag-paint sample-pixel tools so the user sees
+   * stamps appear under the cursor before mouseup commits them as a single
+   * image-shape layer. Coords are in the same (cropped) source-pixel space
+   * as the snapshot the stamps came from — drawn at `scale` to match the
+   * target canvas. Skipped on export by virtue of liveCanvas being false.
+   */
+  overlayCanvas?: HTMLCanvasElement
 }
 
 export function dimsAfterRotation(
@@ -213,6 +222,16 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
     } else if (layer.kind === 'mask') {
       applyMask(ctx, layer, annoScale, w, h)
     }
+  }
+
+  // Drag-paint overlay — sits above committed layers + drawingPreview, below
+  // selection chrome. Source canvas is in (cropped) source-pixel space; we
+  // scale to target by `scale` (so it lands 1:1 over the rendered image).
+  if (input.liveCanvas && input.overlayCanvas) {
+    ctx.save()
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.drawImage(input.overlayCanvas, 0, 0, w, h)
+    ctx.restore()
   }
 
   // Selection chrome — drawn last so it sits above all content. Skipped for

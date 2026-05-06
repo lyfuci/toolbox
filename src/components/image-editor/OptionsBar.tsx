@@ -512,9 +512,8 @@ export function OptionsBar({
     )
   }
 
-  // Sample-pixel tools (Spot Heal / Clone Stamp / History Brush) — all share
-  // the same shell: brush size + a tool-specific hint. Stamp additionally
-  // surfaces whether a clone source has been set.
+  // Sample-pixel tools (Spot Heal / Clone Stamp / History Brush) — drag-paint,
+  // share the same brush-options surface as Brush + a tool-specific hint.
   if (tool === 'spotHeal' || tool === 'stamp' || tool === 'historyBrush') {
     const hintKey =
       tool === 'spotHeal'
@@ -522,6 +521,8 @@ export function OptionsBar({
         : tool === 'stamp'
           ? 'pages.imageEditor.cloneStampHint'
           : 'pages.imageEditor.historyBrushHint'
+    const setOpt = (patch: Partial<BrushOptions>) =>
+      setBrushOptions({ ...brushOptions, ...patch })
     return (
       <div className="pf-options">
         <div className="pf-opt-group">
@@ -535,6 +536,26 @@ export function OptionsBar({
             onChange={(e) => setStrokeWidth(Number(e.target.value) || 1)}
           />
         </div>
+        <PercentSlider
+          label={t('pages.imageEditor.brushHardness')}
+          value={brushOptions.hardness}
+          onChange={(v) => setOpt({ hardness: v })}
+        />
+        <PercentSlider
+          label={t('pages.imageEditor.brushSpacing')}
+          value={brushOptions.spacing}
+          onChange={(v) => setOpt({ spacing: v })}
+        />
+        <PercentSlider
+          label={t('pages.imageEditor.brushFlow')}
+          value={brushOptions.flow}
+          onChange={(v) => setOpt({ flow: v })}
+        />
+        <PercentSlider
+          label={t('pages.imageEditor.brushOpacity')}
+          value={brushOptions.opacity}
+          onChange={(v) => setOpt({ opacity: v })}
+        />
         <div className="pf-opt-group" style={{ borderRight: 0 }}>
           <span className="pf-opt-label" style={{ marginRight: 0 }}>
             {t(hintKey)}
