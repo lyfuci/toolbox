@@ -261,6 +261,16 @@ type LayerCommon = {
   opacity: number // 0-100
   blend: BlendMode
   shadow?: Shadow
+  /**
+   * Optional clip baked in at commit time when a marquee/lasso selection was
+   * active. Confines the layer's drawn pixels to this region — matches PS
+   * "drawing inside a selection" semantics. Coords are in the same space as
+   * shape coords (preview-pixel post-rotation, relative to the original
+   * image), so the renderer applies the same crop translation as it does to
+   * shapes. `clipPath` (>= 3 points) takes precedence over `clipRect`.
+   */
+  clipRect?: Rect
+  clipPath?: Point[]
 }
 
 export type ImageLayerProps = LayerCommon & { kind: 'image' }
