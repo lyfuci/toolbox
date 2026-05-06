@@ -325,6 +325,24 @@ function drawImageShape(
 
 function drawBrush(ctx: CanvasRenderingContext2D, s: BrushShape, scale: number) {
   if (s.points.length === 0) return
+  // Dispatch — stamped path is required when the brush has a soft edge or
+  // partial-flow stamps; otherwise the legacy polyline path renders identically
+  // to the pre-options behavior (and is materially faster).
+  const hardness = s.hardness ?? 1
+  const flow = s.flow ?? 1
+  const useStamped = hardness < 1 || flow < 1
+  if (useStamped) {
+    drawBrushStamped(ctx, s, scale, hardness, flow)
+    return
+  }
+  drawBrushPolyline(ctx, s, scale)
+}
+
+function drawBrushPolyline(
+  ctx: CanvasRenderingContext2D,
+  s: BrushShape,
+  scale: number,
+) {
   // Mode dispatch — dodge/burn override color + composite op; eraser cuts
   // alpha; default is straight FG-coloured stroke.
   if (s.mode === 'dodge') {
@@ -355,6 +373,178 @@ function drawBrush(ctx: CanvasRenderingContext2D, s: BrushShape, scale: number) 
   ctx.stroke()
   // Render path uses ctx.save()/restore() per layer, so no need to reset
   // composite/strokeStyle here.
+}
+
+/**
+ * Stamped brush path. Walks the stroke at `spacing * diameter` intervals,
+ * blitting a soft-edged tip at each step into an offscreen canvas with
+ * `globalAlpha = flow` for partial-coverage build-up. The offscreen is then
+ * composited onto the main ctx in one drawImage call — this:
+ *
+ *   1. caps stroke alpha at the layer's `opacity` (overlap-within-stroke can't
+ *      exceed opacity, matching PS),
+ *   2. ensures any layer drop-shadow applies to the stroke as a whole rather
+ *      than to each individual stamp (a 1000-stamp stroke would otherwise
+ *      stack 1000 shadows).
+ */
+function drawBrushStamped(
+  ctx: CanvasRenderingContext2D,
+  s: BrushShape,
+  scale: number,
+  hardness: number,
+  flow: number,
+) {
+  const diameter = Math.max(1, s.strokeWidth * scale)
+  const radius = diameter / 2
+  const spacing = clamp01(s.spacing ?? 0.25)
+  // Spacing of 0 would loop forever; coerce to a minimum of 1px or 5% of diameter.
+  const stepPx = Math.max(1, diameter * (spacing > 0 ? spacing : 0.05))
+
+  // Build a stamping plan first so we can size the offscreen exactly to fit.
+  const stamps = planStamps(s.points, scale, stepPx)
+  if (stamps.length === 0) return
+
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const p of stamps) {
+    if (p.x < minX) minX = p.x
+    if (p.y < minY) minY = p.y
+    if (p.x > maxX) maxX = p.x
+    if (p.y > maxY) maxY = p.y
+  }
+  // Pad by radius on every side so the soft tip fits.
+  const offX = Math.floor(minX - radius - 1)
+  const offY = Math.floor(minY - radius - 1)
+  const offW = Math.ceil(maxX + radius + 1) - offX
+  const offH = Math.ceil(maxY + radius + 1) - offY
+  if (offW < 1 || offH < 1) return
+
+  const tipColor = tipColorForBrush(s)
+  const tip = getBrushTip(diameter, hardness, tipColor)
+  const off = document.createElement('canvas')
+  off.width = offW
+  off.height = offH
+  const offCtx = off.getContext('2d')
+  if (!offCtx) return
+  offCtx.globalAlpha = clamp01(flow)
+  for (const p of stamps) {
+    offCtx.drawImage(tip, p.x - radius - offX, p.y - radius - offY)
+  }
+
+  // Composite the assembled stroke onto the main ctx. Mode dispatch matches
+  // the polyline path: eraser → destination-out, dodge/burn → lighter/multiply.
+  if (s.eraser) {
+    ctx.globalCompositeOperation = 'destination-out'
+  } else if (s.mode === 'burn') {
+    ctx.globalCompositeOperation = 'multiply'
+  } else if (s.mode === 'dodge') {
+    ctx.globalCompositeOperation = 'lighter'
+  }
+  ctx.drawImage(off, offX, offY)
+}
+
+/**
+ * Walk a polyline placing a stamp every `stepPx` along its length. Always
+ * stamps the first point; the last segment may have a leftover < stepPx that
+ * we ignore (matches PS — a brush stroke that ends mid-step doesn't get an
+ * extra dab).
+ */
+function planStamps(
+  points: Array<{ x: number; y: number }>,
+  scale: number,
+  stepPx: number,
+): Array<{ x: number; y: number }> {
+  if (points.length === 0) return []
+  const out: Array<{ x: number; y: number }> = []
+  out.push({ x: points[0].x * scale, y: points[0].y * scale })
+  if (points.length === 1) return out
+  let leftover = 0
+  for (let i = 1; i < points.length; i++) {
+    const ax = points[i - 1].x * scale
+    const ay = points[i - 1].y * scale
+    const bx = points[i].x * scale
+    const by = points[i].y * scale
+    const dx = bx - ax
+    const dy = by - ay
+    const segLen = Math.hypot(dx, dy)
+    if (segLen === 0) continue
+    let traveled = stepPx - leftover
+    while (traveled <= segLen) {
+      const t = traveled / segLen
+      out.push({ x: ax + dx * t, y: ay + dy * t })
+      traveled += stepPx
+    }
+    leftover = segLen - (traveled - stepPx)
+  }
+  return out
+}
+
+function tipColorForBrush(s: BrushShape): string {
+  if (s.eraser) return '#ffffff'
+  if (s.mode === 'burn') return '#000000'
+  if (s.mode === 'dodge') return '#ffffff'
+  return s.color
+}
+
+// Cap on the tip cache. Each entry is at most ~200×200 px ARGB ≈ 160 KB; 64
+// entries ≈ 10 MB worst case. LRU eviction via Map insertion-order.
+const TIP_CACHE_MAX = 64
+const tipCache = new Map<string, HTMLCanvasElement>()
+
+function getBrushTip(
+  diameter: number,
+  hardness: number,
+  color: string,
+): HTMLCanvasElement {
+  // Round before keying so dragging a slider doesn't continuously rebuild.
+  const D = Math.max(1, Math.round(diameter))
+  const H = Math.round(hardness * 20) / 20
+  const key = `${D}|${H}|${color}`
+  const cached = tipCache.get(key)
+  if (cached) {
+    // Refresh LRU position.
+    tipCache.delete(key)
+    tipCache.set(key, cached)
+    return cached
+  }
+  const c = document.createElement('canvas')
+  c.width = D
+  c.height = D
+  const cctx = c.getContext('2d')
+  if (cctx) {
+    const r = D / 2
+    // Solid disk in the brush color, then mask with a radial alpha fade —
+    // same two-pass technique used by the sample-pixel tools, gives accurate
+    // soft edges regardless of color components.
+    cctx.fillStyle = color
+    cctx.beginPath()
+    cctx.arc(r, r, r, 0, Math.PI * 2)
+    cctx.fill()
+    cctx.globalCompositeOperation = 'destination-in'
+    // hardness=1 → solid radius == r (no falloff); hardness=0 → solid center
+    // is a single point, falloff fills the entire radius.
+    const inner = r * H
+    const grad = cctx.createRadialGradient(r, r, inner, r, r, r)
+    grad.addColorStop(0, 'rgba(0,0,0,1)')
+    grad.addColorStop(1, 'rgba(0,0,0,0)')
+    cctx.fillStyle = grad
+    cctx.fillRect(0, 0, D, D)
+  }
+  tipCache.set(key, c)
+  if (tipCache.size > TIP_CACHE_MAX) {
+    // Evict oldest entry.
+    const oldestKey = tipCache.keys().next().value
+    if (oldestKey !== undefined) tipCache.delete(oldestKey)
+  }
+  return c
+}
+
+function clamp01(n: number): number {
+  if (n < 0) return 0
+  if (n > 1) return 1
+  return n
 }
 
 function drawMosaic(

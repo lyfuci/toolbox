@@ -1,4 +1,4 @@
-import type { Adjustments, EditorState, Transforms } from './types'
+import type { Adjustments, BrushOptions, EditorState, Transforms } from './types'
 
 export const DEFAULT_TRANSFORMS: Transforms = {
   rotation: 0,
@@ -34,6 +34,17 @@ export const initialState = (): EditorState => ({
 // Live-preview canvas dimension cap, for snappy filter slider editing.
 // Export render uses scale=1 and ignores this.
 export const PREVIEW_MAX = 900
+
+// Defaults match the legacy polyline path: hardness=1 + flow=1 means the
+// renderer uses the fast/identical-to-old code path. Spacing is pre-set to
+// 0.25 (a sensible value if the user touches hardness/flow), so they don't
+// need to go hunting for it.
+export const DEFAULT_BRUSH_OPTIONS: BrushOptions = {
+  hardness: 1,
+  spacing: 0.25,
+  flow: 1,
+  opacity: 1,
+}
 
 export const PROJECT_VERSION = 1
 export const PROJECT_TAG = 'toolbox-image-editor' as const

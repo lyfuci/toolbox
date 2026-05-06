@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { Tool } from '@/lib/image-editor/types'
+import type { BrushOptions, Tool } from '@/lib/image-editor/types'
 
 type Props = {
   tool: Tool
@@ -9,6 +9,8 @@ type Props = {
   setBgColor: (c: string) => void
   strokeWidth: number
   setStrokeWidth: (n: number) => void
+  brushOptions: BrushOptions
+  setBrushOptions: (b: BrushOptions) => void
   bucketTolerance: number
   setBucketTolerance: (n: number) => void
   wandTolerance: number
@@ -40,6 +42,8 @@ export function OptionsBar({
   setBgColor,
   strokeWidth,
   setStrokeWidth,
+  brushOptions,
+  setBrushOptions,
   bucketTolerance,
   setBucketTolerance,
   wandTolerance,
@@ -144,9 +148,13 @@ export function OptionsBar({
     )
   }
 
-  // Brush / pencil / eraser / dodge / burn — stroke width (+ color for brush
-  // only; dodge/burn override via mode).
+  // Brush / eraser / dodge / burn — stroke width + color (brush only) +
+  // hardness/spacing/flow/opacity sliders. Dodge/burn hide opacity (they keep
+  // a hardcoded exposure to preserve the subtle build-up feel).
   if (tool === 'brush' || tool === 'eraser' || tool === 'dodge' || tool === 'burn') {
+    const showOpacity = tool === 'brush' || tool === 'eraser'
+    const setOpt = (patch: Partial<BrushOptions>) =>
+      setBrushOptions({ ...brushOptions, ...patch })
     return (
       <div className="pf-options">
         <div className="pf-opt-group">
@@ -178,6 +186,28 @@ export function OptionsBar({
               }}
             />
           </div>
+        )}
+        <PercentSlider
+          label={t('pages.imageEditor.brushHardness')}
+          value={brushOptions.hardness}
+          onChange={(v) => setOpt({ hardness: v })}
+        />
+        <PercentSlider
+          label={t('pages.imageEditor.brushSpacing')}
+          value={brushOptions.spacing}
+          onChange={(v) => setOpt({ spacing: v })}
+        />
+        <PercentSlider
+          label={t('pages.imageEditor.brushFlow')}
+          value={brushOptions.flow}
+          onChange={(v) => setOpt({ flow: v })}
+        />
+        {showOpacity && (
+          <PercentSlider
+            label={t('pages.imageEditor.brushOpacity')}
+            value={brushOptions.opacity}
+            onChange={(v) => setOpt({ opacity: v })}
+          />
         )}
         {(tool === 'dodge' || tool === 'burn') && (
           <div className="pf-opt-group" style={{ borderRight: 0 }}>
@@ -538,6 +568,36 @@ export function OptionsBar({
           {t('pages.imageEditor.moveToolHint')}
         </span>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Compact "label + range slider + percent number" combo for brush options. The
+ * range maps 0..100 to the underlying 0..1 value so the user sees integer
+ * percents in the UI.
+ */
+function PercentSlider(props: {
+  label: string
+  value: number // 0..1
+  onChange: (v: number) => void
+}) {
+  const pct = Math.round(props.value * 100)
+  const set = (n: number) => props.onChange(Math.min(1, Math.max(0, n / 100)))
+  return (
+    <div className="pf-opt-group">
+      <span className="pf-opt-label">{props.label}:</span>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={pct}
+        onChange={(e) => set(Number(e.target.value))}
+        style={{ width: 80, accentColor: 'var(--pf-accent)' }}
+      />
+      <span className="pf-opt-label" style={{ marginLeft: 6, marginRight: 0, minWidth: 28, textAlign: 'right' }}>
+        {pct}%
+      </span>
     </div>
   )
 }

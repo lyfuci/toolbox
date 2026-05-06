@@ -137,6 +137,24 @@ export type BrushShape = {
    * or darken the underlying pixels — same effect as PS's Dodge / Burn tools.
    */
   mode?: 'dodge' | 'burn'
+  /**
+   * Edge softness, 0..1. 1 = crisp (legacy polyline path); < 1 = soft falloff
+   * via stamped soft-edge tip. Undefined treated as 1 for backward-compat with
+   * pre-options brush layers.
+   */
+  hardness?: number
+  /**
+   * Distance between successive stamps as a fraction of brush diameter, 0..1.
+   * Only meaningful in the stamped path (i.e. when `hardness < 1` or `flow <
+   * 1`). Undefined treated as 0.25 (a sensible default for stamped strokes).
+   */
+  spacing?: number
+  /**
+   * Per-stamp alpha multiplier, 0..1. Combined with the layer's `opacity`
+   * field (which caps stroke total) to give PS-style flow/opacity control.
+   * Undefined treated as 1. Forces the stamped path when < 1.
+   */
+  flow?: number
 }
 export type ImageShape = {
   kind: 'image'
@@ -321,3 +339,23 @@ export type Project = {
 
 // Output settings (not saved to project; per-export).
 export type OutputFormat = 'png' | 'jpeg' | 'webp'
+
+/**
+ * Tunable defaults for brush-family tools (brush / eraser / dodge / burn).
+ * Stored on the editor instance (not in EditorState) — UI-only state, doesn't
+ * need to round-trip through undo or project save.
+ *
+ * `opacity` is applied to brush + eraser layers at commit time (baked into
+ * `layer.opacity`). Dodge/burn ignore opacity and use their own hardcoded
+ * exposure to preserve the existing "subtle build-up" feel.
+ *
+ * `hardness`, `spacing`, `flow` are baked into the BrushShape; the renderer
+ * uses a stamped-tip path whenever hardness < 1 or flow < 1, otherwise the
+ * legacy polyline path stays in effect.
+ */
+export type BrushOptions = {
+  hardness: number // 0..1
+  spacing: number // 0..1
+  flow: number // 0..1
+  opacity: number // 0..1, brush + eraser only
+}
