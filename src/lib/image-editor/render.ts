@@ -1,9 +1,10 @@
+import { applyAdjustment } from './adjustments'
 import { drawShape, type ImageCache } from './drawing'
 import { filterString } from './filters'
 import { getHandles, getLayerBBox, normalizeRect } from './hit'
 import { translateLayer } from './transform'
 import type {
-  AnnotationLayer,
+  AdjustmentLayer,
   BlendMode,
   EditorState,
   Layer,
@@ -203,6 +204,8 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
       ctx.restore()
     } else if (l.kind === 'mask') {
       applyMask(ctx, l, annoScale, w, h)
+    } else if (l.kind === 'adjustment') {
+      applyAdjustmentLayer(canvas, ctx, l, annoScale)
     }
   }
 
@@ -221,6 +224,8 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
       ctx.restore()
     } else if (layer.kind === 'mask') {
       applyMask(ctx, layer, annoScale, w, h)
+    } else if (layer.kind === 'adjustment') {
+      applyAdjustmentLayer(canvas, ctx, layer, annoScale)
     }
   }
 
@@ -446,7 +451,7 @@ function applyMask(
  */
 function applyLayerClip(
   ctx: CanvasRenderingContext2D,
-  layer: AnnotationLayer,
+  layer: { clipRect?: Rect; clipPath?: Point[] },
   scale: number,
 ) {
   const path = layer.clipPath
@@ -467,6 +472,44 @@ function applyLayerClip(
     ctx.rect(nr.x * scale, nr.y * scale, nr.w * scale, nr.h * scale)
     ctx.clip()
   }
+}
+
+/**
+ * Apply an adjustment layer to the accumulated canvas: copy current pixels to
+ * a temp canvas, transform via the adjustment kind's pure-JS pixel function,
+ * then composite the result back through the layer's clip + opacity. Layer
+ * opacity blends adjusted-vs-original via globalAlpha at the composite step
+ * (pure-JS apply runs at full strength regardless of opacity).
+ */
+function applyAdjustmentLayer(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  layer: AdjustmentLayer,
+  scale: number,
+) {
+  if (canvas.width < 1 || canvas.height < 1) return
+  const adjusted = document.createElement('canvas')
+  adjusted.width = canvas.width
+  adjusted.height = canvas.height
+  const actx = adjusted.getContext('2d')
+  if (!actx) return
+  actx.drawImage(canvas, 0, 0)
+  let imageData: ImageData
+  try {
+    imageData = actx.getImageData(0, 0, canvas.width, canvas.height)
+  } catch {
+    // CORS-tainted source — adjustment can't read pixels. Bail silently
+    // rather than exploding; the layer just won't visibly do anything.
+    return
+  }
+  applyAdjustment(imageData.data, layer.params)
+  actx.putImageData(imageData, 0, 0)
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.globalAlpha = layer.opacity / 100
+  applyLayerClip(ctx, layer, scale)
+  ctx.drawImage(adjusted, 0, 0)
+  ctx.restore()
 }
 
 function normalizeRects(rects: Rect[], scale: number): Rect[] {

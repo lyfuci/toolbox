@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { AdjustmentKind } from '@/lib/image-editor/types'
 
 /**
  * PS-style menu bar — File / Edit / Image / Layer / View menus across the
@@ -43,6 +44,7 @@ type Props = {
     rotate90?: () => void
     flipH?: () => void
     flipV?: () => void
+    openAdjustment?: (kind: AdjustmentKind) => void
     duplicateLayer?: () => void
     deleteLayer?: () => void
     zoomIn?: () => void
@@ -118,6 +120,70 @@ export function MenuBar({ handlers }: Props) {
           { id: 'rot90', label: t('pages.imageEditor.menu.rotate90'), onClick: handlers.rotate90 },
           { id: 'flipH', label: t('pages.imageEditor.menu.flipH'), onClick: handlers.flipH },
           { id: 'flipV', label: t('pages.imageEditor.menu.flipV'), onClick: handlers.flipV },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'adj-bc',
+            label: t('pages.imageEditor.adjustments.brightnessContrast') + '…',
+            onClick: () => handlers.openAdjustment?.('brightnessContrast'),
+          },
+          {
+            id: 'adj-levels',
+            label: t('pages.imageEditor.adjustments.levels') + '…',
+            shortcut: '⌘L',
+            onClick: () => handlers.openAdjustment?.('levels'),
+          },
+          {
+            id: 'adj-curves',
+            label: t('pages.imageEditor.adjustments.curves') + '…',
+            shortcut: '⌘M',
+            onClick: () => handlers.openAdjustment?.('curves'),
+          },
+          {
+            id: 'adj-exposure',
+            label: t('pages.imageEditor.adjustments.exposure') + '…',
+            onClick: () => handlers.openAdjustment?.('exposure'),
+          },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'adj-vibrance',
+            label: t('pages.imageEditor.adjustments.vibrance') + '…',
+            onClick: () => handlers.openAdjustment?.('vibrance'),
+          },
+          {
+            id: 'adj-hsl',
+            label: t('pages.imageEditor.adjustments.hueSaturation') + '…',
+            shortcut: '⌘U',
+            onClick: () => handlers.openAdjustment?.('hueSaturation'),
+          },
+          {
+            id: 'adj-cb',
+            label: t('pages.imageEditor.adjustments.colorBalance') + '…',
+            shortcut: '⌘B',
+            onClick: () => handlers.openAdjustment?.('colorBalance'),
+          },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'adj-invert',
+            label: t('pages.imageEditor.adjustments.invert'),
+            shortcut: '⌘I',
+            onClick: () => handlers.openAdjustment?.('invert'),
+          },
+          {
+            id: 'adj-posterize',
+            label: t('pages.imageEditor.adjustments.posterize') + '…',
+            onClick: () => handlers.openAdjustment?.('posterize'),
+          },
+          {
+            id: 'adj-threshold',
+            label: t('pages.imageEditor.adjustments.threshold') + '…',
+            onClick: () => handlers.openAdjustment?.('threshold'),
+          },
         ],
       ],
     },

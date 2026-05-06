@@ -298,8 +298,106 @@ export type MaskLayer = LayerCommon & {
   rects: Rect[] // union of these is the visible region for layers BELOW this mask
 }
 
+/** Levels — input/output black & white points + gamma. Per-channel applied identically. */
+export type LevelsParams = {
+  kind: 'levels'
+  inputBlack: number // 0..255
+  inputWhite: number // 0..255
+  gamma: number // 0.01..10, 1 = identity
+  outputBlack: number // 0..255
+  outputWhite: number // 0..255
+}
+/**
+ * Curves — RGB tone curve defined by control points the renderer interpolates
+ * (Catmull-Rom-ish spline) into a 256-entry LUT. Points are stored sorted by
+ * x; both x and y are in [0, 255]. Default identity curve has two endpoints
+ * (0,0) and (255,255).
+ */
+export type CurvesParams = {
+  kind: 'curves'
+  points: Array<{ x: number; y: number }>
+}
+/** Posterize — quantize each channel to N evenly-spaced levels. */
+export type PosterizeParams = {
+  kind: 'posterize'
+  levels: number // 2..32
+}
+/**
+ * Threshold — binary B&W. Pixels with luminance >= threshold map to white,
+ * rest to black; alpha preserved.
+ */
+export type ThresholdParams = {
+  kind: 'threshold'
+  threshold: number // 0..255
+}
+/** Brightness + Contrast (PS-style centred at 128). */
+export type BrightnessContrastParams = {
+  kind: 'brightnessContrast'
+  brightness: number // -100..100
+  contrast: number // -100..100
+}
+/** Hue / Saturation / Lightness shift in HSL space. */
+export type HueSaturationParams = {
+  kind: 'hueSaturation'
+  hue: number // -180..180 (degrees)
+  saturation: number // -100..100
+  lightness: number // -100..100
+}
+/** Color Balance — additive shift along the three opposite-color axes. */
+export type ColorBalanceParams = {
+  kind: 'colorBalance'
+  cyanRed: number // -100..100
+  magentaGreen: number // -100..100
+  yellowBlue: number // -100..100
+}
+/** Photographic invert — `255 - x` per channel. No params. */
+export type InvertParams = { kind: 'invert' }
+/**
+ * Vibrance — saturation that protects already-saturated pixels. `vibrance`
+ * boosts unsaturated areas, `saturation` is a flat multiplier (negative
+ * values desaturate).
+ */
+export type VibranceParams = {
+  kind: 'vibrance'
+  vibrance: number // -100..100
+  saturation: number // -100..100
+}
+/** Photographic Exposure — log brightness + offset + gamma. */
+export type ExposureParams = {
+  kind: 'exposure'
+  exposure: number // -3..3 stops
+  offset: number // -0.5..0.5
+  gamma: number // 0.1..10, 1 = identity
+}
+export type AdjustmentParams =
+  | LevelsParams
+  | CurvesParams
+  | PosterizeParams
+  | ThresholdParams
+  | BrightnessContrastParams
+  | HueSaturationParams
+  | ColorBalanceParams
+  | InvertParams
+  | VibranceParams
+  | ExposureParams
+
+export type AdjustmentKind = AdjustmentParams['kind']
+
+/**
+ * Adjustment layer — non-destructive pixel transform applied to the
+ * accumulated canvas at the layer's position in the stack (PS-style: affects
+ * everything below it). Rendered via getImageData → JS transform →
+ * putImageData → composite back through the layer's clip + opacity. Selection
+ * clip is honored via the same `clipRect` / `clipPath` mechanism as
+ * annotation layers.
+ */
+export type AdjustmentLayer = LayerCommon & {
+  kind: 'adjustment'
+  params: AdjustmentParams
+}
+
 // User-addable overlay layer types (the image is special, see EditorState).
-export type Layer = AnnotationLayer | MaskLayer
+export type Layer = AnnotationLayer | MaskLayer | AdjustmentLayer
 
 // The full editing state. The HTMLImageElement (pixels) is held outside this
 // state so it doesn't enter the history stack; here we only track the image

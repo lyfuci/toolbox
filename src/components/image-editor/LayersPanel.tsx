@@ -163,6 +163,9 @@ function LayerRow({
 
 function layerLabelKey(layer: Layer): string {
   if (layer.kind === 'mask') return 'pages.imageEditor.annoLabel.mask'
+  if (layer.kind === 'adjustment') {
+    return `pages.imageEditor.adjustments.${layer.params.kind}`
+  }
   switch (layer.shape.kind) {
     case 'rect':
       return 'pages.imageEditor.annoLabel.rect'

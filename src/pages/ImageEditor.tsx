@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { AdjustmentDialog } from '@/components/image-editor/AdjustmentDialog'
 import { Canvas, type CanvasHandle } from '@/components/image-editor/Canvas'
 import { DropZone } from '@/components/image-editor/DropZone'
 import { MenuBar } from '@/components/image-editor/MenuBar'
@@ -23,6 +24,9 @@ import {
   serializeProject,
 } from '@/lib/image-editor/serialize'
 import type {
+  AdjustmentKind,
+  AdjustmentLayer,
+  AdjustmentParams,
   AnnotationLayer,
   BrushOptions,
   EditorState,
@@ -528,6 +532,56 @@ export function ImageEditorPage() {
     toast.success(t('pages.imageEditor.cropCleared'))
   }, [history, state, t])
 
+  // ── Adjustments dialog ─────────────────────────────────────────────────
+  // `openAdjustment` toggles the modal; `adjustmentDraft` holds the live
+  // preview layer that Canvas overlays via its `extraPreviewLayer` prop. On
+  // Apply, the draft is committed via the regular commitLayer flow (which
+  // also bakes in any active selection clip). On Cancel, the draft is
+  // discarded and the canvas snaps back.
+  const [openAdjustment, setOpenAdjustment] = useState<AdjustmentKind | null>(null)
+  const [adjustmentDraft, setAdjustmentDraft] = useState<AdjustmentLayer | null>(null)
+  const handleAdjustmentPreview = useCallback((params: AdjustmentParams | null) => {
+    if (params === null) {
+      setAdjustmentDraft(null)
+      return
+    }
+    setAdjustmentDraft({
+      id: 'adjustment-draft',
+      name: params.kind,
+      visible: true,
+      opacity: 100,
+      blend: 'normal',
+      kind: 'adjustment',
+      params,
+    })
+  }, [])
+  const handleAdjustmentApply = useCallback(
+    (params: AdjustmentParams) => {
+      const layerName =
+        params.kind === 'levels'
+          ? t('pages.imageEditor.adjustments.levels')
+          : params.kind === 'posterize'
+            ? t('pages.imageEditor.adjustments.posterize')
+            : t('pages.imageEditor.adjustments.threshold')
+      commitLayer({
+        id: crypto.randomUUID(),
+        name: layerName,
+        visible: true,
+        opacity: 100,
+        blend: 'normal',
+        kind: 'adjustment',
+        params,
+      })
+      setAdjustmentDraft(null)
+      setOpenAdjustment(null)
+    },
+    [commitLayer, t],
+  )
+  const handleAdjustmentCancel = useCallback(() => {
+    setAdjustmentDraft(null)
+    setOpenAdjustment(null)
+  }, [])
+
   // ── Sample-pixel tools (Spot Heal / Clone Stamp / History Brush) ──────
   // All three are drag-paint: Canvas owns the snapshot + offscreen + stamp
   // loop; the parent's only jobs are the Clone Stamp source toast + the
@@ -852,6 +906,7 @@ export function ImageEditorPage() {
               }),
             flipH: () => setTransforms({ ...state.transforms, flipH: !state.transforms.flipH }),
             flipV: () => setTransforms({ ...state.transforms, flipV: !state.transforms.flipV }),
+            openAdjustment: (kind: AdjustmentKind) => setOpenAdjustment(kind),
             duplicateLayer: () => duplicateRef.current(),
             deleteLayer: () => deleteLayerRef.current(),
             zoomIn,
@@ -966,6 +1021,7 @@ export function ImageEditorPage() {
               onCloneSetSource={handleSetCloneSource}
               cloneSource={cloneSource}
               onCloneNeedSource={handleCloneNeedSource}
+              extraPreviewLayer={adjustmentDraft ?? undefined}
             />
           </Workspace>
         </div>
@@ -994,6 +1050,12 @@ export function ImageEditorPage() {
         />
       </div>
 
+      <AdjustmentDialog
+        open={openAdjustment}
+        onPreview={handleAdjustmentPreview}
+        onApply={handleAdjustmentApply}
+        onCancel={handleAdjustmentCancel}
+      />
     </div>
   )
 }
