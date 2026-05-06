@@ -1,15 +1,63 @@
 import type { HandleId } from './hit'
-import type { Layer, Point, Rect, Shape } from './types'
+import type { EditorState, Layer, Point, Rect, Shape } from './types'
 
 /** Translate a layer by (dx, dy), in preview-canvas pixels. */
 export function translateLayer(layer: Layer, dx: number, dy: number): Layer {
+  const clip = translatedClipFields(layer, dx, dy)
   if (layer.kind === 'mask') {
     return {
       ...layer,
+      ...clip,
       rects: layer.rects.map((r) => ({ ...r, x: r.x + dx, y: r.y + dy })),
     }
   }
-  return { ...layer, shape: translateShape(layer.shape, dx, dy) }
+  return { ...layer, ...clip, shape: translateShape(layer.shape, dx, dy) }
+}
+
+/**
+ * Compute the translated `clipRect`/`clipPath` for a layer. The clip moves
+ * alongside the layer geometry so a layer's baked-in selection stays aligned
+ * with its shape across the user-facing Move tool and the renderer's crop-shift
+ * pass. Returns an empty object when there's no clip — callers spread it
+ * unconditionally.
+ */
+function translatedClipFields(
+  layer: Layer,
+  dx: number,
+  dy: number,
+): { clipRect?: Rect; clipPath?: Point[] } {
+  const out: { clipRect?: Rect; clipPath?: Point[] } = {}
+  if (layer.clipRect) {
+    out.clipRect = {
+      ...layer.clipRect,
+      x: layer.clipRect.x + dx,
+      y: layer.clipRect.y + dy,
+    }
+  }
+  if (layer.clipPath) {
+    out.clipPath = layer.clipPath.map((p) => ({ x: p.x + dx, y: p.y + dy }))
+  }
+  return out
+}
+
+/**
+ * Bake the active selection (if any) onto a freshly-committed layer as a
+ * `clipRect`/`clipPath`. Selections with zero area are ignored — drawing into
+ * an invisible clip would leave the user with mysteriously absent pixels.
+ *
+ * Once baked, the clip travels with the layer through undo/redo + project
+ * save, and `translateLayer` keeps it aligned with the layer's geometry.
+ */
+export function withSelectionClip(layer: Layer, state: EditorState): Layer {
+  const path = state.selectionPath
+  if (path && path.length >= 3) {
+    return { ...layer, clipPath: path.map((p) => ({ x: p.x, y: p.y })) }
+  }
+  const sel = state.selection
+  if (sel && sel.w !== 0 && sel.h !== 0) {
+    return { ...layer, clipRect: { ...sel } }
+  }
+  return layer
 }
 
 function translateShape(shape: Shape, dx: number, dy: number): Shape {

@@ -3,6 +3,7 @@ import { filterString } from './filters'
 import { getHandles, getLayerBBox, normalizeRect } from './hit'
 import { translateLayer } from './transform'
 import type {
+  AnnotationLayer,
   BlendMode,
   EditorState,
   Layer,
@@ -184,6 +185,7 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
       ctx.globalAlpha = l.opacity / 100
       ctx.globalCompositeOperation = blendModeToOp(l.blend)
       applyShadow(ctx, l.shadow, annoScale)
+      applyLayerClip(ctx, l, annoScale)
       // Mosaic + Blur both sample the underlying composite — snapshot first
       // so they read pre-shape pixels rather than their own output.
       const needsUnderlying = l.shape.kind === 'mosaic' || l.shape.kind === 'blur'
@@ -203,6 +205,7 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
       ctx.globalAlpha = layer.opacity / 100
       ctx.globalCompositeOperation = blendModeToOp(layer.blend)
       applyShadow(ctx, layer.shadow, annoScale)
+      applyLayerClip(ctx, layer, annoScale)
       const needsUnderlying = layer.shape.kind === 'mosaic' || layer.shape.kind === 'blur'
       const underlying = needsUnderlying ? snapshotCanvas(canvas) : canvas
       drawShape(ctx, layer.shape, annoScale, underlying, input.imageCache)
@@ -413,6 +416,38 @@ function applyMask(
   ctx.restore()
   void w
   void h
+}
+
+/**
+ * Apply a layer's baked-in selection clip (if any) to the current ctx so the
+ * subsequent `drawShape` is constrained to the selection region. Coords on the
+ * clip live in the same (already crop-shifted) space as the layer's shape, so
+ * we just multiply by `scale`. `clipPath` (>= 3 points) takes precedence over
+ * `clipRect`.
+ */
+function applyLayerClip(
+  ctx: CanvasRenderingContext2D,
+  layer: AnnotationLayer,
+  scale: number,
+) {
+  const path = layer.clipPath
+  if (path && path.length >= 3) {
+    ctx.beginPath()
+    ctx.moveTo(path[0].x * scale, path[0].y * scale)
+    for (let i = 1; i < path.length; i++) {
+      ctx.lineTo(path[i].x * scale, path[i].y * scale)
+    }
+    ctx.closePath()
+    ctx.clip()
+    return
+  }
+  const r = layer.clipRect
+  if (r && r.w !== 0 && r.h !== 0) {
+    const nr = normalizeRect(r)
+    ctx.beginPath()
+    ctx.rect(nr.x * scale, nr.y * scale, nr.w * scale, nr.h * scale)
+    ctx.clip()
+  }
 }
 
 function normalizeRects(rects: Rect[], scale: number): Rect[] {

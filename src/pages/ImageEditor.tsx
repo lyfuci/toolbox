@@ -16,7 +16,7 @@ import { floodFillMask, maskToDataUrl } from '@/lib/image-editor/flood-fill'
 import { useHistoryState } from '@/lib/image-editor/history'
 import { fileToDataUrl, useImageCache } from '@/lib/image-editor/image-cache'
 import { dimsAfterRotation, renderTo } from '@/lib/image-editor/render'
-import { translateLayer } from '@/lib/image-editor/transform'
+import { translateLayer, withSelectionClip } from '@/lib/image-editor/transform'
 import {
   loadImageFromUrl,
   parseProject,
@@ -309,8 +309,9 @@ export function ImageEditorPage() {
   )
   const commitLayer = useCallback(
     (layer: Layer) => {
-      history.set({ ...state, layers: [...state.layers, layer] })
-      setSelectedLayerId(layer.id)
+      const clipped = withSelectionClip(layer, state)
+      history.set({ ...state, layers: [...state.layers, clipped] })
+      setSelectedLayerId(clipped.id)
     },
     [history, state],
   )
@@ -605,7 +606,12 @@ export function ImageEditorPage() {
       } catch {
         /* render will retry */
       }
-      history.set({ ...state, layers: [...state.layers, newLayer] })
+      // Sample-pixel tools share commitLayer's selection-clip behavior, but
+      // skip setSelectedLayerId so the layers panel doesn't jump on every stamp.
+      history.set({
+        ...state,
+        layers: [...state.layers, withSelectionClip(newLayer, state)],
+      })
     },
     [state, history, strokeWidth, ensureImage],
   )
