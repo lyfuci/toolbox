@@ -22,6 +22,7 @@ import { dimsAfterRotation, renderTo } from '@/lib/image-editor/render'
 import { layerEquals, resizeLayer, translateLayer } from '@/lib/image-editor/transform'
 import type {
   AnnotationLayer,
+  BrushOptions,
   EditorState,
   Layer,
   MaskLayer,
@@ -56,6 +57,13 @@ type Props = {
   tool: Tool
   toolColor: string
   toolStrokeWidth: number
+  /**
+   * Brush-family options (hardness / spacing / flow / opacity). Baked into
+   * BrushShape + the new layer's `opacity` at commit time so the values
+   * persist with the stroke through undo/redo + project save. Dodge/burn
+   * ignore `opacity` (they keep their hardcoded subtle build-up exposure).
+   */
+  brushOptions: BrushOptions
   /** Currently selected layer id (or 'image' for the background). */
   selectedId: string
   onSelect: (id: string) => void
@@ -179,6 +187,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     tool,
     toolColor,
     toolStrokeWidth,
+    brushOptions,
     selectedId,
     onSelect,
     onCommitLayer,
@@ -874,6 +883,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
         kind: 'drawing',
         layer: {
           ...baseLayer(tool === 'eraser' ? 'Eraser' : 'Brush'),
+          opacity: Math.round(brushOptions.opacity * 100),
           kind: 'annotation',
           shape: {
             kind: 'brush',
@@ -881,13 +891,18 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
             color: toolColor,
             strokeWidth: toolStrokeWidth,
             eraser: tool === 'eraser',
+            hardness: brushOptions.hardness,
+            spacing: brushOptions.spacing,
+            flow: brushOptions.flow,
           },
         } as AnnotationLayer,
       })
     } else if (tool === 'dodge' || tool === 'burn') {
       // Dodge / Burn share the brush-stroke + low-opacity build-up pattern.
       // Burn paints black with 'multiply' op for darkening; dodge paints
-      // white with 'lighter' for brightening.
+      // white with 'lighter' for brightening. Opacity slider is hidden in the
+      // OptionsBar for these tools — they keep a hardcoded 30% exposure to
+      // preserve the subtle build-up; hardness/spacing/flow still apply.
       const isBurn = tool === 'burn'
       setInteraction({
         kind: 'drawing',
@@ -901,6 +916,9 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
             color: isBurn ? '#000000' : '#ffffff',
             strokeWidth: toolStrokeWidth,
             mode: isBurn ? 'burn' : 'dodge',
+            hardness: brushOptions.hardness,
+            spacing: brushOptions.spacing,
+            flow: brushOptions.flow,
           },
         } as AnnotationLayer,
       })

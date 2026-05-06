@@ -11,7 +11,7 @@ import { ToolsPalette } from '@/components/image-editor/ToolsPalette'
 import { STUB_TOOLS } from '@/components/image-editor/tool-meta'
 import { Workspace, type WorkspaceHandle } from '@/components/image-editor/Workspace'
 import '@/components/image-editor/pixelforge.css'
-import { initialState, PREVIEW_MAX } from '@/lib/image-editor/defaults'
+import { DEFAULT_BRUSH_OPTIONS, initialState, PREVIEW_MAX } from '@/lib/image-editor/defaults'
 import { floodFillMask, maskToDataUrl } from '@/lib/image-editor/flood-fill'
 import { useHistoryState } from '@/lib/image-editor/history'
 import { fileToDataUrl, useImageCache } from '@/lib/image-editor/image-cache'
@@ -24,6 +24,7 @@ import {
 } from '@/lib/image-editor/serialize'
 import type {
   AnnotationLayer,
+  BrushOptions,
   EditorState,
   Layer,
   OutputFormat,
@@ -76,6 +77,7 @@ export function ImageEditorPage() {
     [],
   )
   const [strokeWidth, setStrokeWidth] = useState(4)
+  const [brushOptions, setBrushOptions] = useState<BrushOptions>(DEFAULT_BRUSH_OPTIONS)
   const [bucketTolerance, setBucketTolerance] = useState(32)
   const [wandTolerance, setWandTolerance] = useState(32)
   // Clone Stamp source point — set by Alt+click while the Stamp tool is
@@ -1050,6 +1052,8 @@ export function ImageEditorPage() {
           setBgColor={(c) => setColors((s) => ({ ...s, bg: c }))}
           strokeWidth={strokeWidth}
           setStrokeWidth={setStrokeWidth}
+          brushOptions={brushOptions}
+          setBrushOptions={setBrushOptions}
           bucketTolerance={bucketTolerance}
           setBucketTolerance={setBucketTolerance}
           wandTolerance={wandTolerance}
@@ -1125,6 +1129,7 @@ export function ImageEditorPage() {
               tool={tool}
               toolColor={colors.fg}
               toolStrokeWidth={strokeWidth}
+              brushOptions={brushOptions}
               selectedId={selectedLayerId}
               onSelect={setSelectedLayerId}
               onCommitLayer={commitLayer}
