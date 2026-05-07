@@ -122,20 +122,15 @@ type Props = {
   onWandClick?: (point: Point) => void
   /** Tolerance for the Magic Wand flood fill (0–128). */
   wandTolerance?: number
-  /** Spot Healing Brush — single click → patch sampled from a nearby offset
-   * stamps over the click area. Coords in cropped-canvas preview-pixel space. */
-  onSpotHealClick?: (point: Point) => void
-  /** Clone Stamp Alt+click sets the source point (also cropped-canvas preview
-   * pixels); subsequent clicks stamp from there. */
+  /** Clone Stamp Alt+click sets the source point (cropped-canvas preview
+   * pixels); subsequent click-and-drag paints from there. */
   onCloneSetSource?: (point: Point) => void
-  /** Clone Stamp regular click — stamp from the previously-set source. */
-  onCloneStamp?: (point: Point) => void
   /** Live cloneSource — when set, Canvas renders a small crosshair marker so
    * the user can see what they're sampling. */
   cloneSource?: Point | null
-  /** History Brush — click → patch sampled from the ORIGINAL (no-annotations)
-   * canvas is stamped at the click location, painting back the original. */
-  onHistoryBrushClick?: (point: Point) => void
+  /** Fired when the user tries to start a Clone Stamp stroke without first
+   * setting a source — parent handles the toast (i18n / UX policy lives there). */
+  onCloneNeedSource?: () => void
 }
 
 type Interaction =
@@ -179,6 +174,38 @@ type Interaction =
    * in mousedown). Esc cancels; Enter commits the current path open.
    */
   | { kind: 'pen-drawing'; anchors: PathAnchor[]; pressed: boolean; cursor: Point }
+  /**
+   * Sample-pixel drag-paint (Spot Heal / Clone Stamp / History Brush). Heavy
+   * state — snapshot + offscreen — lives here so mousemove can stamp into
+   * the offscreen and the renderer can blit it on top via `overlayCanvas`.
+   *
+   * Coords are kept in (cropped) source-pixel space throughout: the
+   * snapshot is built at scale=1, the offscreen matches its size, and stamps
+   * use snapshot-space positions. At commit, the offscreen is cropped to the
+   * stroke bbox and committed as one image-shape layer.
+   */
+  | {
+      kind: 'sample-stroke'
+      tool: 'spotHeal' | 'stamp' | 'historyBrush'
+      snapshot: HTMLCanvasElement
+      offscreen: HTMLCanvasElement
+      sampleOffsetSrcX: number // sample = stamp + offset
+      sampleOffsetSrcY: number
+      srcRadius: number // brush radius in source pixels
+      stepPx: number // spacing between stamps in source pixels
+      hardness: number
+      flow: number
+      lastSrcX: number // last stamp position in snapshot/offscreen coords
+      lastSrcY: number
+      leftover: number // unused distance carried into the next mousemove
+      // Bbox of all stamps in snapshot coords — for cropping at commit.
+      minX: number
+      minY: number
+      maxX: number
+      maxY: number
+      layerName: string
+      layerOpacity: number // 0..100
+    }
 
 export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
   {
@@ -202,11 +229,9 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     onCommitSelection,
     onCommitPolygonSelection,
     onWandClick,
-    onSpotHealClick,
     onCloneSetSource,
-    onCloneStamp,
     cloneSource,
-    onHistoryBrushClick,
+    onCloneNeedSource,
   },
   ref,
 ) {
@@ -272,6 +297,8 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
             : undefined,
       selection: selectionLayer ? { layer: selectionLayer } : undefined,
       imageCache,
+      overlayCanvas:
+        interaction.kind === 'sample-stroke' ? interaction.offscreen : undefined,
       liveCanvas: true,
     })
     // Crop preview overlay — drawn AFTER the image render so it sits on top.
@@ -557,24 +584,23 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       return
     }
 
-    // Spot Healing Brush: single click → parent samples a nearby patch and
-    // commits it as an image layer over the click area.
-    if (tool === 'spotHeal') {
-      onSpotHealClick?.(p)
+    // Sample-pixel tools (Spot Heal / Clone Stamp / History Brush): drag-paint
+    // — mousedown opens a sample-stroke interaction (snapshot + offscreen),
+    // mousemove walks the path stamping into the offscreen, mouseup commits
+    // the offscreen as one image-shape layer. Alt+click on Stamp is the
+    // exception — it sets the source point without starting a stroke.
+    if (tool === 'spotHeal' || tool === 'historyBrush') {
+      startSampleStroke(p, tool)
       return
     }
-
-    // Clone Stamp: Alt+click sets source; regular click stamps from source.
     if (tool === 'stamp') {
-      if (e.altKey) onCloneSetSource?.(p)
-      else onCloneStamp?.(p)
-      return
-    }
-
-    // History Brush: click → parent samples original image at click and
-    // commits as image layer (revealing the original under annotations).
-    if (tool === 'historyBrush') {
-      onHistoryBrushClick?.(p)
+      if (e.altKey) {
+        onCloneSetSource?.(p)
+      } else if (!cloneSource) {
+        onCloneNeedSource?.()
+      } else {
+        startSampleStroke(p, 'stamp')
+      }
       return
     }
 
@@ -706,6 +732,10 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       updateDrawing(p)
       return
     }
+    if (interaction.kind === 'sample-stroke') {
+      stepSampleStroke(p)
+      return
+    }
     if (interaction.kind === 'moving') {
       const dx = p.x - interaction.startMouse.x
       const dy = p.y - interaction.startMouse.y
@@ -772,6 +802,8 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       if (!shouldDiscardDrawing(interaction.layer)) {
         onCommitLayer(interaction.layer)
       }
+    } else if (interaction.kind === 'sample-stroke') {
+      finishSampleStroke()
     } else if (
       interaction.kind === 'moving' ||
       interaction.kind === 'resizing'
@@ -984,6 +1016,208 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
         } as MaskLayer,
       })
     }
+  }
+
+  /**
+   * Begin a sample-pixel drag stroke. Builds a snapshot of the canvas (with
+   * annotations stripped for History Brush) at source resolution, allocates
+   * an offscreen of the same size, computes the per-stroke sample offset
+   * based on the tool, and stamps once at the click point.
+   */
+  function startSampleStroke(p: Point, kind: 'spotHeal' | 'stamp' | 'historyBrush') {
+    const cropOriginX = state.cropRect
+      ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w)
+      : 0
+    const cropOriginY = state.cropRect
+      ? Math.min(state.cropRect.y, state.cropRect.y + state.cropRect.h)
+      : 0
+    const stampSrcX = (p.x + cropOriginX) / previewScale
+    const stampSrcY = (p.y + cropOriginY) / previewScale
+    const srcRadius = Math.max(2, Math.round(toolStrokeWidth / 2 / previewScale))
+
+    const snapshot = document.createElement('canvas')
+    renderTo(snapshot, {
+      image,
+      // History Brush samples from a "no-annotations" baseline so the user
+      // paints back the original image; the other two sample from the live
+      // composite (so they pick up everything the user has drawn so far).
+      state: kind === 'historyBrush' ? { ...state, layers: [] } : state,
+      scale: 1,
+      previewScale,
+      imageCache,
+    })
+    const offscreen = document.createElement('canvas')
+    offscreen.width = snapshot.width
+    offscreen.height = snapshot.height
+
+    let offsetX = 0
+    let offsetY = 0
+    let layerName = 'History Brush'
+    if (kind === 'spotHeal') {
+      // Spot Heal samples a couple of brush-radii to the right of the cursor;
+      // mirror leftward when the offset would land out of bounds. Locked for
+      // the whole stroke so subsequent stamps stay visually consistent.
+      offsetX = srcRadius * 2.5
+      if (stampSrcX + offsetX + srcRadius >= snapshot.width) offsetX = -offsetX
+      layerName = 'Spot Heal'
+    } else if (kind === 'stamp' && cloneSource) {
+      const csX = (cloneSource.x + cropOriginX) / previewScale
+      const csY = (cloneSource.y + cropOriginY) / previewScale
+      offsetX = csX - stampSrcX
+      offsetY = csY - stampSrcY
+      layerName = 'Clone Stamp'
+    }
+
+    const hardness = clamp01(brushOptions.hardness)
+    const flow = clamp01(brushOptions.flow)
+    const spacing = clamp01(brushOptions.spacing)
+    const stepPx = Math.max(1, srcRadius * 2 * (spacing > 0 ? spacing : 0.05))
+
+    stampSamplePatch(
+      snapshot,
+      offscreen,
+      stampSrcX,
+      stampSrcY,
+      stampSrcX + offsetX,
+      stampSrcY + offsetY,
+      srcRadius,
+      hardness,
+      flow,
+    )
+
+    setInteraction({
+      kind: 'sample-stroke',
+      tool: kind,
+      snapshot,
+      offscreen,
+      sampleOffsetSrcX: offsetX,
+      sampleOffsetSrcY: offsetY,
+      srcRadius,
+      stepPx,
+      hardness,
+      flow,
+      lastSrcX: stampSrcX,
+      lastSrcY: stampSrcY,
+      leftover: 0,
+      minX: stampSrcX,
+      minY: stampSrcY,
+      maxX: stampSrcX,
+      maxY: stampSrcY,
+      layerName,
+      layerOpacity: Math.round(clamp01(brushOptions.opacity) * 100),
+    })
+  }
+
+  /**
+   * Continue a sample-stroke — walk from the last stamp position to the new
+   * cursor at `stepPx` intervals, blitting a soft-masked sample at each step.
+   * Updates the stroke's bbox so the eventual commit can crop the offscreen.
+   */
+  function stepSampleStroke(p: Point) {
+    if (interaction.kind !== 'sample-stroke') return
+    const i = interaction
+    const cropOriginX = state.cropRect
+      ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w)
+      : 0
+    const cropOriginY = state.cropRect
+      ? Math.min(state.cropRect.y, state.cropRect.y + state.cropRect.h)
+      : 0
+    const targetSrcX = (p.x + cropOriginX) / previewScale
+    const targetSrcY = (p.y + cropOriginY) / previewScale
+    const dx = targetSrcX - i.lastSrcX
+    const dy = targetSrcY - i.lastSrcY
+    const segLen = Math.hypot(dx, dy)
+    if (segLen < 1e-6) return
+
+    let traveled = i.stepPx - i.leftover
+    let { lastSrcX, lastSrcY, minX, minY, maxX, maxY } = i
+    while (traveled <= segLen) {
+      const t = traveled / segLen
+      const sx = i.lastSrcX + dx * t
+      const sy = i.lastSrcY + dy * t
+      stampSamplePatch(
+        i.snapshot,
+        i.offscreen,
+        sx,
+        sy,
+        sx + i.sampleOffsetSrcX,
+        sy + i.sampleOffsetSrcY,
+        i.srcRadius,
+        i.hardness,
+        i.flow,
+      )
+      lastSrcX = sx
+      lastSrcY = sy
+      if (sx < minX) minX = sx
+      if (sx > maxX) maxX = sx
+      if (sy < minY) minY = sy
+      if (sy > maxY) maxY = sy
+      traveled += i.stepPx
+    }
+    setInteraction({
+      ...i,
+      lastSrcX,
+      lastSrcY,
+      leftover: segLen - (traveled - i.stepPx),
+      minX,
+      minY,
+      maxX,
+      maxY,
+    })
+  }
+
+  /**
+   * Wrap up a sample-stroke: crop the offscreen to the stroke's bbox (plus a
+   * radius of slack), commit as a single image-shape annotation layer at the
+   * matching preview-pixel coords. Bypassed bbox stays in source-pixel space
+   * up until the conversion to preview-pixel.
+   */
+  function finishSampleStroke() {
+    if (interaction.kind !== 'sample-stroke') return
+    const i = interaction
+    const cropOriginX = state.cropRect
+      ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w)
+      : 0
+    const cropOriginY = state.cropRect
+      ? Math.min(state.cropRect.y, state.cropRect.y + state.cropRect.h)
+      : 0
+    const margin = i.srcRadius + 4
+    const cx = Math.max(0, Math.floor(i.minX - margin))
+    const cy = Math.max(0, Math.floor(i.minY - margin))
+    const cxMax = Math.min(i.offscreen.width, Math.ceil(i.maxX + margin))
+    const cyMax = Math.min(i.offscreen.height, Math.ceil(i.maxY + margin))
+    const cw = cxMax - cx
+    const ch = cyMax - cy
+    if (cw < 1 || ch < 1) {
+      setInteraction({ kind: 'idle' })
+      return
+    }
+    const cropped = document.createElement('canvas')
+    cropped.width = cw
+    cropped.height = ch
+    cropped.getContext('2d')?.drawImage(i.offscreen, cx, cy, cw, ch, 0, 0, cw, ch)
+    const dataUrl = cropped.toDataURL('image/png')
+    const wPreview = cw * previewScale
+    const hPreview = ch * previewScale
+    const xPreview = cx * previewScale + cropOriginX
+    const yPreview = cy * previewScale + cropOriginY
+    onCommitLayer({
+      id: crypto.randomUUID(),
+      name: i.layerName,
+      visible: true,
+      opacity: i.layerOpacity,
+      blend: 'normal',
+      kind: 'annotation',
+      shape: {
+        kind: 'image',
+        x: xPreview,
+        y: yPreview,
+        w: wPreview,
+        h: hPreview,
+        dataUrl,
+      },
+    })
+    setInteraction({ kind: 'idle' })
   }
 
   // Update cursor on idle hover so users can preview what a click will do.
@@ -1333,6 +1567,67 @@ function drawPenPreview(
   }
 
   ctx.restore()
+}
+
+/**
+ * Sample one stamp into the offscreen — blit a square patch from `snapshot`
+ * around (sampleX, sampleY), soft-mask it to a circle of radius `radius`
+ * with the requested `hardness`, and draw it onto `offscreen` at (stampX,
+ * stampY) with `flow` per-stamp alpha. Coordinates are in source-pixel space
+ * (matches snapshot dimensions).
+ */
+function stampSamplePatch(
+  snapshot: HTMLCanvasElement,
+  offscreen: HTMLCanvasElement,
+  stampX: number,
+  stampY: number,
+  sampleX: number,
+  sampleY: number,
+  radius: number,
+  hardness: number,
+  flow: number,
+) {
+  const sz = Math.max(2, Math.ceil(radius * 2 + 4))
+  const tmp = document.createElement('canvas')
+  tmp.width = sz
+  tmp.height = sz
+  const tctx = tmp.getContext('2d')
+  if (!tctx) return
+  // 1. Blit the sample patch.
+  tctx.drawImage(
+    snapshot,
+    Math.round(sampleX - sz / 2),
+    Math.round(sampleY - sz / 2),
+    sz,
+    sz,
+    0,
+    0,
+    sz,
+    sz,
+  )
+  // 2. Soft-mask via destination-in radial gradient. hardness=1 → solid disk
+  // == full radius (no falloff); hardness=0 → falloff fills the entire radius.
+  tctx.globalCompositeOperation = 'destination-in'
+  const r = sz / 2
+  const inner = r * hardness
+  const grad = tctx.createRadialGradient(r, r, inner, r, r, r)
+  grad.addColorStop(0, 'rgba(0,0,0,1)')
+  grad.addColorStop(1, 'rgba(0,0,0,0)')
+  tctx.fillStyle = grad
+  tctx.fillRect(0, 0, sz, sz)
+  // 3. Composite onto offscreen at the stamp position.
+  const octx = offscreen.getContext('2d')
+  if (!octx) return
+  octx.save()
+  octx.globalAlpha = flow
+  octx.drawImage(tmp, Math.round(stampX - sz / 2), Math.round(stampY - sz / 2))
+  octx.restore()
+}
+
+function clamp01(n: number): number {
+  if (n < 0) return 0
+  if (n > 1) return 1
+  return n
 }
 
 /**
