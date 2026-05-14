@@ -131,6 +131,13 @@ type Props = {
   /** Fired when the user tries to start a Clone Stamp stroke without first
    * setting a source — parent handles the toast (i18n / UX policy lives there). */
   onCloneNeedSource?: () => void
+  /**
+   * Optional ad-hoc preview layer (e.g. an Adjustments-dialog draft). Rendered
+   * via the existing `drawingPreview` slot when no in-progress drawing or pen
+   * interaction is active. Lets the parent overlay a layer on the canvas
+   * without committing it to history.
+   */
+  extraPreviewLayer?: Layer
 }
 
 type Interaction =
@@ -232,6 +239,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     onCloneSetSource,
     cloneSource,
     onCloneNeedSource,
+    extraPreviewLayer,
   },
   ref,
 ) {
@@ -294,7 +302,9 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
           ? { layer: interaction.layer }
           : interaction.kind === 'pen-drawing' && interaction.anchors.length >= 1
             ? { layer: penPreviewLayer(interaction.anchors, toolColor, toolStrokeWidth) }
-            : undefined,
+            : extraPreviewLayer
+              ? { layer: extraPreviewLayer }
+              : undefined,
       selection: selectionLayer ? { layer: selectionLayer } : undefined,
       imageCache,
       overlayCanvas:
@@ -347,6 +357,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     toolStrokeWidth,
     tool,
     cloneSource,
+    extraPreviewLayer,
   ])
 
   useImperativeHandle(
