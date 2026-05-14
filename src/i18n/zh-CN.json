@@ -553,6 +553,9 @@
         "flipV": "垂直翻转",
         "duplicateLayer": "复制图层",
         "deleteLayer": "删除图层",
+        "newGroup": "新建组…",
+        "groupLayers": "图层编组",
+        "ungroupLayers": "取消图层编组",
         "zoomIn": "放大",
         "zoomOut": "缩小",
         "zoomFit": "适合屏幕",
@@ -631,7 +634,6 @@
       "brushOpacity": "不透明度",
       "format": "格式",
       "quality": "质量",
-      "layers": "图层",
       "layerImage": "图片（背景）",
       "layerProps": "图层属性",
       "opacity": "不透明度",
@@ -667,7 +669,14 @@
         "burn": "加深笔触",
         "note": "便签",
         "frame": "画框",
-        "path": "路径"
+        "path": "路径",
+        "group": "图层组"
+      },
+      "layers": {
+        "expand": "展开组",
+        "collapse": "折叠组",
+        "dropInto": "拖入组",
+        "dropOutside": "拖到此处移出组"
       },
       "project": "项目",
       "projectSave": "保存项目 (.json)",

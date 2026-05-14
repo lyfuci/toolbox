@@ -31,6 +31,28 @@ export function getLayerBBox(layer: Layer): Rect | null {
     if (layer.clipRect) return normalizeRect(layer.clipRect)
     return null
   }
+  if (layer.kind === 'group') {
+    // Union of child bboxes — gives the panel selection chrome something
+    // sensible to draw and lets canvas hit-tests on a collapsed group return
+    // an id when the user clicks within any visible child's area.
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    let any = false
+    for (const c of layer.children) {
+      if (!c.visible) continue
+      const b = getLayerBBox(c)
+      if (!b) continue
+      any = true
+      if (b.x < minX) minX = b.x
+      if (b.y < minY) minY = b.y
+      if (b.x + b.w > maxX) maxX = b.x + b.w
+      if (b.y + b.h > maxY) maxY = b.y + b.h
+    }
+    if (!any) return null
+    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+  }
   return getShapeBBox(layer.shape)
 }
 
@@ -116,13 +138,23 @@ export function pointInBBox(p: Point, b: Rect): boolean {
 
 /**
  * Find the topmost layer whose bbox contains the point. Walks layers
- * top→bottom (last in array = topmost) and returns the first hit.
- * Skips hidden layers.
+ * top→bottom (last in array = topmost) and returns the first hit. Descends
+ * into expanded groups so a click on a child returns that child's id; a
+ * click on any descendant of a *collapsed* group returns the group's id
+ * (matches the panel's disclosure state — the user can't reach the child
+ * from the panel either while the group is collapsed).
+ *
+ * Skips hidden layers (and hidden groups, recursively).
  */
 export function pickLayer(layers: Layer[], p: Point): string | null {
   for (let i = layers.length - 1; i >= 0; i--) {
     const layer = layers[i]
     if (!layer.visible) continue
+    if (layer.kind === 'group') {
+      const inner = pickLayer(layer.children, p)
+      if (inner !== null) return layer.expanded ? inner : layer.id
+      continue
+    }
     const bbox = getLayerBBox(layer)
     if (bbox && pointInBBox(p, bbox)) return layer.id
   }
@@ -138,9 +170,10 @@ export function getHandles(layer: Layer): Handle[] {
     if (layer.rects.length === 0) return []
     return rectCornerHandles(normalizeRect(layer.rects[0]))
   }
-  if (layer.kind === 'adjustment' || layer.kind === 'filter') {
-    // Cover the whole canvas (subject to clip); no resize handles.
-    // Move/resize through the layers panel instead if ever needed.
+  if (layer.kind === 'adjustment' || layer.kind === 'filter' || layer.kind === 'group') {
+    // Cover the whole canvas (subject to clip); no resize handles. Move/
+    // resize through the layers panel instead if ever needed. Groups: the
+    // user resizes group contents by selecting individual children.
     return []
   }
   switch (layer.shape.kind) {

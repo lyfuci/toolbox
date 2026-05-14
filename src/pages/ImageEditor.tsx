@@ -17,6 +17,16 @@ import { DEFAULT_BRUSH_OPTIONS, initialState, PREVIEW_MAX } from '@/lib/image-ed
 import { floodFillMask, maskToDataUrl } from '@/lib/image-editor/flood-fill'
 import { useHistoryState } from '@/lib/image-editor/history'
 import { fileToDataUrl, useImageCache } from '@/lib/image-editor/image-cache'
+import {
+  deepCloneLayerWithNewIds,
+  findLayerById,
+  findLayerPath,
+  insertAtPath,
+  isGroup,
+  mapLayerById,
+  removeLayerById,
+  reorderSibling,
+} from '@/lib/image-editor/layer-tree'
 import { dimsAfterRotation, renderTo } from '@/lib/image-editor/render'
 import { translateLayer, withSelectionClip } from '@/lib/image-editor/transform'
 import {
@@ -34,6 +44,7 @@ import type {
   FilterKind,
   FilterLayer,
   FilterParams,
+  GroupLayer,
   Layer,
   OutputFormat,
   Point,
@@ -106,6 +117,8 @@ export function ImageEditorPage() {
   const duplicateRef = useRef<() => void>(() => {})
   const moveLayerRef = useRef<(d: 'forward' | 'backward' | 'front' | 'back') => void>(() => {})
   const deleteLayerRef = useRef<() => void>(() => {})
+  const groupRef = useRef<() => void>(() => {})
+  const ungroupRef = useRef<() => void>(() => {})
 
   // Zoom + pan + Space-held pan mode.
   const [zoom, setZoom] = useState(1)
@@ -202,6 +215,13 @@ export function ImageEditorPage() {
         if (e.key === 'j' || e.key === 'J') { e.preventDefault(); duplicateRef.current(); return }
         if (e.key === ']') { e.preventDefault(); moveLayerRef.current(e.shiftKey ? 'front' : 'forward'); return }
         if (e.key === '[') { e.preventDefault(); moveLayerRef.current(e.shiftKey ? 'back' : 'backward'); return }
+        if (e.key === 'g' || e.key === 'G') {
+          // Cmd+G groups the selected layer; Shift+Cmd+G ungroups.
+          e.preventDefault()
+          if (e.shiftKey) ungroupRef.current()
+          else groupRef.current()
+          return
+        }
         // Cmd+D = deselect, Cmd+A = select all (PS conventions). Both no-op
         // when there's no image yet.
         if (e.key === 'd' || e.key === 'D') {
@@ -313,6 +333,9 @@ export function ImageEditorPage() {
   }, [focused, zoomIn, zoomOut, zoomReset, swapColors, resetColors, selectedLayerId, trySetTool, history, state, image])
 
   // ── Layer state helpers ──────────────────────────────────────────────────
+  // All of these are tree-aware — `state.layers` is a nested tree once groups
+  // are in play, so they delegate to layer-tree helpers rather than open-
+  // coding the recursion inline.
   const setLayers = useCallback(
     (layers: Layer[]) => history.set({ ...state, layers }),
     [history, state],
@@ -320,6 +343,8 @@ export function ImageEditorPage() {
   const commitLayer = useCallback(
     (layer: Layer) => {
       const clipped = withSelectionClip(layer, state)
+      // v1: newly-committed layers always land at the top of the top-level
+      // stack. Users can drag them into a group from the panel afterwards.
       history.set({ ...state, layers: [...state.layers, clipped] })
       setSelectedLayerId(clipped.id)
     },
@@ -329,14 +354,12 @@ export function ImageEditorPage() {
     (id: string, patch: Partial<Layer>) =>
       history.set({
         ...state,
-        layers: state.layers.map((l) =>
-          l.id === id ? ({ ...l, ...patch } as Layer) : l,
-        ),
+        layers: mapLayerById(state.layers, id, (l) => ({ ...l, ...patch } as Layer)),
       }),
     [history, state],
   )
   const deleteLayer = useCallback(
-    (id: string) => history.set({ ...state, layers: state.layers.filter((l) => l.id !== id) }),
+    (id: string) => history.set({ ...state, layers: removeLayerById(state.layers, id) }),
     [history, state],
   )
   const patchImageLayer = useCallback(
@@ -348,47 +371,100 @@ export function ImageEditorPage() {
     (id: string, layer: Layer) =>
       history.set({
         ...state,
-        layers: state.layers.map((l) => (l.id === id ? layer : l)),
+        layers: mapLayerById(state.layers, id, () => layer),
       }),
     [history, state],
   )
 
+  // Group / Ungroup actions, exposed via the Layer menu and Cmd+G shortcuts.
+  const groupSelected = useCallback(() => {
+    if (!selectedLayerId || selectedLayerId === 'image') return
+    const path = findLayerPath(state.layers, selectedLayerId)
+    if (!path) return
+    const layer = findLayerById(state.layers, selectedLayerId)
+    if (!layer) return
+    const removed = removeLayerById(state.layers, selectedLayerId)
+    const group: GroupLayer = {
+      id: crypto.randomUUID(),
+      name: t('pages.imageEditor.annoLabel.group'),
+      visible: true,
+      opacity: 100,
+      blend: 'normal',
+      kind: 'group',
+      children: [layer],
+      expanded: true,
+    }
+    history.set({ ...state, layers: insertAtPath(removed, path, group) })
+    setSelectedLayerId(group.id)
+  }, [history, selectedLayerId, state, t])
+
+  const ungroupSelected = useCallback(() => {
+    if (!selectedLayerId || selectedLayerId === 'image') return
+    const layer = findLayerById(state.layers, selectedLayerId)
+    if (!layer || !isGroup(layer)) return
+    const path = findLayerPath(state.layers, selectedLayerId)
+    if (!path) return
+    const removed = removeLayerById(state.layers, selectedLayerId)
+    // Splice children into the same position the group used to occupy.
+    // Preserve child order so visual stacking is unchanged.
+    let acc = removed
+    for (let i = 0; i < layer.children.length; i++) {
+      const childPath = [...path.slice(0, -1), path[path.length - 1] + i]
+      acc = insertAtPath(acc, childPath, layer.children[i])
+    }
+    history.set({ ...state, layers: acc })
+    setSelectedLayerId(layer.children[layer.children.length - 1]?.id ?? 'image')
+  }, [history, selectedLayerId, state])
+
+  const newGroup = useCallback(() => {
+    const group: GroupLayer = {
+      id: crypto.randomUUID(),
+      name: t('pages.imageEditor.annoLabel.group'),
+      visible: true,
+      opacity: 100,
+      blend: 'normal',
+      kind: 'group',
+      children: [],
+      expanded: true,
+    }
+    history.set({ ...state, layers: [...state.layers, group] })
+    setSelectedLayerId(group.id)
+  }, [history, state, t])
+
+  const selectedLayer = findLayerById(state.layers, selectedLayerId)
+  const canGroupSelected = !!selectedLayer && selectedLayerId !== 'image'
+  const canUngroupSelected = !!selectedLayer && isGroup(selectedLayer)
+
   useEffect(() => {
     duplicateRef.current = () => {
-      const orig = state.layers.find((l) => l.id === selectedLayerId)
+      if (!selectedLayerId || selectedLayerId === 'image') return
+      const orig = findLayerById(state.layers, selectedLayerId)
       if (!orig) return
-      const copy = JSON.parse(JSON.stringify(orig)) as Layer
-      copy.id = crypto.randomUUID()
+      const copy = deepCloneLayerWithNewIds(orig)
       copy.name = `${orig.name} copy`
+      // Translate the new layer 10px down/right so users see the duplicate
+      // peeking out from under the original.
       const shifted = translateLayer(copy, 10, 10)
-      const idx = state.layers.findIndex((l) => l.id === selectedLayerId)
-      const next = [...state.layers]
-      next.splice(idx + 1, 0, shifted)
-      history.set({ ...state, layers: next })
+      // Insert as a sibling immediately after the original in its parent.
+      const path = findLayerPath(state.layers, selectedLayerId)
+      if (!path) return
+      const insertPath = [...path.slice(0, -1), path[path.length - 1] + 1]
+      history.set({ ...state, layers: insertAtPath(state.layers, insertPath, shifted) })
       setSelectedLayerId(shifted.id)
     }
     moveLayerRef.current = (direction) => {
-      const idx = state.layers.findIndex((l) => l.id === selectedLayerId)
-      if (idx === -1) return
-      const next = [...state.layers]
-      const [layer] = next.splice(idx, 1)
-      let newIdx: number
-      if (direction === 'forward') newIdx = Math.min(next.length, idx + 1)
-      else if (direction === 'backward') newIdx = Math.max(0, idx - 1)
-      else if (direction === 'front') newIdx = next.length
-      else newIdx = 0
-      if (newIdx === idx) return
-      next.splice(newIdx, 0, layer)
+      if (!selectedLayerId || selectedLayerId === 'image') return
+      const next = reorderSibling(state.layers, selectedLayerId, direction)
+      if (next === state.layers) return
       history.set({ ...state, layers: next })
     }
     deleteLayerRef.current = () => {
       if (!selectedLayerId || selectedLayerId === 'image') return
-      history.set({
-        ...state,
-        layers: state.layers.filter((l) => l.id !== selectedLayerId),
-      })
+      history.set({ ...state, layers: removeLayerById(state.layers, selectedLayerId) })
       setSelectedLayerId('image')
     }
+    groupRef.current = groupSelected
+    ungroupRef.current = ungroupSelected
   })
 
   // ── Crop ─────────────────────────────────────────────────────────────────
@@ -954,6 +1030,11 @@ export function ImageEditorPage() {
             openFilter: (kind: FilterKind) => setOpenFilter(kind),
             duplicateLayer: () => duplicateRef.current(),
             deleteLayer: () => deleteLayerRef.current(),
+            newGroup,
+            groupSelected,
+            ungroupSelected,
+            canGroupSelected,
+            canUngroupSelected,
             zoomIn,
             zoomOut,
             zoomFit: zoomReset,

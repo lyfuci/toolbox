@@ -491,8 +491,30 @@ export type FilterLayer = LayerCommon & {
   params: FilterParams
 }
 
+/**
+ * Group layer — a folder that holds a nested stack of child layers. The
+ * renderer composites children onto an offscreen canvas (in their own bottom→
+ * top order) and then composites that offscreen back onto the parent canvas
+ * with the group's own `opacity` / `blend` / `clipRect` / `clipPath`. This
+ * "normal mode" semantics keeps adjustment/filter layers contained inside the
+ * group — they only see layers within the same group, not the world below.
+ *
+ * `expanded` controls only the LayersPanel disclosure state; the renderer
+ * always walks all children regardless. Groups can be nested arbitrarily.
+ */
+export type GroupLayer = LayerCommon & {
+  kind: 'group'
+  children: Layer[]
+  expanded: boolean
+}
+
 // User-addable overlay layer types (the image is special, see EditorState).
-export type Layer = AnnotationLayer | MaskLayer | AdjustmentLayer | FilterLayer
+export type Layer =
+  | AnnotationLayer
+  | MaskLayer
+  | AdjustmentLayer
+  | FilterLayer
+  | GroupLayer
 
 // The full editing state. The HTMLImageElement (pixels) is held outside this
 // state so it doesn't enter the history stack; here we only track the image

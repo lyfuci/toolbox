@@ -18,6 +18,7 @@ import {
   type HandleId,
 } from '@/lib/image-editor/hit'
 import type { ImageCache } from '@/lib/image-editor/drawing'
+import { findLayerById, mapLayerById } from '@/lib/image-editor/layer-tree'
 import { dimsAfterRotation, renderTo } from '@/lib/image-editor/render'
 import { layerEquals, resizeLayer, translateLayer } from '@/lib/image-editor/transform'
 import type {
@@ -258,11 +259,11 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
   // movement without polluting history.
   const effectiveState: EditorState = useMemo(() => {
     if (interaction.kind === 'moving' || interaction.kind === 'resizing') {
+      // mapLayerById recurses through groups, so layers nested inside a
+      // group still pick up their in-progress preview during a drag.
       return {
         ...state,
-        layers: state.layers.map((l) =>
-          l.id === interaction.layerId ? interaction.preview : l,
-        ),
+        layers: mapLayerById(state.layers, interaction.layerId, () => interaction.preview),
       }
     }
     return state
@@ -276,7 +277,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     if (interaction.kind === 'moving' || interaction.kind === 'resizing') {
       return interaction.preview
     }
-    return effectiveState.layers.find((l) => l.id === selectedId) ?? null
+    return findLayerById(effectiveState.layers, selectedId)
   }, [interaction, selectedId, effectiveState])
 
   // Switching off the crop tool clears any uncommitted crop preview — keeps
@@ -642,7 +643,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
 
     // Resize: if a layer is selected, see if the click hit one of its handles.
     if (selectedId && selectedId !== 'image') {
-      const sel = state.layers.find((l) => l.id === selectedId)
+      const sel = findLayerById(state.layers, selectedId)
       if (sel) {
         const handle = pickHandle(getHandles(sel), p)
         if (handle) {
@@ -662,7 +663,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     const pickedId = pickLayer(state.layers, p)
     if (pickedId) {
       onSelect(pickedId)
-      const layer = state.layers.find((l) => l.id === pickedId)!
+      const layer = findLayerById(state.layers, pickedId)!
       setInteraction({
         kind: 'moving',
         layerId: pickedId,
@@ -1279,7 +1280,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     }
     const p = eventToCanvasXY(e)
     if (selectedId && selectedId !== 'image') {
-      const sel = state.layers.find((l) => l.id === selectedId)
+      const sel = findLayerById(state.layers, selectedId)
       if (sel) {
         const handle = pickHandle(getHandles(sel), p)
         if (handle) {

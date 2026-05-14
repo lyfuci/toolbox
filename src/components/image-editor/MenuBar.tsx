@@ -48,6 +48,11 @@ type Props = {
     openFilter?: (kind: FilterKind) => void
     duplicateLayer?: () => void
     deleteLayer?: () => void
+    newGroup?: () => void
+    groupSelected?: () => void
+    ungroupSelected?: () => void
+    canGroupSelected?: boolean
+    canUngroupSelected?: boolean
     zoomIn?: () => void
     zoomOut?: () => void
     zoomFit?: () => void
@@ -262,6 +267,14 @@ export function MenuBar({ handlers }: Props) {
       sections: [
         [
           {
+            id: 'newGroup',
+            label: t('pages.imageEditor.menu.newGroup'),
+            onClick: handlers.newGroup,
+          },
+        ],
+        { sep: true },
+        [
+          {
             id: 'dup',
             label: t('pages.imageEditor.menu.duplicateLayer'),
             shortcut: '⌘J',
@@ -272,6 +285,23 @@ export function MenuBar({ handlers }: Props) {
             label: t('pages.imageEditor.menu.deleteLayer'),
             shortcut: '⌫',
             onClick: handlers.deleteLayer,
+          },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'groupSel',
+            label: t('pages.imageEditor.menu.groupLayers'),
+            shortcut: '⌘G',
+            onClick: handlers.groupSelected,
+            disabled: !handlers.canGroupSelected,
+          },
+          {
+            id: 'ungroupSel',
+            label: t('pages.imageEditor.menu.ungroupLayers'),
+            shortcut: '⇧⌘G',
+            onClick: handlers.ungroupSelected,
+            disabled: !handlers.canUngroupSelected,
           },
         ],
       ],

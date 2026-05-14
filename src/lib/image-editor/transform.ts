@@ -16,6 +16,15 @@ export function translateLayer(layer: Layer, dx: number, dy: number): Layer {
     // with a translate.
     return { ...layer, ...clip }
   }
+  if (layer.kind === 'group') {
+    // Translate the group's own clip + each child recursively so a Move
+    // operation on a group shifts everything inside it as a unit.
+    return {
+      ...layer,
+      ...clip,
+      children: layer.children.map((c) => translateLayer(c, dx, dy)),
+    }
+  }
   return { ...layer, ...clip, shape: translateShape(layer.shape, dx, dy) }
 }
 
@@ -123,10 +132,10 @@ export function resizeLayer(
       ],
     }
   }
-  if (layer.kind === 'adjustment' || layer.kind === 'filter') {
-    // Adjustment + filter layers have no resizable geometry; getHandles
-    // returns [] for them so this branch shouldn't be reached, but keep it
-    // as a no-op for safety.
+  if (layer.kind === 'adjustment' || layer.kind === 'filter' || layer.kind === 'group') {
+    // Adjustment + filter + group layers have no resizable geometry of their
+    // own; getHandles returns [] for them so this branch shouldn't be
+    // reached, but keep it as a no-op for safety.
     return layer
   }
   const s = layer.shape
