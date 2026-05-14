@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { AdjustmentKind } from '@/lib/image-editor/types'
+import type { AdjustmentKind, FilterKind } from '@/lib/image-editor/types'
 
 /**
  * PS-style menu bar — File / Edit / Image / Layer / View menus across the
@@ -45,6 +45,7 @@ type Props = {
     flipH?: () => void
     flipV?: () => void
     openAdjustment?: (kind: AdjustmentKind) => void
+    openFilter?: (kind: FilterKind) => void
     duplicateLayer?: () => void
     deleteLayer?: () => void
     zoomIn?: () => void
@@ -183,6 +184,74 @@ export function MenuBar({ handlers }: Props) {
             id: 'adj-threshold',
             label: t('pages.imageEditor.adjustments.threshold') + '…',
             onClick: () => handlers.openAdjustment?.('threshold'),
+          },
+        ],
+      ],
+    },
+    {
+      id: 'filter',
+      label: t('pages.imageEditor.menu.filter'),
+      sections: [
+        [
+          {
+            id: 'flt-gaussianBlur',
+            label: t('pages.imageEditor.filters.gaussianBlur') + '…',
+            shortcut: '⇧⌘F',
+            onClick: () => handlers.openFilter?.('gaussianBlur'),
+          },
+          {
+            id: 'flt-boxBlur',
+            label: t('pages.imageEditor.filters.boxBlur') + '…',
+            onClick: () => handlers.openFilter?.('boxBlur'),
+          },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'flt-sharpen',
+            label: t('pages.imageEditor.filters.sharpen') + '…',
+            onClick: () => handlers.openFilter?.('sharpen'),
+          },
+          {
+            id: 'flt-unsharpMask',
+            label: t('pages.imageEditor.filters.unsharpMask') + '…',
+            onClick: () => handlers.openFilter?.('unsharpMask'),
+          },
+          {
+            id: 'flt-highPass',
+            label: t('pages.imageEditor.filters.highPass') + '…',
+            onClick: () => handlers.openFilter?.('highPass'),
+          },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'flt-addNoise',
+            label: t('pages.imageEditor.filters.addNoise') + '…',
+            onClick: () => handlers.openFilter?.('addNoise'),
+          },
+          {
+            id: 'flt-despeckle',
+            label: t('pages.imageEditor.filters.despeckle'),
+            onClick: () => handlers.openFilter?.('despeckle'),
+          },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'flt-mosaic',
+            label: t('pages.imageEditor.filters.mosaic') + '…',
+            onClick: () => handlers.openFilter?.('mosaic'),
+          },
+          {
+            id: 'flt-findEdges',
+            label: t('pages.imageEditor.filters.findEdges'),
+            onClick: () => handlers.openFilter?.('findEdges'),
+          },
+          {
+            id: 'flt-emboss',
+            label: t('pages.imageEditor.filters.emboss') + '…',
+            onClick: () => handlers.openFilter?.('emboss'),
           },
         ],
       ],

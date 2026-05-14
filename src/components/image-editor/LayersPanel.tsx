@@ -166,6 +166,9 @@ function layerLabelKey(layer: Layer): string {
   if (layer.kind === 'adjustment') {
     return `pages.imageEditor.adjustments.${layer.params.kind}`
   }
+  if (layer.kind === 'filter') {
+    return `pages.imageEditor.filters.${layer.params.kind}`
+  }
   switch (layer.shape.kind) {
     case 'rect':
       return 'pages.imageEditor.annoLabel.rect'

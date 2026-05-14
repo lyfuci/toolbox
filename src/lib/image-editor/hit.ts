@@ -23,11 +23,11 @@ export function getLayerBBox(layer: Layer): Rect | null {
     // v1: a mask is a single rect.
     return normalizeRect(layer.rects[0])
   }
-  if (layer.kind === 'adjustment') {
-    // Adjustment layers cover the entire canvas (subject to clip). The
-    // layers panel still needs to be able to select them, so we return the
-    // clip if one's set; otherwise no bbox (clicking the canvas can't pick
-    // an adjustment layer — the user uses the layers panel instead).
+  if (layer.kind === 'adjustment' || layer.kind === 'filter') {
+    // Adjustment + filter layers cover the entire canvas (subject to clip).
+    // The layers panel still needs to be able to select them, so we return
+    // the clip if one's set; otherwise no bbox (clicking the canvas can't
+    // pick one — the user uses the layers panel instead).
     if (layer.clipRect) return normalizeRect(layer.clipRect)
     return null
   }
@@ -138,9 +138,9 @@ export function getHandles(layer: Layer): Handle[] {
     if (layer.rects.length === 0) return []
     return rectCornerHandles(normalizeRect(layer.rects[0]))
   }
-  if (layer.kind === 'adjustment') {
-    // Adjustment layers cover the whole canvas (subject to clip); no resize
-    // handles. Move/resize through the layers panel instead if ever needed.
+  if (layer.kind === 'adjustment' || layer.kind === 'filter') {
+    // Cover the whole canvas (subject to clip); no resize handles.
+    // Move/resize through the layers panel instead if ever needed.
     return []
   }
   switch (layer.shape.kind) {
