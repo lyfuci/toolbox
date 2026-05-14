@@ -1,5 +1,6 @@
 import { applyAdjustment } from './adjustments'
 import { drawShape, type ImageCache } from './drawing'
+import { applyFilter, scaleFilterParams } from './filter-ops'
 import { filterString } from './filters'
 import { getHandles, getLayerBBox, normalizeRect } from './hit'
 import { translateLayer } from './transform'
@@ -7,6 +8,7 @@ import type {
   AdjustmentLayer,
   BlendMode,
   EditorState,
+  FilterLayer,
   Layer,
   MaskLayer,
   Point,
@@ -206,6 +208,8 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
       applyMask(ctx, l, annoScale, w, h)
     } else if (l.kind === 'adjustment') {
       applyAdjustmentLayer(canvas, ctx, l, annoScale)
+    } else if (l.kind === 'filter') {
+      applyFilterLayer(canvas, ctx, l, annoScale)
     }
   }
 
@@ -226,6 +230,8 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
       applyMask(ctx, layer, annoScale, w, h)
     } else if (layer.kind === 'adjustment') {
       applyAdjustmentLayer(canvas, ctx, layer, annoScale)
+    } else if (layer.kind === 'filter') {
+      applyFilterLayer(canvas, ctx, layer, annoScale)
     }
   }
 
@@ -475,17 +481,55 @@ function applyLayerClip(
 }
 
 /**
- * Apply an adjustment layer to the accumulated canvas: copy current pixels to
- * a temp canvas, transform via the adjustment kind's pure-JS pixel function,
- * then composite the result back through the layer's clip + opacity. Layer
- * opacity blends adjusted-vs-original via globalAlpha at the composite step
- * (pure-JS apply runs at full strength regardless of opacity).
+ * Apply an adjustment layer to the accumulated canvas. Per-pixel adjustments
+ * (LUT / HSL) don't need spatial info, so the transform ignores width/height.
  */
 function applyAdjustmentLayer(
   canvas: HTMLCanvasElement,
   ctx: CanvasRenderingContext2D,
   layer: AdjustmentLayer,
   scale: number,
+) {
+  applyPixelTransformLayer(canvas, ctx, layer, scale, (data) =>
+    applyAdjustment(data, layer.params),
+  )
+}
+
+/**
+ * Apply a filter layer. Same pipeline as adjustment, but the transform
+ * receives width/height (filters are neighbourhood-dependent: blur, sharpen,
+ * Sobel, etc.). Spatial params (radius / cellSize / height) are stored in
+ * preview-canvas pixels and scaled here to match the target buffer's
+ * resolution — keeps a "10px blur" looking the same on preview vs export.
+ */
+function applyFilterLayer(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  layer: FilterLayer,
+  scale: number,
+) {
+  const params = scaleFilterParams(layer.params, scale)
+  applyPixelTransformLayer(canvas, ctx, layer, scale, (data, w, h) =>
+    applyFilter(data, w, h, params),
+  )
+}
+
+/**
+ * Shared pipeline for non-destructive pixel-transform layers (adjustments +
+ * filters). Snapshot current canvas → getImageData → apply pure-JS transform
+ * → putImageData → composite back through the layer's clip + opacity. Layer
+ * opacity blends transformed-vs-original via globalAlpha at the composite
+ * step (the transform itself runs at full strength regardless of opacity).
+ *
+ * CORS-tainted sources cause `getImageData` to throw — caught and the layer
+ * silently no-ops rather than exploding the entire render pass.
+ */
+function applyPixelTransformLayer(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  layer: { clipRect?: Rect; clipPath?: Point[]; opacity: number },
+  scale: number,
+  transform: (data: Uint8ClampedArray, width: number, height: number) => void,
 ) {
   if (canvas.width < 1 || canvas.height < 1) return
   const adjusted = document.createElement('canvas')
@@ -498,11 +542,9 @@ function applyAdjustmentLayer(
   try {
     imageData = actx.getImageData(0, 0, canvas.width, canvas.height)
   } catch {
-    // CORS-tainted source — adjustment can't read pixels. Bail silently
-    // rather than exploding; the layer just won't visibly do anything.
     return
   }
-  applyAdjustment(imageData.data, layer.params)
+  transform(imageData.data, imageData.width, imageData.height)
   actx.putImageData(imageData, 0, 0)
   ctx.save()
   ctx.setTransform(1, 0, 0, 1, 0, 0)

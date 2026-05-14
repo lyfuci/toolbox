@@ -396,8 +396,103 @@ export type AdjustmentLayer = LayerCommon & {
   params: AdjustmentParams
 }
 
+// ── Filter layer ─────────────────────────────────────────────────────────
+
+/**
+ * Spatial radius/size fields on filter params are stored in **preview-canvas
+ * pixels** (same convention as `BlurShape.radius`). The renderer multiplies
+ * by `annoScale` before applying, so a filter looks identical across the
+ * live preview and a 1:1 export.
+ */
+
+/** Gaussian blur — separable kernel of size derived from radius (≈σ). */
+export type GaussianBlurParams = {
+  kind: 'gaussianBlur'
+  radius: number // preview-canvas px, 0..100
+}
+/** Box blur — uniform-weight separable averaging kernel. */
+export type BoxBlurParams = {
+  kind: 'boxBlur'
+  radius: number // preview-canvas px, 1..50
+}
+/** Sharpen — 3×3 unsharp kernel scaled by `amount`. */
+export type SharpenParams = {
+  kind: 'sharpen'
+  amount: number // %, 0..200 (100 = standard kernel)
+}
+/**
+ * Unsharp mask — `result = orig + (orig - blur) * amount`, applied only where
+ * |orig - blur| exceeds threshold. blur is gaussian of `radius`.
+ */
+export type UnsharpMaskParams = {
+  kind: 'unsharpMask'
+  amount: number // %, 0..500
+  radius: number // preview-canvas px, 0.1..50
+  threshold: number // 0..255
+}
+/** High pass — subtract a gaussian blur from the original, midpoint at 128. */
+export type HighPassParams = {
+  kind: 'highPass'
+  radius: number // preview-canvas px, 0.1..50
+}
+/**
+ * Add noise — random per-pixel delta. `monochromatic`: same delta across RGB
+ * (luminance noise) vs. independent per-channel (chroma noise). `seed` is
+ * generated at apply time so the noise stays visually stable across canvas
+ * re-renders (pan / zoom / unrelated layer edits) — a deterministic PRNG
+ * keyed by `(seed, pixelIndex)` produces the deltas.
+ */
+export type AddNoiseParams = {
+  kind: 'addNoise'
+  amount: number // 0..255 (max +/- delta)
+  monochromatic: boolean
+  seed: number // u32; set once at apply time, persists through undo/save
+}
+/** Despeckle — 3×3 median per channel; reduces speckle noise. No params. */
+export type DespeckleParams = { kind: 'despeckle' }
+/** Mosaic — average each cellSize×cellSize block, fill with that average. */
+export type MosaicParams = {
+  kind: 'mosaic'
+  cellSize: number // preview-canvas px, 2..200
+}
+/** Find edges — Sobel magnitude, inverted (white background, dark edges). */
+export type FindEdgesParams = { kind: 'findEdges' }
+/** Emboss — directional gradient, midpoint 128, scaled by amount. */
+export type EmbossParams = {
+  kind: 'emboss'
+  angle: number // degrees, -180..180
+  height: number // preview-canvas px, 1..10
+  amount: number // %, 1..500
+}
+
+export type FilterParams =
+  | GaussianBlurParams
+  | BoxBlurParams
+  | SharpenParams
+  | UnsharpMaskParams
+  | HighPassParams
+  | AddNoiseParams
+  | DespeckleParams
+  | MosaicParams
+  | FindEdgesParams
+  | EmbossParams
+
+export type FilterKind = FilterParams['kind']
+
+/**
+ * Filter layer — non-destructive *neighbourhood-dependent* pixel transform
+ * (blur, sharpen, edge detect, etc.) applied to the accumulated canvas at the
+ * layer's position in the stack. Architecturally identical to AdjustmentLayer
+ * — the only difference is that filter ops need width+height (they read
+ * neighbouring pixels), where adjustments are per-pixel-independent.
+ */
+export type FilterLayer = LayerCommon & {
+  kind: 'filter'
+  params: FilterParams
+}
+
 // User-addable overlay layer types (the image is special, see EditorState).
-export type Layer = AnnotationLayer | MaskLayer | AdjustmentLayer
+export type Layer = AnnotationLayer | MaskLayer | AdjustmentLayer | FilterLayer
 
 // The full editing state. The HTMLImageElement (pixels) is held outside this
 // state so it doesn't enter the history stack; here we only track the image

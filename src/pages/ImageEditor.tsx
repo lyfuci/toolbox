@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { AdjustmentDialog } from '@/components/image-editor/AdjustmentDialog'
 import { Canvas, type CanvasHandle } from '@/components/image-editor/Canvas'
 import { DropZone } from '@/components/image-editor/DropZone'
+import { FilterDialog } from '@/components/image-editor/FilterDialog'
 import { MenuBar } from '@/components/image-editor/MenuBar'
 import { OptionsBar } from '@/components/image-editor/OptionsBar'
 import { RightSidebar } from '@/components/image-editor/RightSidebar'
@@ -30,6 +31,9 @@ import type {
   AnnotationLayer,
   BrushOptions,
   EditorState,
+  FilterKind,
+  FilterLayer,
+  FilterParams,
   Layer,
   OutputFormat,
   Point,
@@ -557,15 +561,9 @@ export function ImageEditorPage() {
   }, [])
   const handleAdjustmentApply = useCallback(
     (params: AdjustmentParams) => {
-      const layerName =
-        params.kind === 'levels'
-          ? t('pages.imageEditor.adjustments.levels')
-          : params.kind === 'posterize'
-            ? t('pages.imageEditor.adjustments.posterize')
-            : t('pages.imageEditor.adjustments.threshold')
       commitLayer({
         id: crypto.randomUUID(),
-        name: layerName,
+        name: t(`pages.imageEditor.adjustments.${params.kind}`),
         visible: true,
         opacity: 100,
         blend: 'normal',
@@ -580,6 +578,52 @@ export function ImageEditorPage() {
   const handleAdjustmentCancel = useCallback(() => {
     setAdjustmentDraft(null)
     setOpenAdjustment(null)
+  }, [])
+
+  // ── Filter dialog ──────────────────────────────────────────────────────
+  // Mirror of the Adjustments dialog flow, but for FilterLayer. extraPreviewLayer
+  // on Canvas takes the live draft so the user sees the filter applied as
+  // they tweak; on Apply, the draft is committed via commitLayer (which bakes
+  // in any active selection clip). Filters take widthxheight so the work runs
+  // through applyPixelTransformLayer; the dialog shape is otherwise identical.
+  const [openFilter, setOpenFilter] = useState<FilterKind | null>(null)
+  const [filterDraft, setFilterDraft] = useState<FilterLayer | null>(null)
+  const handleFilterPreview = useCallback((params: FilterParams | null) => {
+    if (params === null) {
+      setFilterDraft(null)
+      return
+    }
+    setFilterDraft({
+      id: 'filter-draft',
+      name: params.kind,
+      visible: true,
+      opacity: 100,
+      blend: 'normal',
+      kind: 'filter',
+      params,
+    })
+  }, [])
+  const handleFilterApply = useCallback(
+    (params: FilterParams) => {
+      // Note: AddNoise's `seed` is set in the dialog at mount, so the params
+      // passed in here already carry a stable seed — no apply-time fixup needed.
+      commitLayer({
+        id: crypto.randomUUID(),
+        name: t(`pages.imageEditor.filters.${params.kind}`),
+        visible: true,
+        opacity: 100,
+        blend: 'normal',
+        kind: 'filter',
+        params,
+      })
+      setFilterDraft(null)
+      setOpenFilter(null)
+    },
+    [commitLayer, t],
+  )
+  const handleFilterCancel = useCallback(() => {
+    setFilterDraft(null)
+    setOpenFilter(null)
   }, [])
 
   // ── Sample-pixel tools (Spot Heal / Clone Stamp / History Brush) ──────
@@ -907,6 +951,7 @@ export function ImageEditorPage() {
             flipH: () => setTransforms({ ...state.transforms, flipH: !state.transforms.flipH }),
             flipV: () => setTransforms({ ...state.transforms, flipV: !state.transforms.flipV }),
             openAdjustment: (kind: AdjustmentKind) => setOpenAdjustment(kind),
+            openFilter: (kind: FilterKind) => setOpenFilter(kind),
             duplicateLayer: () => duplicateRef.current(),
             deleteLayer: () => deleteLayerRef.current(),
             zoomIn,
@@ -1021,7 +1066,7 @@ export function ImageEditorPage() {
               onCloneSetSource={handleSetCloneSource}
               cloneSource={cloneSource}
               onCloneNeedSource={handleCloneNeedSource}
-              extraPreviewLayer={adjustmentDraft ?? undefined}
+              extraPreviewLayer={adjustmentDraft ?? filterDraft ?? undefined}
             />
           </Workspace>
         </div>
@@ -1055,6 +1100,12 @@ export function ImageEditorPage() {
         onPreview={handleAdjustmentPreview}
         onApply={handleAdjustmentApply}
         onCancel={handleAdjustmentCancel}
+      />
+      <FilterDialog
+        open={openFilter}
+        onPreview={handleFilterPreview}
+        onApply={handleFilterApply}
+        onCancel={handleFilterCancel}
       />
     </div>
   )
