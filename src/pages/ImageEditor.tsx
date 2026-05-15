@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { AdjustmentDialog } from '@/components/image-editor/AdjustmentDialog'
 import { Canvas, type CanvasHandle } from '@/components/image-editor/Canvas'
 import { DropZone } from '@/components/image-editor/DropZone'
+import { FillDialog } from '@/components/image-editor/FillDialog'
 import { FilterDialog } from '@/components/image-editor/FilterDialog'
 import { MenuBar } from '@/components/image-editor/MenuBar'
 import { OptionsBar } from '@/components/image-editor/OptionsBar'
@@ -13,11 +14,22 @@ import {
   type SelectModifyKind,
 } from '@/components/image-editor/SelectModifyDialog'
 import { StatusBar } from '@/components/image-editor/StatusBar'
+import { StrokeDialog } from '@/components/image-editor/StrokeDialog'
 import { ToolsPalette } from '@/components/image-editor/ToolsPalette'
 import { STUB_TOOLS } from '@/components/image-editor/tool-meta'
 import { Workspace, type WorkspaceHandle } from '@/components/image-editor/Workspace'
 import '@/components/image-editor/pixelforge.css'
+import {
+  buildImageShapeLayer,
+  extractRegion,
+  flattenToDataUrl,
+  mergeLayersToImageLayer,
+  previewDimsOf,
+  regionFromSelection,
+  renderEditorToCanvas,
+} from '@/lib/image-editor/composite-ops'
 import { DEFAULT_BRUSH_OPTIONS, initialState, PREVIEW_MAX } from '@/lib/image-editor/defaults'
+import { fillSelection, strokeSelection, type StrokePosition } from '@/lib/image-editor/edit-ops'
 import { floodFillMask, maskToDataUrl } from '@/lib/image-editor/flood-fill'
 import { useHistoryState } from '@/lib/image-editor/history'
 import { fileToDataUrl, useImageCache } from '@/lib/image-editor/image-cache'
@@ -25,6 +37,7 @@ import {
   deepCloneLayerWithNewIds,
   findLayerById,
   findLayerPath,
+  getLayerAtPath,
   insertAtPath,
   isGroup,
   mapLayerById,
@@ -135,6 +148,13 @@ export function ImageEditorPage() {
   const deselectRef = useRef<() => void>(() => {})
   const reselectRef = useRef<() => void>(() => {})
   const inverseSelectionRef = useRef<() => void>(() => {})
+  const cutRef = useRef<() => void>(() => {})
+  const copyRef = useRef<() => void>(() => {})
+  const copyMergedRef = useRef<() => void>(() => {})
+  const pasteRef = useRef<() => void>(() => {})
+  const pasteInPlaceRef = useRef<() => void>(() => {})
+  const mergeDownRef = useRef<() => void>(() => {})
+  const mergeVisibleRef = useRef<() => void>(() => {})
 
   // Zoom + pan + Space-held pan mode.
   const [zoom, setZoom] = useState(1)
@@ -236,6 +256,31 @@ export function ImageEditorPage() {
           e.preventDefault()
           if (e.shiftKey) ungroupRef.current()
           else groupRef.current()
+          return
+        }
+        // Edit menu clipboard shortcuts.
+        if (e.key === 'x' || e.key === 'X') {
+          e.preventDefault()
+          cutRef.current()
+          return
+        }
+        if (e.key === 'c' || e.key === 'C') {
+          e.preventDefault()
+          if (e.shiftKey) copyMergedRef.current()
+          else copyRef.current()
+          return
+        }
+        if (e.key === 'v' || e.key === 'V') {
+          e.preventDefault()
+          if (e.shiftKey) pasteInPlaceRef.current()
+          else pasteRef.current()
+          return
+        }
+        // Layer menu merge shortcuts.
+        if (e.key === 'e' || e.key === 'E') {
+          e.preventDefault()
+          if (e.shiftKey) mergeVisibleRef.current()
+          else mergeDownRef.current()
           return
         }
         // Selection shortcuts: Cmd+A all, Cmd+D deselect (snapshots for
@@ -509,6 +554,327 @@ export function ImageEditorPage() {
   const canReselect =
     !hasSelection && (!!state.lastSelection || (state.lastSelectionPath?.length ?? 0) >= 3)
 
+  // ── Edit menu: clipboard + Cut/Copy/Paste + Fill/Stroke ─────────────────
+  //
+  // Clipboard is in-memory, not part of EditorState — Cut/Copy don't push to
+  // history (matches PS — pasting is what creates a history entry). Each
+  // entry carries the original preview-pixel bbox so Paste-in-Place can
+  // land the layer where it came from.
+  const [clipboard, setClipboard] = useState<{ dataUrl: string; bbox: { x: number; y: number; w: number; h: number } } | null>(null)
+  const [fillOpen, setFillOpen] = useState(false)
+  const [strokeOpen, setStrokeOpen] = useState(false)
+
+  /**
+   * Copy a region from the editor onto the in-memory clipboard. When a layer
+   * is selected (other than 'image'), the region is extracted from just that
+   * layer; otherwise the entire composite is sampled. With no selection, the
+   * region defaults to the whole canvas — matching PS.
+   */
+  const copyRegion = useCallback(
+    (mode: 'layer' | 'merged'): { dataUrl: string; bbox: { x: number; y: number; w: number; h: number } } | null => {
+      if (!image) return null
+      const { previewScale, w, h } = previewDimsOf(image, state)
+      const region =
+        regionFromSelection(state) ?? { kind: 'full', dims: { w, h } } as const
+      const canvas =
+        mode === 'merged' || selectedLayerId === 'image'
+          ? renderEditorToCanvas(image, state, imageCache)
+          : renderEditorToCanvas(image, state, imageCache, {
+              layerFilter: (l) => l.id === selectedLayerId,
+              includeImageBackground: false,
+            })
+      return extractRegion(canvas, region, previewScale)
+    },
+    [image, state, selectedLayerId, imageCache],
+  )
+
+  const handleCopy = useCallback(() => {
+    const r = copyRegion('layer')
+    if (!r) {
+      toast.message(t('pages.imageEditor.editMenu.copyEmpty'))
+      return
+    }
+    setClipboard(r)
+    toast.success(t('pages.imageEditor.editMenu.copied'))
+  }, [copyRegion, t])
+
+  const handleCopyMerged = useCallback(() => {
+    const r = copyRegion('merged')
+    if (!r) {
+      toast.message(t('pages.imageEditor.editMenu.copyEmpty'))
+      return
+    }
+    setClipboard(r)
+    toast.success(t('pages.imageEditor.editMenu.copied'))
+  }, [copyRegion, t])
+
+  /**
+   * Cut — Copy, then erase the selection region from the active layer. The
+   * active layer is rasterized first (a brush-shape becomes an image-shape
+   * carrying the pre-erase bitmap), so Cut works uniformly across vector
+   * and pixel layers. Skips the image background (PS treats it as locked).
+   */
+  const handleCut = useCallback(() => {
+    if (!image) return
+    if (!hasSelection) {
+      toast.message(t('pages.imageEditor.editMenu.cutNeedsSelection'))
+      return
+    }
+    if (selectedLayerId === 'image' || !selectedLayerId) {
+      toast.message(t('pages.imageEditor.editMenu.cutNoBackground'))
+      return
+    }
+    const layer = findLayerById(state.layers, selectedLayerId)
+    if (!layer || layer.kind === 'group' || layer.kind === 'mask' || layer.kind === 'adjustment' || layer.kind === 'filter') {
+      toast.message(t('pages.imageEditor.editMenu.cutNotSupported'))
+      return
+    }
+    const r = copyRegion('layer')
+    if (!r) {
+      toast.message(t('pages.imageEditor.editMenu.copyEmpty'))
+      return
+    }
+    setClipboard(r)
+    // Rasterize current layer and erase the selection region from it.
+    const { previewScale, w, h } = previewDimsOf(image, state)
+    const layerCanvas = renderEditorToCanvas(image, state, imageCache, {
+      layerFilter: (l) => l.id === selectedLayerId,
+      includeImageBackground: false,
+    })
+    const eraseCtx = layerCanvas.getContext('2d')
+    if (!eraseCtx) return
+    eraseCtx.globalCompositeOperation = 'destination-out'
+    eraseCtx.fillStyle = '#000'
+    const region = regionFromSelection(state)
+    eraseCtx.beginPath()
+    if (!region) {
+      eraseCtx.rect(0, 0, layerCanvas.width, layerCanvas.height)
+    } else if (region.kind === 'rect') {
+      const rc = region.rect
+      eraseCtx.rect(
+        rc.x / previewScale,
+        rc.y / previewScale,
+        rc.w / previewScale,
+        rc.h / previewScale,
+      )
+    } else {
+      for (let i = 0; i < region.path.length; i++) {
+        const p = region.path[i]
+        const x = p.x / previewScale
+        const y = p.y / previewScale
+        if (i === 0) eraseCtx.moveTo(x, y)
+        else eraseCtx.lineTo(x, y)
+      }
+      eraseCtx.closePath()
+    }
+    eraseCtx.fill()
+    eraseCtx.globalCompositeOperation = 'source-over'
+    let dataUrl: string
+    try {
+      dataUrl = layerCanvas.toDataURL('image/png')
+    } catch {
+      return
+    }
+    const replacement = buildImageShapeLayer({
+      dataUrl,
+      bbox: { x: 0, y: 0, w, h },
+      name: layer.name,
+    })
+    // Carry over visibility / opacity / blend / shadow / clip from the orig.
+    const merged: Layer = {
+      ...replacement,
+      id: layer.id,
+      name: layer.name,
+      visible: layer.visible,
+      opacity: layer.opacity,
+      blend: layer.blend,
+      shadow: layer.shadow,
+      clipRect: layer.clipRect,
+      clipPath: layer.clipPath,
+      clipInverse: layer.clipInverse,
+    }
+    history.set({ ...state, layers: mapLayerById(state.layers, layer.id, () => merged) })
+    toast.success(t('pages.imageEditor.editMenu.cut'))
+  }, [image, hasSelection, selectedLayerId, state, copyRegion, imageCache, history, t])
+
+  const handlePaste = useCallback(() => {
+    if (!image || !clipboard) {
+      toast.message(t('pages.imageEditor.editMenu.pasteEmpty'))
+      return
+    }
+    const { w: previewW, h: previewH } = previewDimsOf(image, state)
+    // Center the pasted region on the preview canvas. Sizes are in preview
+    // pixels (the same space shape coords live in).
+    const bbox = {
+      x: (previewW - clipboard.bbox.w) / 2,
+      y: (previewH - clipboard.bbox.h) / 2,
+      w: clipboard.bbox.w,
+      h: clipboard.bbox.h,
+    }
+    const layer = buildImageShapeLayer({
+      dataUrl: clipboard.dataUrl,
+      bbox,
+      name: t('pages.imageEditor.annoLabel.paste'),
+    })
+    commitLayer(layer)
+    toast.success(t('pages.imageEditor.editMenu.pasted'))
+  }, [image, clipboard, state, commitLayer, t])
+
+  const handlePasteInPlace = useCallback(() => {
+    if (!image || !clipboard) {
+      toast.message(t('pages.imageEditor.editMenu.pasteEmpty'))
+      return
+    }
+    const layer = buildImageShapeLayer({
+      dataUrl: clipboard.dataUrl,
+      bbox: clipboard.bbox,
+      name: t('pages.imageEditor.annoLabel.paste'),
+    })
+    commitLayer(layer)
+    toast.success(t('pages.imageEditor.editMenu.pasted'))
+  }, [image, clipboard, commitLayer, t])
+
+  const handleFillApply = useCallback(
+    (args: { color: string; opacity: number; blend: import('@/lib/image-editor/types').BlendMode }) => {
+      if (!image) return
+      const layer = fillSelection({
+        image,
+        state,
+        color: args.color,
+        opacity: args.opacity,
+        blend: args.blend,
+        name: t('pages.imageEditor.annoLabel.fill'),
+      })
+      if (!layer) return
+      commitLayer(layer)
+      setFillOpen(false)
+    },
+    [image, state, commitLayer, t],
+  )
+
+  const handleStrokeApply = useCallback(
+    (args: { color: string; width: number; position: StrokePosition }) => {
+      if (!image) return
+      const layer = strokeSelection({
+        image,
+        state,
+        color: args.color,
+        width: args.width,
+        position: args.position,
+        name: t('pages.imageEditor.annoLabel.stroke'),
+      })
+      if (!layer) return
+      commitLayer(layer)
+      setStrokeOpen(false)
+    },
+    [image, state, commitLayer, t],
+  )
+
+  // ── Layer menu: Merge Down / Merge Visible / Flatten Image ──────────────
+  //
+  // All three reduce to "composite some subset of layers into one image-
+  // shape annotation and remove the originals". Flatten goes further by
+  // re-binding the underlying image to the result, clearing transforms /
+  // adjust / crop / layers — effectively re-baselining the project.
+  const handleMergeDown = useCallback(() => {
+    if (!image) return
+    if (!selectedLayerId || selectedLayerId === 'image') return
+    const path = findLayerPath(state.layers, selectedLayerId)
+    if (!path) return
+    const parentPath = path.slice(0, -1)
+    const idx = path[path.length - 1]
+    if (idx === 0) {
+      toast.message(t('pages.imageEditor.layerMenu.mergeDownNoBelow'))
+      return
+    }
+    // Sibling at idx-1 inside the selected layer's actual parent — must use
+    // getLayerAtPath(parentPath) for nested groups (state.layers[parentPath[0]]
+    // would skip down only one level and return the grandparent for paths
+    // 3+ deep).
+    const siblings: Layer[] =
+      parentPath.length === 0
+        ? state.layers
+        : (() => {
+            const parent = getLayerAtPath(state.layers, parentPath)
+            return parent && isGroup(parent) ? parent.children : []
+          })()
+    const belowId = siblings[idx - 1]?.id
+    if (!belowId) return
+    const ids = new Set<string>([selectedLayerId, belowId])
+    const merged = mergeLayersToImageLayer({
+      image,
+      state,
+      imageCache,
+      pred: (l) => ids.has(l.id),
+      name: t('pages.imageEditor.annoLabel.merged'),
+    })
+    if (!merged) return
+    // Remove both originals, insert merged at the lower position.
+    let layers = removeLayerById(state.layers, selectedLayerId)
+    layers = removeLayerById(layers, belowId)
+    const newPath = [...parentPath, idx - 1]
+    layers = insertAtPath(layers, newPath, merged)
+    history.set({ ...state, layers })
+    setSelectedLayerId(merged.id)
+    toast.success(t('pages.imageEditor.layerMenu.mergedDown'))
+  }, [image, selectedLayerId, state, imageCache, history, t])
+
+  const handleMergeVisible = useCallback(() => {
+    if (!image) return
+    const visibleIds = new Set<string>()
+    const collectVisible = (layers: Layer[]) => {
+      for (const l of layers) {
+        if (!l.visible) continue
+        if (l.kind === 'group') {
+          collectVisible(l.children)
+        }
+        visibleIds.add(l.id)
+      }
+    }
+    collectVisible(state.layers)
+    if (visibleIds.size === 0) {
+      toast.message(t('pages.imageEditor.layerMenu.mergeVisibleNone'))
+      return
+    }
+    const merged = mergeLayersToImageLayer({
+      image,
+      state,
+      imageCache,
+      pred: (l) => visibleIds.has(l.id),
+      name: t('pages.imageEditor.annoLabel.merged'),
+    })
+    if (!merged) return
+    // Remove all visible layers, append merged at the top of the top-level
+    // stack. Hidden layers are preserved in place.
+    let layers = state.layers
+    for (const id of visibleIds) {
+      layers = removeLayerById(layers, id)
+    }
+    layers = [...layers, merged]
+    history.set({ ...state, layers })
+    setSelectedLayerId(merged.id)
+    toast.success(t('pages.imageEditor.layerMenu.mergedVisible'))
+  }, [image, state, imageCache, history, t])
+
+  const handleFlatten = useCallback(async () => {
+    if (!image) return
+    const dataUrl = flattenToDataUrl(image, state, imageCache)
+    if (!dataUrl) return
+    try {
+      const img = await loadImageFromUrl(dataUrl)
+      setImage(img)
+      // Reset everything that no longer makes sense after a flatten — layers
+      // are baked in, transforms / adjust are zeroed, crop / selection
+      // cleared. History is wiped via `reset` so undo can't accidentally
+      // resurrect the pre-flatten layers with the new bitmap baseline.
+      history.reset(initialState())
+      setSelectedLayerId('image')
+      toast.success(t('pages.imageEditor.layerMenu.flattened'))
+    } catch {
+      toast.error(t('pages.imageEditor.errLoadFailed'))
+    }
+  }, [image, state, imageCache, history, t])
+
   useEffect(() => {
     duplicateRef.current = () => {
       if (!selectedLayerId || selectedLayerId === 'image') return
@@ -543,6 +909,13 @@ export function ImageEditorPage() {
     deselectRef.current = handleDeselect
     reselectRef.current = handleReselect
     inverseSelectionRef.current = handleInverse
+    cutRef.current = handleCut
+    copyRef.current = handleCopy
+    copyMergedRef.current = handleCopyMerged
+    pasteRef.current = handlePaste
+    pasteInPlaceRef.current = handlePasteInPlace
+    mergeDownRef.current = handleMergeDown
+    mergeVisibleRef.current = handleMergeVisible
   })
 
   // ── Crop ─────────────────────────────────────────────────────────────────
@@ -1122,6 +1495,17 @@ export function ImageEditorPage() {
             canDeselect: hasSelection,
             canReselect,
             canModifySelection: hasSelection,
+            cut: handleCut,
+            copy: handleCopy,
+            copyMerged: handleCopyMerged,
+            paste: handlePaste,
+            pasteInPlace: handlePasteInPlace,
+            fill: () => setFillOpen(true),
+            stroke: () => setStrokeOpen(true),
+            canPaste: !!clipboard,
+            mergeDown: handleMergeDown,
+            mergeVisible: handleMergeVisible,
+            flatten: handleFlatten,
             zoomIn,
             zoomOut,
             zoomFit: zoomReset,
@@ -1279,6 +1663,19 @@ export function ImageEditorPage() {
         open={selectModifyOp}
         onApply={handleSelectModifyApply}
         onCancel={() => setSelectModifyOp(null)}
+      />
+      <FillDialog
+        open={fillOpen}
+        fgColor={colors.fg}
+        bgColor={colors.bg}
+        onApply={handleFillApply}
+        onCancel={() => setFillOpen(false)}
+      />
+      <StrokeDialog
+        open={strokeOpen}
+        fgColor={colors.fg}
+        onApply={handleStrokeApply}
+        onCancel={() => setStrokeOpen(false)}
       />
     </div>
   )

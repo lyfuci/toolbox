@@ -62,6 +62,17 @@ type Props = {
     canDeselect?: boolean
     canReselect?: boolean
     canModifySelection?: boolean
+    cut?: () => void
+    copy?: () => void
+    copyMerged?: () => void
+    paste?: () => void
+    pasteInPlace?: () => void
+    fill?: () => void
+    stroke?: () => void
+    canPaste?: boolean
+    mergeDown?: () => void
+    mergeVisible?: () => void
+    flatten?: () => void
     zoomIn?: () => void
     zoomOut?: () => void
     zoomFit?: () => void
@@ -123,6 +134,55 @@ export function MenuBar({ handlers }: Props) {
             shortcut: '⇧⌘Z',
             onClick: handlers.redo,
             disabled: !handlers.canRedo,
+          },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'cut',
+            label: t('pages.imageEditor.menu.cut'),
+            shortcut: '⌘X',
+            onClick: handlers.cut,
+          },
+          {
+            id: 'copy',
+            label: t('pages.imageEditor.menu.copy'),
+            shortcut: '⌘C',
+            onClick: handlers.copy,
+          },
+          {
+            id: 'copyMerged',
+            label: t('pages.imageEditor.menu.copyMerged'),
+            shortcut: '⇧⌘C',
+            onClick: handlers.copyMerged,
+          },
+          {
+            id: 'paste',
+            label: t('pages.imageEditor.menu.paste'),
+            shortcut: '⌘V',
+            onClick: handlers.paste,
+            disabled: !handlers.canPaste,
+          },
+          {
+            id: 'pasteInPlace',
+            label: t('pages.imageEditor.menu.pasteInPlace'),
+            shortcut: '⇧⌘V',
+            onClick: handlers.pasteInPlace,
+            disabled: !handlers.canPaste,
+          },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'fill',
+            label: t('pages.imageEditor.menu.fill') + '…',
+            shortcut: '⇧F5',
+            onClick: handlers.fill,
+          },
+          {
+            id: 'stroke',
+            label: t('pages.imageEditor.menu.stroke') + '…',
+            onClick: handlers.stroke,
           },
         ],
       ],
@@ -360,6 +420,26 @@ export function MenuBar({ handlers }: Props) {
             shortcut: '⇧⌘G',
             onClick: handlers.ungroupSelected,
             disabled: !handlers.canUngroupSelected,
+          },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'mergeDown',
+            label: t('pages.imageEditor.menu.mergeDown'),
+            shortcut: '⌘E',
+            onClick: handlers.mergeDown,
+          },
+          {
+            id: 'mergeVisible',
+            label: t('pages.imageEditor.menu.mergeVisible'),
+            shortcut: '⇧⌘E',
+            onClick: handlers.mergeVisible,
+          },
+          {
+            id: 'flatten',
+            label: t('pages.imageEditor.menu.flatten'),
+            onClick: handlers.flatten,
           },
         ],
       ],

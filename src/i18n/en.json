@@ -557,6 +557,16 @@
         "newGroup": "New Group…",
         "groupLayers": "Group Layer",
         "ungroupLayers": "Ungroup Layer",
+        "mergeDown": "Merge Down",
+        "mergeVisible": "Merge Visible",
+        "flatten": "Flatten Image",
+        "cut": "Cut",
+        "copy": "Copy",
+        "copyMerged": "Copy Merged",
+        "paste": "Paste",
+        "pasteInPlace": "Paste in Place",
+        "fill": "Fill",
+        "stroke": "Stroke",
         "zoomIn": "Zoom In",
         "zoomOut": "Zoom Out",
         "zoomFit": "Fit on Screen",
@@ -570,6 +580,40 @@
         "expand": "Expand Selection",
         "contract": "Contract Selection",
         "amountPx": "Amount (px)"
+      },
+      "editMenu": {
+        "copied": "Copied to clipboard",
+        "copyEmpty": "Nothing to copy",
+        "cut": "Cut to clipboard",
+        "cutNeedsSelection": "Cut needs an active selection",
+        "cutNoBackground": "Can't cut from background — duplicate the layer first",
+        "cutNotSupported": "Cut isn't supported on this layer type",
+        "pasted": "Pasted",
+        "pasteEmpty": "Clipboard is empty"
+      },
+      "fillDialog": {
+        "contents": "Contents",
+        "fg": "Foreground",
+        "bg": "Background",
+        "black": "Black",
+        "white": "White",
+        "gray50": "50% Gray",
+        "custom": "Custom"
+      },
+      "strokeDialog": {
+        "color": "Color",
+        "width": "Width",
+        "position": "Position",
+        "inside": "Inside",
+        "center": "Center",
+        "outside": "Outside"
+      },
+      "layerMenu": {
+        "mergeDownNoBelow": "Nothing below this layer to merge with",
+        "mergedDown": "Merged down",
+        "mergeVisibleNone": "No visible layers to merge",
+        "mergedVisible": "Visible layers merged",
+        "flattened": "Image flattened"
       },
       "panelLayers": "Layers",
       "panelChannels": "Channels",
@@ -680,7 +724,11 @@
         "note": "Note",
         "frame": "Frame",
         "path": "Path",
-        "group": "Group"
+        "group": "Group",
+        "paste": "Pasted",
+        "fill": "Fill",
+        "stroke": "Stroke",
+        "merged": "Merged"
       },
       "layers": {
         "expand": "Expand group",
