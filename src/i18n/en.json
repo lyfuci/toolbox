@@ -676,7 +676,8 @@
         "expand": "Expand group",
         "collapse": "Collapse group",
         "dropInto": "Drop into group",
-        "dropOutside": "Drop here to move out of group"
+        "dropOutside": "Drop here to move out of group",
+        "resizeHandle": "Drag to resize Layers panel"
       },
       "project": "Project",
       "projectSave": "Save project (.json)",

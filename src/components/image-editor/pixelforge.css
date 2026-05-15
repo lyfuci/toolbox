@@ -377,6 +377,29 @@
   flex-direction: column;
   border-bottom: 2px solid var(--pf-bg-0);
   flex-shrink: 0;
+  /* When a fixed pixel height is applied inline (Layers section), the body
+     stretches and scrolls internally — the tabs header stays at its natural
+     min-height. */
+  min-height: 0;
+}
+/* Scrollable panel body — used by panels (Layers) that need to scroll internally
+   when content overflows. Pairs with `flex: 1` so the body fills the remainder
+   of a fixed-height panel group. */
+.pf-panel-group .pf-scroll-y {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* Drag handle between resizable panel groups. Visually a thin divider; the
+   cursor changes to ns-resize on hover so the affordance is obvious. */
+.pf-resize-handle {
+  height: 4px;
+  background: var(--pf-bg-0);
+  cursor: ns-resize;
+  flex-shrink: 0;
+}
+.pf-resize-handle:hover {
+  background: var(--pf-accent, #3b82f6);
 }
 .pf-panel-group:last-child {
   border-bottom: 0;
