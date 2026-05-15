@@ -222,6 +222,12 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
     } else {
       drawMarqueeChrome(ctx, state.selection, cropOriginX, cropOriginY, annoScale)
     }
+    // Inverse selection: add an outer dashed rect along the canvas border, so
+    // the user can see the marquee + outer pair (PS shows the same — ants on
+    // both rings tell you the selection is inverted).
+    if (state.selectionInverse) {
+      drawCanvasMarqueeChrome(ctx, annoScale)
+    }
   }
 }
 
@@ -366,6 +372,26 @@ function drawSelectionPathChrome(
   ctx.setLineDash([4 * scale, 3 * scale])
   trace()
   ctx.stroke()
+  ctx.setLineDash([])
+  ctx.restore()
+}
+
+/**
+ * Outer-ring marching ants traced along the canvas edge — drawn on top of
+ * the inner selection chrome when `selectionInverse` is set, so the user
+ * sees both rings (matching PS's visual cue for an inverted selection).
+ */
+function drawCanvasMarqueeChrome(ctx: CanvasRenderingContext2D, scale: number) {
+  const w = ctx.canvas.width
+  const h = ctx.canvas.height
+  ctx.save()
+  ctx.strokeStyle = '#000000'
+  ctx.lineWidth = Math.max(1, scale)
+  ctx.setLineDash([])
+  ctx.strokeRect(0.5, 0.5, w - 1, h - 1)
+  ctx.strokeStyle = '#ffffff'
+  ctx.setLineDash([4 * scale, 3 * scale])
+  ctx.strokeRect(0.5, 0.5, w - 1, h - 1)
   ctx.setLineDash([])
   ctx.restore()
 }
@@ -521,26 +547,35 @@ function applyMask(
  */
 function applyLayerClip(
   ctx: CanvasRenderingContext2D,
-  layer: { clipRect?: Rect; clipPath?: Point[] },
+  layer: { clipRect?: Rect; clipPath?: Point[]; clipInverse?: boolean },
   scale: number,
 ) {
+  const inverse = !!layer.clipInverse
   const path = layer.clipPath
   if (path && path.length >= 3) {
     ctx.beginPath()
+    if (inverse) {
+      // Outer ring covers the entire canvas in target pixels; combined with
+      // the inner path via even-odd fill, the inner ring punches a hole.
+      ctx.rect(0, 0, ctx.canvas.width, ctx.canvas.height)
+    }
     ctx.moveTo(path[0].x * scale, path[0].y * scale)
     for (let i = 1; i < path.length; i++) {
       ctx.lineTo(path[i].x * scale, path[i].y * scale)
     }
     ctx.closePath()
-    ctx.clip()
+    ctx.clip(inverse ? 'evenodd' : 'nonzero')
     return
   }
   const r = layer.clipRect
   if (r && r.w !== 0 && r.h !== 0) {
     const nr = normalizeRect(r)
     ctx.beginPath()
+    if (inverse) {
+      ctx.rect(0, 0, ctx.canvas.width, ctx.canvas.height)
+    }
     ctx.rect(nr.x * scale, nr.y * scale, nr.w * scale, nr.h * scale)
-    ctx.clip()
+    ctx.clip(inverse ? 'evenodd' : 'nonzero')
   }
 }
 

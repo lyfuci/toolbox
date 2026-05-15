@@ -56,20 +56,31 @@ function translatedClipFields(
 
 /**
  * Bake the active selection (if any) onto a freshly-committed layer as a
- * `clipRect`/`clipPath`. Selections with zero area are ignored — drawing into
- * an invisible clip would leave the user with mysteriously absent pixels.
+ * `clipRect`/`clipPath` (+ `clipInverse` when state.selectionInverse is set).
+ * Selections with zero area are ignored — drawing into an invisible clip
+ * would leave the user with mysteriously absent pixels.
  *
  * Once baked, the clip travels with the layer through undo/redo + project
  * save, and `translateLayer` keeps it aligned with the layer's geometry.
+ *
+ * Inverted selections: `clipInverse: true` flows through; the renderer pairs
+ * the stored ring with an outer canvas-rect under evenodd fill at draw time.
+ * No selection at all + inverse=true means "the whole canvas is selected"
+ * (PS semantics), so the layer is returned with no clip.
  */
 export function withSelectionClip(layer: Layer, state: EditorState): Layer {
+  const inverse = !!state.selectionInverse
   const path = state.selectionPath
   if (path && path.length >= 3) {
-    return { ...layer, clipPath: path.map((p) => ({ x: p.x, y: p.y })) }
+    return {
+      ...layer,
+      clipPath: path.map((p) => ({ x: p.x, y: p.y })),
+      clipInverse: inverse || undefined,
+    }
   }
   const sel = state.selection
   if (sel && sel.w !== 0 && sel.h !== 0) {
-    return { ...layer, clipRect: { ...sel } }
+    return { ...layer, clipRect: { ...sel }, clipInverse: inverse || undefined }
   }
   return layer
 }

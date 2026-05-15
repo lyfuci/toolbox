@@ -53,6 +53,15 @@ type Props = {
     ungroupSelected?: () => void
     canGroupSelected?: boolean
     canUngroupSelected?: boolean
+    selectAll?: () => void
+    deselect?: () => void
+    reselect?: () => void
+    inverseSelection?: () => void
+    selectExpand?: () => void
+    selectContract?: () => void
+    canDeselect?: boolean
+    canReselect?: boolean
+    canModifySelection?: boolean
     zoomIn?: () => void
     zoomOut?: () => void
     zoomFit?: () => void
@@ -189,6 +198,55 @@ export function MenuBar({ handlers }: Props) {
             id: 'adj-threshold',
             label: t('pages.imageEditor.adjustments.threshold') + '…',
             onClick: () => handlers.openAdjustment?.('threshold'),
+          },
+        ],
+      ],
+    },
+    {
+      id: 'select',
+      label: t('pages.imageEditor.menu.select'),
+      sections: [
+        [
+          {
+            id: 'selAll',
+            label: t('pages.imageEditor.selectMenu.all'),
+            shortcut: '⌘A',
+            onClick: handlers.selectAll,
+          },
+          {
+            id: 'selDeselect',
+            label: t('pages.imageEditor.selectMenu.deselect'),
+            shortcut: '⌘D',
+            onClick: handlers.deselect,
+            disabled: !handlers.canDeselect,
+          },
+          {
+            id: 'selReselect',
+            label: t('pages.imageEditor.selectMenu.reselect'),
+            shortcut: '⇧⌘D',
+            onClick: handlers.reselect,
+            disabled: !handlers.canReselect,
+          },
+          {
+            id: 'selInverse',
+            label: t('pages.imageEditor.selectMenu.inverse'),
+            shortcut: '⇧⌘I',
+            onClick: handlers.inverseSelection,
+          },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'selExpand',
+            label: t('pages.imageEditor.selectMenu.expand') + '…',
+            onClick: handlers.selectExpand,
+            disabled: !handlers.canModifySelection,
+          },
+          {
+            id: 'selContract',
+            label: t('pages.imageEditor.selectMenu.contract') + '…',
+            onClick: handlers.selectContract,
+            disabled: !handlers.canModifySelection,
           },
         ],
       ],

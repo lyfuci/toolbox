@@ -537,6 +537,7 @@
         "file": "文件",
         "edit": "编辑",
         "image": "图像",
+        "select": "选择",
         "filter": "滤镜",
         "layer": "图层",
         "view": "视图",
@@ -560,6 +561,15 @@
         "zoomOut": "缩小",
         "zoomFit": "适合屏幕",
         "toggleFocus": "切换焦点模式"
+      },
+      "selectMenu": {
+        "all": "全部",
+        "deselect": "取消选择",
+        "reselect": "重新选择",
+        "inverse": "反向",
+        "expand": "扩展选区",
+        "contract": "收缩选区",
+        "amountPx": "数量（像素）"
       },
       "panelLayers": "图层",
       "panelChannels": "通道",

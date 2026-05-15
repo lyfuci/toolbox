@@ -289,6 +289,13 @@ type LayerCommon = {
    */
   clipRect?: Rect
   clipPath?: Point[]
+  /**
+   * When true, the clip region above is INVERTED — the renderer draws the
+   * outer canvas rect together with the clip ring under the evenodd fill
+   * rule, so paint lands everywhere *except* the original selection. Baked
+   * from `EditorState.selectionInverse` at commit time.
+   */
+  clipInverse?: boolean
 }
 
 export type ImageLayerProps = LayerCommon & { kind: 'image' }
@@ -534,6 +541,22 @@ export type EditorState = {
    */
   selection?: Rect
   selectionPath?: Point[]
+  /**
+   * Selection inversion flag (PS Select > Inverse). When true, the active
+   * selection is the *complement* of `selection`/`selectionPath` within the
+   * canvas. Renderer's marching-ants chrome adds an outer canvas-rect outline
+   * when set; `withSelectionClip` bakes this onto committed layers so a
+   * subsequent paint stroke lands outside the original region.
+   */
+  selectionInverse?: boolean
+  /**
+   * Snapshot of the previous selection state, captured each time `selection`
+   * transitions from set→cleared (PS Select > Deselect). The Reselect action
+   * restores all three fields atomically.
+   */
+  lastSelection?: Rect
+  lastSelectionPath?: Point[]
+  lastSelectionInverse?: boolean
   /**
    * Optional crop region. Stored in the same coordinate space shape coords use
    * (post-rotation preview-canvas pixels), so it's applied after transforms.
