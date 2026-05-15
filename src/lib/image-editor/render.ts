@@ -9,6 +9,7 @@ import type {
   BlendMode,
   EditorState,
   FilterLayer,
+  GroupLayer,
   Layer,
   MaskLayer,
   Point,
@@ -181,58 +182,18 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
   const shiftForCrop = (layer: Layer): Layer =>
     state.cropRect ? translateLayer(layer, -cropOriginX, -cropOriginY) : layer
 
+  const renderCtx: PerLayerCtx = {
+    annoScale,
+    liveCanvas: !!input.liveCanvas,
+    imageCache: input.imageCache,
+  }
   for (const layer of state.layers) {
-    if (!layer.visible) continue
-    // Notes are UI-only annotations — never bake into export.
-    if (
-      !input.liveCanvas &&
-      layer.kind === 'annotation' &&
-      layer.shape.kind === 'note'
-    ) {
-      continue
-    }
-    const l = shiftForCrop(layer)
-    if (l.kind === 'annotation') {
-      ctx.save()
-      ctx.globalAlpha = l.opacity / 100
-      ctx.globalCompositeOperation = blendModeToOp(l.blend)
-      applyShadow(ctx, l.shadow, annoScale)
-      applyLayerClip(ctx, l, annoScale)
-      // Mosaic + Blur both sample the underlying composite — snapshot first
-      // so they read pre-shape pixels rather than their own output.
-      const needsUnderlying = l.shape.kind === 'mosaic' || l.shape.kind === 'blur'
-      const underlying = needsUnderlying ? snapshotCanvas(canvas) : canvas
-      drawShape(ctx, l.shape, annoScale, underlying, input.imageCache)
-      ctx.restore()
-    } else if (l.kind === 'mask') {
-      applyMask(ctx, l, annoScale, w, h)
-    } else if (l.kind === 'adjustment') {
-      applyAdjustmentLayer(canvas, ctx, l, annoScale)
-    } else if (l.kind === 'filter') {
-      applyFilterLayer(canvas, ctx, l, annoScale)
-    }
+    renderLayer(canvas, ctx, shiftForCrop(layer), renderCtx)
   }
 
   // In-progress preview (a layer not yet committed to state.layers).
   if (drawingPreview) {
-    const layer = shiftForCrop(drawingPreview.layer)
-    if (layer.kind === 'annotation') {
-      ctx.save()
-      ctx.globalAlpha = layer.opacity / 100
-      ctx.globalCompositeOperation = blendModeToOp(layer.blend)
-      applyShadow(ctx, layer.shadow, annoScale)
-      applyLayerClip(ctx, layer, annoScale)
-      const needsUnderlying = layer.shape.kind === 'mosaic' || layer.shape.kind === 'blur'
-      const underlying = needsUnderlying ? snapshotCanvas(canvas) : canvas
-      drawShape(ctx, layer.shape, annoScale, underlying, input.imageCache)
-      ctx.restore()
-    } else if (layer.kind === 'mask') {
-      applyMask(ctx, layer, annoScale, w, h)
-    } else if (layer.kind === 'adjustment') {
-      applyAdjustmentLayer(canvas, ctx, layer, annoScale)
-    } else if (layer.kind === 'filter') {
-      applyFilterLayer(canvas, ctx, layer, annoScale)
-    }
+    renderLayer(canvas, ctx, shiftForCrop(drawingPreview.layer), renderCtx)
   }
 
   // Drag-paint overlay — sits above committed layers + drawingPreview, below
@@ -262,6 +223,109 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
       drawMarqueeChrome(ctx, state.selection, cropOriginX, cropOriginY, annoScale)
     }
   }
+}
+
+/**
+ * Per-layer rendering parameters shared across recursive calls. Holds anything
+ * that doesn't change between the top-level loop and any group's offscreen
+ * pass — the scale, the live-canvas flag (gates UI-only chrome like notes),
+ * and the image-cache for image shapes.
+ */
+type PerLayerCtx = {
+  annoScale: number
+  liveCanvas: boolean
+  imageCache: ImageCache | undefined
+}
+
+/**
+ * Render a single layer onto `ctx` (which is the context for `canvas`). Used
+ * for both committed layers and the in-progress drawing preview, and re-
+ * invoked recursively for group children. Coordinates on `layer` are assumed
+ * to already be crop-shifted by the caller.
+ *
+ * Group layers render in two steps: first all children composite onto an
+ * offscreen canvas the same size as `canvas`, then that offscreen blits onto
+ * `canvas` honoring the group's own opacity, blend, and clip. This gives PS-
+ * "normal mode" semantics — adjustment / filter layers inside a group only
+ * affect the group's contents, not the world below it.
+ */
+function renderLayer(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  layer: Layer,
+  rc: PerLayerCtx,
+): void {
+  if (!layer.visible) return
+  // Notes are UI-only annotations — never bake into export.
+  if (
+    !rc.liveCanvas &&
+    layer.kind === 'annotation' &&
+    layer.shape.kind === 'note'
+  ) {
+    return
+  }
+  if (layer.kind === 'annotation') {
+    ctx.save()
+    ctx.globalAlpha = layer.opacity / 100
+    ctx.globalCompositeOperation = blendModeToOp(layer.blend)
+    applyShadow(ctx, layer.shadow, rc.annoScale)
+    applyLayerClip(ctx, layer, rc.annoScale)
+    // Mosaic + Blur both sample the underlying composite — snapshot first
+    // so they read pre-shape pixels rather than their own output.
+    const needsUnderlying = layer.shape.kind === 'mosaic' || layer.shape.kind === 'blur'
+    const underlying = needsUnderlying ? snapshotCanvas(canvas) : canvas
+    drawShape(ctx, layer.shape, rc.annoScale, underlying, rc.imageCache)
+    ctx.restore()
+    return
+  }
+  if (layer.kind === 'mask') {
+    applyMask(ctx, layer, rc.annoScale, canvas.width, canvas.height)
+    return
+  }
+  if (layer.kind === 'adjustment') {
+    applyAdjustmentLayer(canvas, ctx, layer, rc.annoScale)
+    return
+  }
+  if (layer.kind === 'filter') {
+    applyFilterLayer(canvas, ctx, layer, rc.annoScale)
+    return
+  }
+  if (layer.kind === 'group') {
+    renderGroupLayer(canvas, ctx, layer, rc)
+    return
+  }
+}
+
+/**
+ * Render a group: composite children to an offscreen canvas, then drawImage
+ * that offscreen onto the destination with the group's own opacity / blend /
+ * clip. Children read pixel data via `snapshotCanvas(offscreen)` (mosaic /
+ * blur) and `getImageData(offscreen)` (adjustment / filter), so they only
+ * see other layers within the same group — "normal mode" group semantics.
+ */
+function renderGroupLayer(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  layer: GroupLayer,
+  rc: PerLayerCtx,
+): void {
+  if (canvas.width < 1 || canvas.height < 1) return
+  const offscreen = document.createElement('canvas')
+  offscreen.width = canvas.width
+  offscreen.height = canvas.height
+  const octx = offscreen.getContext('2d')
+  if (!octx) return
+  for (const child of layer.children) {
+    renderLayer(offscreen, octx, child, rc)
+  }
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.globalAlpha = layer.opacity / 100
+  ctx.globalCompositeOperation = blendModeToOp(layer.blend)
+  applyShadow(ctx, layer.shadow, rc.annoScale)
+  applyLayerClip(ctx, layer, rc.annoScale)
+  ctx.drawImage(offscreen, 0, 0)
+  ctx.restore()
 }
 
 /**

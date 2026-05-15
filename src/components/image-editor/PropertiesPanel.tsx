@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Label } from '@/components/ui/label'
 import { Slider } from './Slider'
+import { findLayerById } from '@/lib/image-editor/layer-tree'
 import {
   BLEND_MODES,
   type BlendMode,
@@ -36,10 +37,10 @@ export function PropertiesPanel({
   patchImageLayer,
 }: Props) {
   const { t } = useTranslation()
-  const selected: Layer | EditorState['imageLayer'] | undefined =
+  const selected: Layer | EditorState['imageLayer'] | null =
     selectedId === 'image'
       ? state.imageLayer
-      : state.layers.find((l) => l.id === selectedId)
+      : findLayerById(state.layers, selectedId)
 
   if (!selected) {
     return (

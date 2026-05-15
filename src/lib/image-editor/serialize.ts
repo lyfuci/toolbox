@@ -1,5 +1,5 @@
 import { initialState, PROJECT_TAG, PROJECT_VERSION } from './defaults'
-import type { EditorState, Project } from './types'
+import type { EditorState, Layer, Project } from './types'
 
 export function serializeProject(args: {
   image: HTMLImageElement
@@ -42,7 +42,9 @@ export function parseProject(text: string): Project {
     source: { name: obj.source.name ?? 'image.png', dataUrl: obj.source.dataUrl },
     state: {
       imageLayer: { ...fallback.imageLayer, ...obj.state.imageLayer },
-      layers: Array.isArray(obj.state.layers) ? obj.state.layers : [],
+      layers: normalizeLayerTree(
+        Array.isArray(obj.state.layers) ? obj.state.layers : [],
+      ),
       transforms: { ...fallback.transforms, ...obj.state.transforms },
       adjust: { ...fallback.adjust, ...obj.state.adjust },
       cropRect: obj.state.cropRect,
@@ -50,6 +52,26 @@ export function parseProject(text: string): Project {
       selectionPath: obj.state.selectionPath,
     },
   }
+}
+
+/**
+ * Walk a parsed-from-JSON layer array and fill defaults for any GroupLayer
+ * that's missing fields the renderer expects. Pre-group projects have no
+ * groups so this is a no-op for them; this is here so future schema additions
+ * inside `GroupLayer` can be defaulted without bumping `PROJECT_VERSION`.
+ */
+function normalizeLayerTree(layers: unknown[]): Layer[] {
+  return layers.map((raw) => {
+    const l = raw as Layer & { children?: unknown; expanded?: unknown }
+    if (l.kind === 'group') {
+      const children = Array.isArray(l.children)
+        ? normalizeLayerTree(l.children as unknown[])
+        : []
+      const expanded = typeof l.expanded === 'boolean' ? l.expanded : true
+      return { ...l, children, expanded }
+    }
+    return l
+  })
 }
 
 export function loadImageFromUrl(url: string): Promise<HTMLImageElement> {

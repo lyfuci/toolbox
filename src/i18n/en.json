@@ -553,6 +553,9 @@
         "flipV": "Flip Vertical",
         "duplicateLayer": "Duplicate Layer",
         "deleteLayer": "Delete Layer",
+        "newGroup": "New Group…",
+        "groupLayers": "Group Layer",
+        "ungroupLayers": "Ungroup Layer",
         "zoomIn": "Zoom In",
         "zoomOut": "Zoom Out",
         "zoomFit": "Fit on Screen",
@@ -631,7 +634,6 @@
       "brushOpacity": "Opacity",
       "format": "Format",
       "quality": "Quality",
-      "layers": "Layers",
       "layerImage": "Image (background)",
       "layerProps": "Layer properties",
       "opacity": "Opacity",
@@ -667,7 +669,14 @@
         "burn": "Burn stroke",
         "note": "Note",
         "frame": "Frame",
-        "path": "Path"
+        "path": "Path",
+        "group": "Group"
+      },
+      "layers": {
+        "expand": "Expand group",
+        "collapse": "Collapse group",
+        "dropInto": "Drop into group",
+        "dropOutside": "Drop here to move out of group"
       },
       "project": "Project",
       "projectSave": "Save project (.json)",
