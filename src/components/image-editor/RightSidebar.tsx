@@ -1,9 +1,13 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AdjustPanel } from './AdjustPanel'
 import { LayersPanel } from './LayersPanel'
 import { PropertiesPanel } from './PropertiesPanel'
 import type { Adjustments, EditorState, Layer, Transforms } from '@/lib/image-editor/types'
+
+const LAYERS_HEIGHT_KEY = 'pf-layers-h'
+const LAYERS_HEIGHT_DEFAULT = 320
+const LAYERS_HEIGHT_MIN = 120
 
 type Props = {
   state: EditorState
@@ -43,6 +47,42 @@ export function RightSidebar({
   const [g2, setG2] = useState<'properties' | 'info'>('properties')
   const [g3, setG3] = useState<'adjustments' | 'navigator'>('adjustments')
 
+  // Layers section height — fixed by default, drag-resizable via the handle
+  // below the panel. Persisted in localStorage so layout sticks across reloads.
+  // The panel body inside scrolls when its content overflows this height —
+  // important for layer groups, which can otherwise push the rest of the
+  // right sidebar offscreen.
+  const [layersHeight, setLayersHeight] = useState<number>(() => {
+    if (typeof window === 'undefined') return LAYERS_HEIGHT_DEFAULT
+    const v = Number(window.localStorage.getItem(LAYERS_HEIGHT_KEY))
+    return Number.isFinite(v) && v >= LAYERS_HEIGHT_MIN ? v : LAYERS_HEIGHT_DEFAULT
+  })
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(LAYERS_HEIGHT_KEY, String(layersHeight))
+  }, [layersHeight])
+
+  const startLayersResize = (e: ReactMouseEvent) => {
+    e.preventDefault()
+    const startY = e.clientY
+    const startH = layersHeight
+    const onMove = (ev: MouseEvent) => {
+      const maxH = Math.max(LAYERS_HEIGHT_MIN + 100, window.innerHeight * 0.75)
+      const next = Math.max(LAYERS_HEIGHT_MIN, Math.min(maxH, startH + (ev.clientY - startY)))
+      setLayersHeight(next)
+    }
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    document.body.style.cursor = 'ns-resize'
+    document.body.style.userSelect = 'none'
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
   return (
     <aside className="pf-right">
       <PanelGroup
@@ -53,9 +93,10 @@ export function RightSidebar({
         ]}
         active={g1}
         setActive={(id) => setG1(id as typeof g1)}
+        fixedHeight={layersHeight}
       >
         {g1 === 'layers' && (
-          <div className="pf-panel-body" style={{ padding: 0 }}>
+          <div className="pf-panel-body pf-scroll-y" style={{ padding: 0 }}>
             <LayersPanel
               state={state}
               selectedId={selectedId}
@@ -70,6 +111,12 @@ export function RightSidebar({
         {g1 === 'channels' && <StubPanel msg={t('pages.imageEditor.panelStubChannels')} />}
         {g1 === 'paths' && <StubPanel msg={t('pages.imageEditor.panelStubPaths')} />}
       </PanelGroup>
+      <div
+        className="pf-resize-handle"
+        onMouseDown={startLayersResize}
+        title={t('pages.imageEditor.layers.resizeHandle')}
+      />
+
 
       <PanelGroup
         tabs={[
@@ -121,14 +168,25 @@ function PanelGroup({
   active,
   setActive,
   children,
+  fixedHeight,
 }: {
   tabs: { id: string; label: string }[]
   active: string
   setActive: (id: string) => void
   children: ReactNode
+  /**
+   * Pin the group to a given pixel height — header stays at natural height,
+   * the body fills the remainder and scrolls internally. Used for the Layers
+   * group so the right sidebar layout stays stable when many layers / groups
+   * push the natural height past the viewport.
+   */
+  fixedHeight?: number
 }) {
   return (
-    <div className="pf-panel-group">
+    <div
+      className="pf-panel-group"
+      style={fixedHeight ? { height: fixedHeight, minHeight: 0 } : undefined}
+    >
       <div className="pf-panel-tabs">
         {tabs.map((t) => (
           <div

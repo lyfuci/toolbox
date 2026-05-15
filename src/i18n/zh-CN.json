@@ -676,7 +676,8 @@
         "expand": "展开组",
         "collapse": "折叠组",
         "dropInto": "拖入组",
-        "dropOutside": "拖到此处移出组"
+        "dropOutside": "拖到此处移出组",
+        "resizeHandle": "拖动调整图层面板高度"
       },
       "project": "项目",
       "projectSave": "保存项目 (.json)",
