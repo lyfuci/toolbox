@@ -8,6 +8,10 @@ import { FilterDialog } from '@/components/image-editor/FilterDialog'
 import { MenuBar } from '@/components/image-editor/MenuBar'
 import { OptionsBar } from '@/components/image-editor/OptionsBar'
 import { RightSidebar } from '@/components/image-editor/RightSidebar'
+import {
+  SelectModifyDialog,
+  type SelectModifyKind,
+} from '@/components/image-editor/SelectModifyDialog'
 import { StatusBar } from '@/components/image-editor/StatusBar'
 import { ToolsPalette } from '@/components/image-editor/ToolsPalette'
 import { STUB_TOOLS } from '@/components/image-editor/tool-meta'
@@ -28,6 +32,14 @@ import {
   reorderSibling,
 } from '@/lib/image-editor/layer-tree'
 import { dimsAfterRotation, renderTo } from '@/lib/image-editor/render'
+import {
+  contractSelection,
+  deselect,
+  expandSelection,
+  inverseSelection,
+  reselect,
+  selectAll,
+} from '@/lib/image-editor/selection-ops'
 import { translateLayer, withSelectionClip } from '@/lib/image-editor/transform'
 import {
   loadImageFromUrl,
@@ -119,6 +131,10 @@ export function ImageEditorPage() {
   const deleteLayerRef = useRef<() => void>(() => {})
   const groupRef = useRef<() => void>(() => {})
   const ungroupRef = useRef<() => void>(() => {})
+  const selectAllRef = useRef<() => void>(() => {})
+  const deselectRef = useRef<() => void>(() => {})
+  const reselectRef = useRef<() => void>(() => {})
+  const inverseSelectionRef = useRef<() => void>(() => {})
 
   // Zoom + pan + Space-held pan mode.
   const [zoom, setZoom] = useState(1)
@@ -222,25 +238,25 @@ export function ImageEditorPage() {
           else groupRef.current()
           return
         }
-        // Cmd+D = deselect, Cmd+A = select all (PS conventions). Both no-op
-        // when there's no image yet.
+        // Selection shortcuts: Cmd+A all, Cmd+D deselect (snapshots for
+        // Reselect), Shift+Cmd+D reselect, Shift+Cmd+I inverse.
         if (e.key === 'd' || e.key === 'D') {
           e.preventDefault()
-          history.set({ ...state, selection: undefined, selectionPath: undefined })
+          if (e.shiftKey) reselectRef.current()
+          else deselectRef.current()
           return
         }
         if (e.key === 'a' || e.key === 'A') {
           e.preventDefault()
-          if (image) {
-            const { baseW, baseH } = dimsAfterRotation(image, state)
-            const previewScale = Math.min(1, PREVIEW_MAX / Math.max(baseW, baseH, 1))
-            history.set({
-              ...state,
-              selection: { x: 0, y: 0, w: baseW * previewScale, h: baseH * previewScale },
-              selectionPath: undefined,
-            })
-          }
+          selectAllRef.current()
           return
+        }
+        if (e.key === 'i' || e.key === 'I') {
+          if (e.shiftKey) {
+            e.preventDefault()
+            inverseSelectionRef.current()
+            return
+          }
         }
         return
       }
@@ -435,6 +451,64 @@ export function ImageEditorPage() {
   const canGroupSelected = !!selectedLayer && selectedLayerId !== 'image'
   const canUngroupSelected = !!selectedLayer && isGroup(selectedLayer)
 
+  // ── Selection menu handlers ───────────────────────────────────────────
+  // `applySelection` merges a partial selection update into history. The
+  // selection-ops helpers return empty objects to signal "no-op" (e.g.,
+  // Reselect with no snapshot, Deselect with nothing selected) — bail in
+  // that case so the no-op doesn't pollute the undo stack.
+  const previewDims = (() => {
+    if (!image) return { w: 0, h: 0 }
+    const { baseW, baseH } = dimsAfterRotation(image, state)
+    const ps = Math.min(1, PREVIEW_MAX / Math.max(baseW, baseH, 1))
+    if (state.cropRect) {
+      const r = state.cropRect
+      return { w: Math.abs(r.w), h: Math.abs(r.h) }
+    }
+    return { w: baseW * ps, h: baseH * ps }
+  })()
+  const applySelection = useCallback(
+    (partial: Partial<EditorState>) => {
+      if (Object.keys(partial).length === 0) return
+      history.set({ ...state, ...partial })
+    },
+    [history, state],
+  )
+  const handleSelectAll = useCallback(
+    () => image && applySelection(selectAll(state, previewDims)),
+    [image, state, previewDims, applySelection],
+  )
+  const handleDeselect = useCallback(
+    () => applySelection(deselect(state)),
+    [state, applySelection],
+  )
+  const handleReselect = useCallback(
+    () => applySelection(reselect(state)),
+    [state, applySelection],
+  )
+  const handleInverse = useCallback(
+    () => image && applySelection(inverseSelection(state, previewDims)),
+    [image, state, previewDims, applySelection],
+  )
+
+  // Select > Modify dialog state. The dialog is shared between Expand /
+  // Contract; the kind determines title + onApply branch.
+  const [selectModifyOp, setSelectModifyOp] = useState<SelectModifyKind | null>(null)
+  const handleSelectModifyApply = useCallback(
+    (kind: SelectModifyKind, px: number) => {
+      const partial =
+        kind === 'expand'
+          ? expandSelection(state, px, previewDims)
+          : contractSelection(state, px)
+      applySelection(partial)
+      setSelectModifyOp(null)
+    },
+    [state, previewDims, applySelection],
+  )
+
+  const hasSelection = !!state.selection || (state.selectionPath?.length ?? 0) >= 3
+  const canReselect =
+    !hasSelection && (!!state.lastSelection || (state.lastSelectionPath?.length ?? 0) >= 3)
+
   useEffect(() => {
     duplicateRef.current = () => {
       if (!selectedLayerId || selectedLayerId === 'image') return
@@ -465,6 +539,10 @@ export function ImageEditorPage() {
     }
     groupRef.current = groupSelected
     ungroupRef.current = ungroupSelected
+    selectAllRef.current = handleSelectAll
+    deselectRef.current = handleDeselect
+    reselectRef.current = handleReselect
+    inverseSelectionRef.current = handleInverse
   })
 
   // ── Crop ─────────────────────────────────────────────────────────────────
@@ -1035,6 +1113,15 @@ export function ImageEditorPage() {
             ungroupSelected,
             canGroupSelected,
             canUngroupSelected,
+            selectAll: handleSelectAll,
+            deselect: handleDeselect,
+            reselect: handleReselect,
+            inverseSelection: handleInverse,
+            selectExpand: () => setSelectModifyOp('expand'),
+            selectContract: () => setSelectModifyOp('contract'),
+            canDeselect: hasSelection,
+            canReselect,
+            canModifySelection: hasSelection,
             zoomIn,
             zoomOut,
             zoomFit: zoomReset,
@@ -1187,6 +1274,11 @@ export function ImageEditorPage() {
         onPreview={handleFilterPreview}
         onApply={handleFilterApply}
         onCancel={handleFilterCancel}
+      />
+      <SelectModifyDialog
+        open={selectModifyOp}
+        onApply={handleSelectModifyApply}
+        onCancel={() => setSelectModifyOp(null)}
       />
     </div>
   )

@@ -537,6 +537,7 @@
         "file": "File",
         "edit": "Edit",
         "image": "Image",
+        "select": "Select",
         "filter": "Filter",
         "layer": "Layer",
         "view": "View",
@@ -560,6 +561,15 @@
         "zoomOut": "Zoom Out",
         "zoomFit": "Fit on Screen",
         "toggleFocus": "Toggle Focus Mode"
+      },
+      "selectMenu": {
+        "all": "All",
+        "deselect": "Deselect",
+        "reselect": "Reselect",
+        "inverse": "Inverse",
+        "expand": "Expand Selection",
+        "contract": "Contract Selection",
+        "amountPx": "Amount (px)"
       },
       "panelLayers": "Layers",
       "panelChannels": "Channels",
