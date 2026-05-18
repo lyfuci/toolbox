@@ -36,7 +36,7 @@ import {
   regionFromSelection,
   renderEditorToCanvas,
 } from '@/lib/image-editor/composite-ops'
-import { DEFAULT_BRUSH_OPTIONS, initialState, PREVIEW_MAX } from '@/lib/image-editor/defaults'
+import { DEFAULT_BRUSH_OPTIONS, DEFAULT_TEXT_OPTIONS, initialState, PREVIEW_MAX } from '@/lib/image-editor/defaults'
 import { fillSelection, strokeSelection, type StrokePosition } from '@/lib/image-editor/edit-ops'
 import { floodFillMask, maskToDataUrl } from '@/lib/image-editor/flood-fill'
 import { useHistoryState } from '@/lib/image-editor/history'
@@ -84,6 +84,7 @@ import type {
   LayerEffectKind,
   OutputFormat,
   SmartSource,
+  TextOptions,
   Point,
   Tool,
   Transforms,
@@ -134,6 +135,7 @@ export function ImageEditorPage() {
   )
   const [strokeWidth, setStrokeWidth] = useState(4)
   const [brushOptions, setBrushOptions] = useState<BrushOptions>(DEFAULT_BRUSH_OPTIONS)
+  const [textOptions, setTextOptions] = useState<TextOptions>(DEFAULT_TEXT_OPTIONS)
   const [bucketTolerance, setBucketTolerance] = useState(32)
   const [wandTolerance, setWandTolerance] = useState(32)
   // Clone Stamp source point — set by Alt+click while the Stamp tool is
@@ -168,6 +170,7 @@ export function ImageEditorPage() {
   const mergeDownRef = useRef<() => void>(() => {})
   const mergeVisibleRef = useRef<() => void>(() => {})
   const stampVisibleRef = useRef<() => void>(() => {})
+  const clippingMaskRef = useRef<() => void>(() => {})
 
   // View menu toggles (UI-only, not part of EditorState or project save).
   // Grid + snap travel together: snap is a no-op when the grid is hidden.
@@ -294,9 +297,10 @@ export function ImageEditorPage() {
         if (e.key === ']') { e.preventDefault(); moveLayerRef.current(e.shiftKey ? 'front' : 'forward'); return }
         if (e.key === '[') { e.preventDefault(); moveLayerRef.current(e.shiftKey ? 'back' : 'backward'); return }
         if (e.key === 'g' || e.key === 'G') {
-          // Cmd+G groups the selected layer; Shift+Cmd+G ungroups.
+          // Cmd+G groups; Shift+Cmd+G ungroups; ⌥⌘G toggles clipping mask.
           e.preventDefault()
-          if (e.shiftKey) ungroupRef.current()
+          if (e.altKey) clippingMaskRef.current()
+          else if (e.shiftKey) ungroupRef.current()
           else groupRef.current()
           return
         }
@@ -1015,6 +1019,36 @@ export function ImageEditorPage() {
    * (and dims). All other SO layers referencing the same sourceRef update
    * simultaneously (PS linked-instance semantics).
    */
+  /** Toggle PS clipping mask on the selected layer. */
+  const handleToggleClippingMask = useCallback(() => {
+    if (!selectedLayerId || selectedLayerId === 'image') return
+    const target = findLayerById(state.layers, selectedLayerId)
+    if (!target) return
+    // v1: clipping is meaningful only for pixel-emitting layers (annotation /
+    // smartObject / group). Adjustment / filter / mask layers consume the
+    // canvas below them; supporting them as clippers correctly requires
+    // computing the base alpha as a clip mask applied during their own
+    // pixel-transform pass, which the v1 render pipeline doesn't do.
+    // Without this guard, a user marking an adjustment as clipping would
+    // see it silently vanish.
+    if (
+      target.kind === 'adjustment' ||
+      target.kind === 'filter' ||
+      target.kind === 'mask'
+    ) {
+      toast.message(t('pages.imageEditor.clippingMask.unsupportedKind'))
+      return
+    }
+    patchLayer(selectedLayerId, { clipping: !target.clipping })
+    toast.success(
+      t(
+        target.clipping
+          ? 'pages.imageEditor.clippingMask.released'
+          : 'pages.imageEditor.clippingMask.created',
+      ),
+    )
+  }, [selectedLayerId, state.layers, patchLayer, t])
+
   const handleReplaceContents = useCallback(async () => {
     if (!image || !selectedLayerId) return
     const layer = findLayerById(state.layers, selectedLayerId)
@@ -1304,6 +1338,7 @@ export function ImageEditorPage() {
     mergeDownRef.current = handleMergeDown
     mergeVisibleRef.current = handleMergeVisible
     stampVisibleRef.current = handleStampVisible
+    clippingMaskRef.current = handleToggleClippingMask
   })
 
   // ── Crop ─────────────────────────────────────────────────────────────────
@@ -1522,6 +1557,22 @@ export function ImageEditorPage() {
     (params: FilterParams) => {
       // Note: AddNoise's `seed` is set in the dialog at mount, so the params
       // passed in here already carry a stable seed — no apply-time fixup needed.
+      // Smart Filters: if the selected layer is a SO, append the filter to
+      // its bakedFilters stack instead of creating a separate FilterLayer.
+      // PS semantics — filters live on the SO and stay non-destructive
+      // (editable through the layer panel later).
+      const selected =
+        selectedLayerId && selectedLayerId !== 'image'
+          ? findLayerById(state.layers, selectedLayerId)
+          : null
+      if (selected && selected.kind === 'smartObject') {
+        const next: FilterParams[] = [...(selected.bakedFilters ?? []), params]
+        patchLayer(selected.id, { bakedFilters: next })
+        setFilterDraft(null)
+        setOpenFilter(null)
+        toast.success(t('pages.imageEditor.smartFilters.added'))
+        return
+      }
       commitLayer({
         id: crypto.randomUUID(),
         name: t(`pages.imageEditor.filters.${params.kind}`),
@@ -1534,7 +1585,7 @@ export function ImageEditorPage() {
       setFilterDraft(null)
       setOpenFilter(null)
     },
-    [commitLayer, t],
+    [commitLayer, selectedLayerId, state.layers, patchLayer, t],
   )
   const handleFilterCancel = useCallback(() => {
     setFilterDraft(null)
@@ -2032,6 +2083,11 @@ export function ImageEditorPage() {
               !!selectedLayerId &&
               selectedLayerId !== 'image' &&
               findLayerById(state.layers, selectedLayerId)?.kind === 'smartObject',
+            toggleClippingMask: handleToggleClippingMask,
+            isClippingMaskSelected:
+              !!selectedLayerId &&
+              selectedLayerId !== 'image' &&
+              !!findLayerById(state.layers, selectedLayerId)?.clipping,
             openLayerStyle: handleOpenLayerStyle,
             zoomIn,
             zoomOut,
@@ -2056,6 +2112,8 @@ export function ImageEditorPage() {
           setStrokeWidth={setStrokeWidth}
           brushOptions={brushOptions}
           setBrushOptions={setBrushOptions}
+          textOptions={textOptions}
+          setTextOptions={setTextOptions}
           bucketTolerance={bucketTolerance}
           setBucketTolerance={setBucketTolerance}
           wandTolerance={wandTolerance}
@@ -2133,6 +2191,7 @@ export function ImageEditorPage() {
               toolColor={colors.fg}
               toolStrokeWidth={strokeWidth}
               brushOptions={brushOptions}
+              textOptions={textOptions}
               selectedId={selectedLayerId}
               onSelect={setSelectedLayerId}
               onCommitLayer={commitLayer}

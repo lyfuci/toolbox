@@ -86,6 +86,9 @@ type Props = {
     replaceSmartObjectContents?: () => void
     /** True when selected layer is a SmartObjectLayer (enables Replace Contents). */
     isSmartObjectSelected?: boolean
+    /** Toggle the clipping mask flag on the currently selected layer. */
+    toggleClippingMask?: () => void
+    isClippingMaskSelected?: boolean
     zoomIn?: () => void
     zoomOut?: () => void
     zoomFit?: () => void
@@ -560,6 +563,15 @@ export function MenuBar({ handlers }: Props) {
             id: 'convertSO',
             label: t('pages.imageEditor.menu.convertToSmartObject'),
             onClick: handlers.convertToSmartObject,
+          },
+          {
+            id: 'clippingMask',
+            label:
+              (handlers.isClippingMaskSelected
+                ? t('pages.imageEditor.menu.releaseClippingMask')
+                : t('pages.imageEditor.menu.createClippingMask')),
+            shortcut: '⌥⌘G',
+            onClick: handlers.toggleClippingMask,
           },
           {
             id: 'replaceSO',

@@ -1,4 +1,4 @@
-import type { Adjustments, BrushOptions, EditorState, Transforms } from './types'
+import type { Adjustments, BrushOptions, EditorState, TextOptions, Transforms } from './types'
 
 export const DEFAULT_TRANSFORMS: Transforms = {
   rotation: 0,
@@ -45,6 +45,17 @@ export const DEFAULT_BRUSH_OPTIONS: BrushOptions = {
   spacing: 0.25,
   flow: 1,
   opacity: 1,
+}
+
+export const DEFAULT_TEXT_OPTIONS: TextOptions = {
+  fontSize: 24,
+  fontFamily: 'sans-serif',
+  fontWeight: 'normal',
+  fontStyle: 'normal',
+  align: 'left',
+  letterSpacing: 0,
+  lineHeight: 1.2,
+  underline: false,
 }
 
 export const PROJECT_VERSION = 1

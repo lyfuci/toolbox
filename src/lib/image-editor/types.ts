@@ -109,6 +109,10 @@ export type ArrowShape = {
   color: string
   strokeWidth: number
 }
+export type TextAlign = 'left' | 'center' | 'right'
+export type FontWeight = 'normal' | 'bold'
+export type FontStyle = 'normal' | 'italic'
+
 export type TextShape = {
   kind: 'text'
   x: number
@@ -116,6 +120,22 @@ export type TextShape = {
   text: string
   color: string
   fontSize: number
+  /** Font family — CSS font-family string. Defaults to 'sans-serif' for
+   *  back-compat with pre-v2 text shapes that didn't carry this field. */
+  fontFamily?: string
+  fontWeight?: FontWeight
+  fontStyle?: FontStyle
+  /** Horizontal alignment relative to (x, y). 'left' = (x, y) is the
+   *  top-left; 'center' = (x, y) is top-centre; 'right' = top-right. */
+  align?: TextAlign
+  /** Extra spacing between glyphs, in preview-canvas pixels. CSS-style
+   *  letter-spacing applied via ctx.letterSpacing where supported, otherwise
+   *  approximated by per-glyph kerning. */
+  letterSpacing?: number
+  /** Multiplier on the font's ascender height. 1 = single spacing. */
+  lineHeight?: number
+  /** Decoration: render an underline beneath the baseline. */
+  underline?: boolean
 }
 export type MosaicShape = {
   kind: 'mosaic'
@@ -572,6 +592,16 @@ type LayerCommon = {
    * from `EditorState.selectionInverse` at commit time.
    */
   clipInverse?: boolean
+  /**
+   * PS "Create Clipping Mask" (⌥⌘G). When true, the layer's rendered
+   * output is masked to the alpha of the *underlying* layer in the same
+   * parent (group or top-level). Multiple stacked clipping layers chain to
+   * the first non-clipping layer below them, matching PS semantics — the
+   * group is sometimes called a "clipping group". Renderer: snapshots the
+   * pre-this-layer canvas, draws the layer's content into an offscreen
+   * masked against the base layer's contribution, then composites.
+   */
+  clipping?: boolean
 }
 
 export type ImageLayerProps = LayerCommon & { kind: 'image' }
@@ -846,6 +876,13 @@ export type SmartObjectLayer = LayerCommon & {
   kind: 'smartObject'
   sourceRef: string
   transform: SmartObjectTransform
+  /**
+   * Smart Filters — non-destructive filter stack applied to the source
+   * pixels BEFORE the transform. Each filter is the same FilterParams type
+   * as a FilterLayer; the renderer walks the stack in order, re-using the
+   * existing per-pixel transform pipeline. Empty / undefined = no filters.
+   */
+  bakedFilters?: FilterParams[]
 }
 
 // User-addable overlay layer types (the image is special, see EditorState).
@@ -937,4 +974,21 @@ export type BrushOptions = {
   spacing: number // 0..1
   flow: number // 0..1
   opacity: number // 0..1, brush + eraser only
+}
+
+/**
+ * Tunable defaults for the Type tool. Persisted on the editor instance,
+ * same UI-only treatment as BrushOptions — never enters EditorState /
+ * undo / project save. New text layers seed their TextShape fields from
+ * these values; existing layers keep whatever they were committed with.
+ */
+export type TextOptions = {
+  fontSize: number
+  fontFamily: string
+  fontWeight: FontWeight
+  fontStyle: FontStyle
+  align: TextAlign
+  letterSpacing: number
+  lineHeight: number
+  underline: boolean
 }
