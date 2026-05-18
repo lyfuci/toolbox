@@ -56,6 +56,7 @@ import {
   mapLayerById,
   removeLayerById,
   reorderSibling,
+  walkLayers,
 } from '@/lib/image-editor/layer-tree'
 import { getLayerBBox } from '@/lib/image-editor/hit'
 import { dimsAfterRotation, renderTo } from '@/lib/image-editor/render'
@@ -160,6 +161,17 @@ export function ImageEditorPage() {
   const workspaceRef = useRef<WorkspaceHandle | null>(null)
 
   const { cache: imageCache, ensure: ensureImage } = useImageCache()
+
+  // Ensure raster Layer Mask dataUrls are loaded into the imageCache so
+  // the renderer's destination-in pass resolves them. ensureImage dedupes
+  // via an inflight map so seen dataUrls don't re-fetch.
+  useEffect(() => {
+    for (const l of walkLayers(state.layers)) {
+      if (l.kind === 'mask' && l.dataUrl) {
+        ensureImage(l.dataUrl).catch(() => {})
+      }
+    }
+  }, [state.layers, ensureImage])
 
   const duplicateRef = useRef<() => void>(() => {})
   const moveLayerRef = useRef<(d: 'forward' | 'backward' | 'front' | 'back') => void>(() => {})
@@ -1119,6 +1131,89 @@ export function ImageEditorPage() {
     [state, history],
   )
 
+  // ── Raster Layer Mask ───────────────────────────────────────────────
+  /**
+   * Create a new raster Layer Mask sized to the current preview canvas,
+   * fully white (everything below visible). The user can then paint into
+   * it with the brush tool (black hides, white reveals).
+   */
+  const handleNewRasterMask = useCallback(async () => {
+    if (!image) return
+    const { w, h } = previewDimsOf(image, state)
+    const c = document.createElement('canvas')
+    c.width = w
+    c.height = h
+    const ctx = c.getContext('2d')
+    if (!ctx) return
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, w, h)
+    const dataUrl = c.toDataURL('image/png')
+    // Await so the brush-paint mousedown intercept can synchronously
+    // pull the cached image — without this, first paint silently falls
+    // through to creating a BrushShape layer over the canvas.
+    try {
+      await ensureImage(dataUrl)
+    } catch {
+      /* mask still usable for non-paint rendering */
+    }
+    const layer: Layer = {
+      id: crypto.randomUUID(),
+      name: t('pages.imageEditor.maskRaster.defaultName'),
+      visible: true,
+      opacity: 100,
+      blend: 'normal',
+      kind: 'mask',
+      rects: [],
+      dataUrl,
+      w,
+      h,
+    }
+    history.set({ ...state, layers: [...state.layers, layer] })
+    setSelectedLayerId(layer.id)
+    toast.success(t('pages.imageEditor.maskRaster.created'))
+  }, [image, state, ensureImage, history, t])
+
+  /**
+   * Convert a rect-based MaskLayer into a raster mask. Rasterizes the
+   * existing rects (white inside, black outside) onto a fresh canvas at
+   * preview-pixel resolution and replaces `rects` with `dataUrl`.
+   */
+  const handleConvertMaskToRaster = useCallback(async () => {
+    if (!image || !selectedLayerId || selectedLayerId === 'image') return
+    const target = findLayerById(state.layers, selectedLayerId)
+    if (!target || target.kind !== 'mask') {
+      toast.message(t('pages.imageEditor.maskRaster.notAMask'))
+      return
+    }
+    if (target.dataUrl) {
+      toast.message(t('pages.imageEditor.maskRaster.alreadyRaster'))
+      return
+    }
+    const { w, h } = previewDimsOf(image, state)
+    const c = document.createElement('canvas')
+    c.width = w
+    c.height = h
+    const ctx = c.getContext('2d')
+    if (!ctx) return
+    ctx.fillStyle = '#000000'
+    ctx.fillRect(0, 0, w, h)
+    ctx.fillStyle = '#ffffff'
+    for (const r of target.rects) {
+      const nx = r.w >= 0 ? r.x : r.x + r.w
+      const ny = r.h >= 0 ? r.y : r.y + r.h
+      ctx.fillRect(nx, ny, Math.abs(r.w), Math.abs(r.h))
+    }
+    const dataUrl = c.toDataURL('image/png')
+    // Await so first brush stroke after convert finds the dataUrl in cache.
+    try {
+      await ensureImage(dataUrl)
+    } catch {
+      /* still usable for rendering */
+    }
+    patchLayer(target.id, { dataUrl, w, h, rects: [] })
+    toast.success(t('pages.imageEditor.maskRaster.converted'))
+  }, [image, selectedLayerId, state, ensureImage, patchLayer, t])
+
   /** Toggle PS clipping mask on the selected layer. */
   const handleToggleClippingMask = useCallback(() => {
     if (!selectedLayerId || selectedLayerId === 'image') return
@@ -1850,6 +1945,13 @@ export function ImageEditorPage() {
           for (const id of Object.keys(sources)) {
             ensureImage(sources[id].dataUrl).catch(() => {})
           }
+          // Preload raster mask dataUrls — same reason as SO sources
+          // (renderer needs them in the imageCache for first paint).
+          for (const l of walkLayers(project.state.layers)) {
+            if (l.kind === 'mask' && l.dataUrl) {
+              ensureImage(l.dataUrl).catch(() => {})
+            }
+          }
           history.reset(project.state)
           setSelectedLayerId('image')
           toast.success(t('pages.imageEditor.projectLoaded'))
@@ -2199,6 +2301,13 @@ export function ImageEditorPage() {
               !!selectedLayerId &&
               selectedLayerId !== 'image' &&
               !!findLayerById(state.layers, selectedLayerId)?.clipping,
+            newRasterMask: handleNewRasterMask,
+            convertMaskToRaster: handleConvertMaskToRaster,
+            isRectMaskSelected: (() => {
+              if (!selectedLayerId || selectedLayerId === 'image') return false
+              const l = findLayerById(state.layers, selectedLayerId)
+              return !!l && l.kind === 'mask' && !l.dataUrl
+            })(),
             openLayerStyle: handleOpenLayerStyle,
             zoomIn,
             zoomOut,

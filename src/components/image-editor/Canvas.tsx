@@ -230,6 +230,15 @@ type Interaction =
    * content via auto-resize on input.
    */
   | { kind: 'text-editing'; point: Point; value: string }
+  /**
+   * Raster Layer Mask painting. When the brush tool is active and the
+   * selected layer is a MaskLayer with `dataUrl`, brush strokes paint
+   * into a mask-sized offscreen instead of creating a new brush layer.
+   * `offscreen` holds the in-progress mask state; on mouseup we export
+   * to dataUrl and patch the layer. FG color luminance drives the
+   * stamp colour (black hides, white reveals — PS convention).
+   */
+  | { kind: 'mask-painting'; layerId: string; offscreen: HTMLCanvasElement; lastPoint: Point }
 
 export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
   {
@@ -374,6 +383,10 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     if (showGrid) {
       drawGridOverlay(canvasRef.current, gridStep)
     }
+    // Mask-paint: no live preview in v1 — `multiply` ghost hid white-
+    // reveal strokes and source-over would obscure the underlying art.
+    // Stroke commits on mouseup via onCommitLayerUpdate, which triggers
+    // a normal re-render with the new mask dataUrl.
   }, [
     image,
     effectiveState,
@@ -666,6 +679,27 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     // exists end-to-end, treat it identically to the no-tool selection arrow.
     // Drawing tools take priority over selection.
     if (tool !== 'none' && tool !== 'arrowPath') {
+      // Raster Layer Mask paint mode: brush / eraser on a selected mask with
+      // dataUrl writes into the mask, not into a new brush layer.
+      if ((tool === 'brush' || tool === 'eraser') && selectedId && selectedId !== 'image') {
+        const sel = findLayerById(state.layers, selectedId)
+        if (sel && sel.kind === 'mask' && sel.dataUrl && sel.w && sel.h && imageCache) {
+          const cached = imageCache.get(sel.dataUrl)
+          if (cached) {
+            // Seed offscreen with the existing mask, then stamp the first dot.
+            const off = document.createElement('canvas')
+            off.width = sel.w
+            off.height = sel.h
+            const octx = off.getContext('2d')
+            if (octx) {
+              octx.drawImage(cached, 0, 0, sel.w, sel.h)
+              stampMaskBrush(octx, p, p, toolStrokeWidth, brushOptions, tool === 'eraser' ? '#000000' : toolColor)
+              setInteraction({ kind: 'mask-painting', layerId: sel.id, offscreen: off, lastPoint: p })
+              return
+            }
+          }
+        }
+      }
       startDrawing(p)
       return
     }
@@ -746,6 +780,16 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     if (interaction.kind === 'polylasso-drawing') {
       // Just update cursor — no point committed until next click.
       setInteraction({ ...interaction, cursor: p })
+      return
+    }
+
+    if (interaction.kind === 'mask-painting') {
+      const octx = interaction.offscreen.getContext('2d')
+      if (octx) {
+        const color = tool === 'eraser' ? '#000000' : toolColor
+        stampMaskBrush(octx, interaction.lastPoint, p, toolStrokeWidth, brushOptions, color)
+      }
+      setInteraction({ ...interaction, lastPoint: p })
       return
     }
 
@@ -845,6 +889,19 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       }
     } else if (interaction.kind === 'sample-stroke') {
       finishSampleStroke()
+    } else if (interaction.kind === 'mask-painting') {
+      // Export the painted offscreen as a new dataUrl and patch the mask
+      // layer. Single history step per stroke (mousedown→mouseup).
+      try {
+        const dataUrl = interaction.offscreen.toDataURL('image/png')
+        const orig = findLayerById(state.layers, interaction.layerId)
+        if (orig && orig.kind === 'mask') {
+          onCommitLayerUpdate(interaction.layerId, { ...orig, dataUrl })
+        }
+      } catch {
+        // Quota / encoding failure — drop the stroke silently. The
+        // mask's existing dataUrl is preserved by virtue of not patching.
+      }
     } else if (
       interaction.kind === 'moving' ||
       interaction.kind === 'resizing'
@@ -1441,6 +1498,67 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
 
 function cursorForHandle(h: Handle): string {
   return cursorForHandleId(h.id)
+}
+
+/** Tiny hex → [r, g, b] tuple parser. Used by mask-paint soft stamps. */
+function hexToRgbTuple(hex: string): [number, number, number] {
+  let s = hex.trim().replace('#', '')
+  if (s.length === 3) s = s.split('').map((c) => c + c).join('')
+  if (s.length !== 6) return [0, 0, 0]
+  const n = parseInt(s, 16)
+  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
+}
+
+/**
+ * Paint a brush segment into the mask offscreen. Uses a 2D context's
+ * arc/quadratic-curve style stamping along the segment from `from` to
+ * `to`. Stamp size = `width`; opacity / flow honour brushOptions; colour
+ * is the raw FG colour (typically white to reveal or black to hide).
+ */
+function stampMaskBrush(
+  ctx: CanvasRenderingContext2D,
+  from: Point,
+  to: Point,
+  width: number,
+  options: { hardness: number; spacing: number; flow: number; opacity: number },
+  color: string,
+): void {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const dist = Math.max(1, Math.hypot(dx, dy))
+  const step = Math.max(1, width * Math.max(0.05, options.spacing))
+  const steps = Math.max(1, Math.ceil(dist / step))
+  ctx.save()
+  ctx.fillStyle = color
+  // hardness=1 → crisp stamp; <1 → fade with a radial gradient. Flow / opacity
+  // multiply into globalAlpha so the cumulative stamp matches the input.
+  ctx.globalAlpha = Math.max(0.05, options.flow * options.opacity)
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps
+    const x = from.x + dx * t
+    const y = from.y + dy * t
+    const r = width / 2
+    if (options.hardness >= 0.999) {
+      ctx.beginPath()
+      ctx.arc(x, y, r, 0, Math.PI * 2)
+      ctx.fill()
+    } else {
+      // Soft edge: radial gradient from solid color to fully transparent.
+      // Parse the hex once into rgba so the transparent stop is well-formed
+      // regardless of `color`'s notation.
+      const rgb = hexToRgbTuple(color)
+      const grad = ctx.createRadialGradient(x, y, r * options.hardness, x, y, r)
+      grad.addColorStop(0, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},1)`)
+      grad.addColorStop(1, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0)`)
+      const oldFill: typeof ctx.fillStyle = ctx.fillStyle
+      ctx.fillStyle = grad
+      ctx.beginPath()
+      ctx.arc(x, y, r, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = oldFill
+    }
+  }
+  ctx.restore()
 }
 
 function cursorForHandleId(id: HandleId): string {

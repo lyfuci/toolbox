@@ -572,6 +572,8 @@
         "replaceSmartObjectContents": "替换内容",
         "createClippingMask": "创建剪贴蒙版",
         "releaseClippingMask": "释放剪贴蒙版",
+        "newRasterMask": "新建栅格蒙版图层",
+        "convertMaskToRaster": "蒙版转换为栅格",
         "imageSize": "图像大小",
         "canvasSize": "画布大小",
         "rotateArbitrary": "任意角度旋转",
@@ -668,6 +670,14 @@
         "created": "已创建剪贴蒙版 —— 图层被下方图层蒙版剪贴",
         "released": "已释放剪贴蒙版",
         "unsupportedKind": "剪贴蒙版仅适用于形状、智能对象和图层组。"
+      },
+      "maskRaster": {
+        "defaultName": "栅格蒙版",
+        "created": "已添加栅格蒙版图层 —— 用画笔涂抹（黑色隐藏，白色显示）",
+        "converted": "蒙版已转为栅格 —— 可用画笔涂抹",
+        "notAMask": "只能对蒙版图层执行转换为栅格。",
+        "alreadyRaster": "该蒙版已是栅格。",
+        "paintMode": "正在蒙版上绘制：{{name}}"
       },
       "smartFilters": {
         "title": "智能滤镜",

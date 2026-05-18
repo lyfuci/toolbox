@@ -572,6 +572,8 @@
         "replaceSmartObjectContents": "Replace Contents",
         "createClippingMask": "Create Clipping Mask",
         "releaseClippingMask": "Release Clipping Mask",
+        "newRasterMask": "New Raster Mask Layer",
+        "convertMaskToRaster": "Convert Mask to Raster",
         "imageSize": "Image Size",
         "canvasSize": "Canvas Size",
         "rotateArbitrary": "Arbitrary Rotation",
@@ -668,6 +670,14 @@
         "created": "Clipping mask created — layer masked to layer below",
         "released": "Clipping mask released",
         "unsupportedKind": "Clipping mask only applies to shape, Smart Object, and group layers."
+      },
+      "maskRaster": {
+        "defaultName": "Raster Mask",
+        "created": "Raster mask layer added — paint with the brush (black hides, white reveals)",
+        "converted": "Mask converted to raster — paintable with the brush",
+        "notAMask": "Convert to Raster only works on a Mask layer.",
+        "alreadyRaster": "This mask is already a raster — nothing to convert.",
+        "paintMode": "Painting into mask: {{name}}"
       },
       "smartFilters": {
         "title": "Smart Filters",

@@ -89,6 +89,11 @@ type Props = {
     /** Toggle the clipping mask flag on the currently selected layer. */
     toggleClippingMask?: () => void
     isClippingMaskSelected?: boolean
+    /** Raster Layer Mask actions. */
+    newRasterMask?: () => void
+    convertMaskToRaster?: () => void
+    /** True when selected layer is a MaskLayer with `rects` and no dataUrl yet. */
+    isRectMaskSelected?: boolean
     zoomIn?: () => void
     zoomOut?: () => void
     zoomFit?: () => void
@@ -577,6 +582,17 @@ export function MenuBar({ handlers }: Props) {
                 : t('pages.imageEditor.menu.createClippingMask')),
             shortcut: '⌥⌘G',
             onClick: handlers.toggleClippingMask,
+          },
+          {
+            id: 'newRasterMask',
+            label: t('pages.imageEditor.menu.newRasterMask'),
+            onClick: handlers.newRasterMask,
+          },
+          {
+            id: 'convertMaskToRaster',
+            label: t('pages.imageEditor.menu.convertMaskToRaster'),
+            onClick: handlers.convertMaskToRaster,
+            disabled: !handlers.isRectMaskSelected,
           },
           {
             id: 'replaceSO',

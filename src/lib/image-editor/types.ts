@@ -608,7 +608,27 @@ export type ImageLayerProps = LayerCommon & { kind: 'image' }
 export type AnnotationLayer = LayerCommon & { kind: 'annotation'; shape: Shape }
 export type MaskLayer = LayerCommon & {
   kind: 'mask'
-  rects: Rect[] // union of these is the visible region for layers BELOW this mask
+  /**
+   * Legacy rect-list mask. The union of these rects is the visible region
+   * for the layers below this mask. Pre-raster projects use this exclusively;
+   * post-raster projects may keep an empty list when `dataUrl` is set.
+   */
+  rects: Rect[]
+  /**
+   * Raster mask. When present, the renderer uses the alpha channel of this
+   * dataUrl as the mask (white = visible, black = hidden, grey = partial).
+   * Stored as a PNG dataUrl at preview-canvas resolution; the cached image
+   * is resolved via the same `imageCache` used by image-shape layers.
+   *
+   * If both `rects` and `dataUrl` are set the raster takes priority — but
+   * the conversion helper (`rasterizeMaskRects`) clears `rects` so the
+   * representations don't drift.
+   */
+  dataUrl?: string
+  /** Preview-pixel dimensions of the raster mask. Required when `dataUrl`
+   *  is set so render can size the destination correctly. */
+  w?: number
+  h?: number
 }
 
 /** Levels — input/output black & white points + gamma. Per-channel applied identically. */
