@@ -44,6 +44,11 @@ type Props = {
     rotate90?: () => void
     flipH?: () => void
     flipV?: () => void
+    rotateArbitrary?: () => void
+    imageSize?: () => void
+    canvasSize?: () => void
+    trim?: () => void
+    revealAll?: () => void
     openAdjustment?: (kind: AdjustmentKind) => void
     openFilter?: (kind: FilterKind) => void
     duplicateLayer?: () => void
@@ -84,6 +89,12 @@ type Props = {
     zoomIn?: () => void
     zoomOut?: () => void
     zoomFit?: () => void
+    zoomActualPixels?: () => void
+    zoomFitScreen?: () => void
+    toggleGrid?: () => void
+    toggleSnap?: () => void
+    showGrid?: boolean
+    snapToGrid?: boolean
     toggleFocus?: () => void
   }
 }
@@ -200,9 +211,38 @@ export function MenuBar({ handlers }: Props) {
       label: t('pages.imageEditor.menu.image'),
       sections: [
         [
+          {
+            id: 'imageSize',
+            label: t('pages.imageEditor.menu.imageSize') + '…',
+            shortcut: '⌥⌘I',
+            onClick: handlers.imageSize,
+          },
+          {
+            id: 'canvasSize',
+            label: t('pages.imageEditor.menu.canvasSize') + '…',
+            shortcut: '⌥⌘C',
+            onClick: handlers.canvasSize,
+          },
+        ],
+        { sep: true },
+        [
           { id: 'rot90', label: t('pages.imageEditor.menu.rotate90'), onClick: handlers.rotate90 },
+          {
+            id: 'rotArb',
+            label: t('pages.imageEditor.menu.rotateArbitrary') + '…',
+            onClick: handlers.rotateArbitrary,
+          },
           { id: 'flipH', label: t('pages.imageEditor.menu.flipH'), onClick: handlers.flipH },
           { id: 'flipV', label: t('pages.imageEditor.menu.flipV'), onClick: handlers.flipV },
+        ],
+        { sep: true },
+        [
+          { id: 'trim', label: t('pages.imageEditor.menu.trim'), onClick: handlers.trim },
+          {
+            id: 'revealAll',
+            label: t('pages.imageEditor.menu.revealAll'),
+            onClick: handlers.revealAll,
+          },
         ],
         { sep: true },
         [
@@ -537,7 +577,37 @@ export function MenuBar({ handlers }: Props) {
         [
           { id: 'zin', label: t('pages.imageEditor.menu.zoomIn'), shortcut: '⌘+', onClick: handlers.zoomIn },
           { id: 'zout', label: t('pages.imageEditor.menu.zoomOut'), shortcut: '⌘-', onClick: handlers.zoomOut },
-          { id: 'fit', label: t('pages.imageEditor.menu.zoomFit'), shortcut: '⌘0', onClick: handlers.zoomFit },
+          {
+            id: 'fitScreen',
+            label: t('pages.imageEditor.menu.zoomFit'),
+            shortcut: '⌘0',
+            onClick: handlers.zoomFitScreen,
+          },
+          {
+            id: 'actual',
+            label: t('pages.imageEditor.menu.actualPixels'),
+            shortcut: '⌘1',
+            onClick: handlers.zoomActualPixels,
+          },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'showGrid',
+            label:
+              (handlers.showGrid ? '✓ ' : '') +
+              t('pages.imageEditor.menu.showGrid'),
+            shortcut: "⌘'",
+            onClick: handlers.toggleGrid,
+          },
+          {
+            id: 'snapGrid',
+            label:
+              (handlers.snapToGrid ? '✓ ' : '') +
+              t('pages.imageEditor.menu.snapToGrid'),
+            shortcut: '⇧⌘;',
+            onClick: handlers.toggleSnap,
+          },
         ],
         { sep: true },
         [

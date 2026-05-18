@@ -563,6 +563,11 @@
         "flatten": "Flatten Image",
         "convertToSmartObject": "Convert to Smart Object",
         "replaceSmartObjectContents": "Replace Contents",
+        "imageSize": "Image Size",
+        "canvasSize": "Canvas Size",
+        "rotateArbitrary": "Arbitrary Rotation",
+        "trim": "Trim",
+        "revealAll": "Reveal All",
         "cut": "Cut",
         "copy": "Copy",
         "copyMerged": "Copy Merged",
@@ -574,6 +579,9 @@
         "zoomIn": "Zoom In",
         "zoomOut": "Zoom Out",
         "zoomFit": "Fit on Screen",
+        "actualPixels": "Actual Pixels (100%)",
+        "showGrid": "Show Grid",
+        "snapToGrid": "Snap to Grid",
         "toggleFocus": "Toggle Focus Mode"
       },
       "selectMenu": {
@@ -619,6 +627,41 @@
         "mergedVisible": "Visible layers merged",
         "stamped": "Visible layers stamped to new layer",
         "flattened": "Image flattened"
+      },
+      "imageSize": {
+        "title": "Image Size",
+        "currentSize": "Current size: {{w}} × {{h}}px",
+        "width": "Width",
+        "height": "Height",
+        "unit": "Unit",
+        "constrain": "Constrain proportions",
+        "applied": "Image resized"
+      },
+      "canvasSize": {
+        "title": "Canvas Size",
+        "currentSize": "Current size: {{w}} × {{h}}px",
+        "width": "Width",
+        "height": "Height",
+        "anchor": "Anchor",
+        "bgColor": "Background colour",
+        "applied": "Canvas resized"
+      },
+      "rotateArbitrary": {
+        "title": "Rotate Image",
+        "angle": "Angle",
+        "hint": "Rotation is destructive; layers / transforms / crop are flattened and reset.",
+        "applied": "Image rotated"
+      },
+      "colorPicker": {
+        "title": "Color Picker"
+      },
+      "imageMenu": {
+        "trimmed": "Image trimmed",
+        "trimNothing": "Nothing to trim — image has no transparent border.",
+        "trimFailed": "Trim failed (image may be CORS-tainted).",
+        "trimNeedsRevealAll": "Clear the current crop (Reveal All) before trimming.",
+        "revealed": "Crop cleared — full image revealed",
+        "noCropToReveal": "No active crop to reveal."
       },
       "smartObject": {
         "title": "Smart Object",

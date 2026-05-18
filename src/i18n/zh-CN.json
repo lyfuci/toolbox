@@ -563,6 +563,11 @@
         "flatten": "拼合图像",
         "convertToSmartObject": "转换为智能对象",
         "replaceSmartObjectContents": "替换内容",
+        "imageSize": "图像大小",
+        "canvasSize": "画布大小",
+        "rotateArbitrary": "任意角度旋转",
+        "trim": "裁修",
+        "revealAll": "显示全部",
         "cut": "剪切",
         "copy": "拷贝",
         "copyMerged": "合并拷贝",
@@ -574,6 +579,9 @@
         "zoomIn": "放大",
         "zoomOut": "缩小",
         "zoomFit": "适合屏幕",
+        "actualPixels": "实际像素 (100%)",
+        "showGrid": "显示网格",
+        "snapToGrid": "对齐到网格",
         "toggleFocus": "切换焦点模式"
       },
       "selectMenu": {
@@ -619,6 +627,41 @@
         "mergedVisible": "已合并可见图层",
         "stamped": "已盖印可见图层到新图层",
         "flattened": "已拼合图像"
+      },
+      "imageSize": {
+        "title": "图像大小",
+        "currentSize": "当前大小：{{w}} × {{h}}px",
+        "width": "宽度",
+        "height": "高度",
+        "unit": "单位",
+        "constrain": "约束比例",
+        "applied": "图像已重设大小"
+      },
+      "canvasSize": {
+        "title": "画布大小",
+        "currentSize": "当前大小：{{w}} × {{h}}px",
+        "width": "宽度",
+        "height": "高度",
+        "anchor": "定位",
+        "bgColor": "背景颜色",
+        "applied": "画布已重设大小"
+      },
+      "rotateArbitrary": {
+        "title": "旋转图像",
+        "angle": "角度",
+        "hint": "任意角度旋转会破坏性地拼合并重置图层/变换/裁剪。",
+        "applied": "图像已旋转"
+      },
+      "colorPicker": {
+        "title": "拾色器"
+      },
+      "imageMenu": {
+        "trimmed": "已裁修图像",
+        "trimNothing": "没有可裁修的区域 —— 图像没有透明边缘。",
+        "trimFailed": "裁修失败（图像可能受 CORS 限制）。",
+        "trimNeedsRevealAll": "请先清除当前裁剪（显示全部）再进行裁修。",
+        "revealed": "已清除裁剪 —— 显示完整图像",
+        "noCropToReveal": "当前没有裁剪可显示。"
       },
       "smartObject": {
         "title": "智能对象",

@@ -207,6 +207,11 @@ type Props = {
   swapColors: () => void
   resetColors: () => void
   onStubClick: (toolName: string) => void
+  /** Click on FG / BG swatch opens the PS-style ColorPickerDialog. The
+   *  native <input type=color> path stays as a hidden fallback (clicking
+   *  the label still focuses the input — relevant for users / OSes that
+   *  prefer the native picker). */
+  onOpenColorPicker?: (which: 'fg' | 'bg') => void
 }
 
 export function ToolsPalette({
@@ -219,6 +224,7 @@ export function ToolsPalette({
   swapColors,
   resetColors,
   onStubClick,
+  onOpenColorPicker,
 }: Props) {
   const { t } = useTranslation()
   return (
@@ -252,12 +258,33 @@ export function ToolsPalette({
         className="pf-tool-colors"
         title={`${t('pages.imageEditor.colors')} — X/D`}
       >
-        <label className="pf-bg" style={{ backgroundColor: bgColor }} title={t('pages.imageEditor.bgColor')}>
-          <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} />
-        </label>
-        <label className="pf-fg" style={{ backgroundColor: fgColor }} title={t('pages.imageEditor.fgColor')}>
-          <input type="color" value={fgColor} onChange={(e) => setFgColor(e.target.value)} />
-        </label>
+        {onOpenColorPicker ? (
+          <>
+            <button
+              type="button"
+              className="pf-bg"
+              style={{ backgroundColor: bgColor, border: 'none', cursor: 'pointer' }}
+              onClick={() => onOpenColorPicker('bg')}
+              title={t('pages.imageEditor.bgColor')}
+            />
+            <button
+              type="button"
+              className="pf-fg"
+              style={{ backgroundColor: fgColor, border: 'none', cursor: 'pointer' }}
+              onClick={() => onOpenColorPicker('fg')}
+              title={t('pages.imageEditor.fgColor')}
+            />
+          </>
+        ) : (
+          <>
+            <label className="pf-bg" style={{ backgroundColor: bgColor }} title={t('pages.imageEditor.bgColor')}>
+              <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} />
+            </label>
+            <label className="pf-fg" style={{ backgroundColor: fgColor }} title={t('pages.imageEditor.fgColor')}>
+              <input type="color" value={fgColor} onChange={(e) => setFgColor(e.target.value)} />
+            </label>
+          </>
+        )}
       </div>
       <div
         className="pf-tool-mode"

@@ -6,9 +6,13 @@ import { Canvas, type CanvasHandle } from '@/components/image-editor/Canvas'
 import { DropZone } from '@/components/image-editor/DropZone'
 import { FillDialog } from '@/components/image-editor/FillDialog'
 import { FilterDialog } from '@/components/image-editor/FilterDialog'
+import { CanvasSizeDialog, type Anchor9 } from '@/components/image-editor/CanvasSizeDialog'
+import { ColorPickerDialog } from '@/components/image-editor/ColorPickerDialog'
 import { ContextMenu, type ContextMenuItem } from '@/components/image-editor/ContextMenu'
+import { ImageSizeDialog } from '@/components/image-editor/ImageSizeDialog'
 import { LayerStyleDialog } from '@/components/image-editor/LayerStyleDialog'
 import { MenuBar } from '@/components/image-editor/MenuBar'
+import { RotateArbitraryDialog } from '@/components/image-editor/RotateArbitraryDialog'
 import { OptionsBar } from '@/components/image-editor/OptionsBar'
 import { RightSidebar } from '@/components/image-editor/RightSidebar'
 import {
@@ -58,7 +62,7 @@ import {
   reselect,
   selectAll,
 } from '@/lib/image-editor/selection-ops'
-import { translateLayer, withSelectionClip } from '@/lib/image-editor/transform'
+import { scaleLayer, translateLayer, withSelectionClip } from '@/lib/image-editor/transform'
 import {
   loadImageFromUrl,
   parseProject,
@@ -165,6 +169,14 @@ export function ImageEditorPage() {
   const mergeVisibleRef = useRef<() => void>(() => {})
   const stampVisibleRef = useRef<() => void>(() => {})
 
+  // View menu toggles (UI-only, not part of EditorState or project save).
+  // Grid + snap travel together: snap is a no-op when the grid is hidden.
+  const [showGrid, setShowGrid] = useState(false)
+  const [snapToGrid, setSnapToGrid] = useState(false)
+  // gridStep is a constant in v1; a follow-up will expose it via a settings
+  // popover next to the View menu toggle.
+  const gridStep = 50 // preview-canvas pixels
+
   // Zoom + pan + Space-held pan mode.
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -189,6 +201,27 @@ export function ImageEditorPage() {
     setZoom(1)
     setPan({ x: 0, y: 0 })
   }, [])
+  // View > Actual Pixels (⌘1): zoom = 1, pan reset. Distinct from Fit on
+  // Screen — actual pixels gives a 1:1 source-pixel view.
+  const zoomActualPixels = useCallback(() => {
+    setZoom(1)
+    setPan({ x: 0, y: 0 })
+  }, [])
+  // View > Fit on Screen (⌘0): compute zoom so the canvas fits inside the
+  // workspace's wrapper rect (with a 24px breathing margin), then centre.
+  const zoomFitScreen = useCallback(() => {
+    if (!image) return
+    const rect = workspaceRef.current?.getWrapperRect()
+    if (!rect) return
+    const margin = 24
+    const baseW = image.naturalWidth
+    const baseH = image.naturalHeight
+    const fitX = (rect.width - margin * 2) / baseW
+    const fitY = (rect.height - margin * 2) / baseH
+    const z = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.min(fitX, fitY)))
+    setZoom(z)
+    setPan({ x: 0, y: 0 })
+  }, [image])
 
   const zoomAtPoint = useCallback(
     (clientX: number, clientY: number, factor: number) => {
@@ -255,8 +288,8 @@ export function ImageEditorPage() {
       if (mod) {
         if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomIn(); return }
         if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomOut(); return }
-        if (e.key === '0') { e.preventDefault(); zoomReset(); return }
-        if (e.key === '1') { e.preventDefault(); setZoom(1); setPan({ x: 0, y: 0 }); return }
+        if (e.key === '0') { e.preventDefault(); zoomFitScreen(); return }
+        if (e.key === '1') { e.preventDefault(); zoomActualPixels(); return }
         if (e.key === 'j' || e.key === 'J') { e.preventDefault(); duplicateRef.current(); return }
         if (e.key === ']') { e.preventDefault(); moveLayerRef.current(e.shiftKey ? 'front' : 'forward'); return }
         if (e.key === '[') { e.preventDefault(); moveLayerRef.current(e.shiftKey ? 'back' : 'backward'); return }
@@ -404,7 +437,7 @@ export function ImageEditorPage() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [focused, zoomIn, zoomOut, zoomReset, swapColors, resetColors, selectedLayerId, trySetTool, history, state, image])
+  }, [focused, zoomIn, zoomOut, zoomReset, zoomActualPixels, zoomFitScreen, swapColors, resetColors, selectedLayerId, trySetTool, history, state, image])
 
   // ── Layer state helpers ──────────────────────────────────────────────────
   // All of these are tree-aware — `state.layers` is a nested tree once groups
@@ -1026,6 +1059,208 @@ export function ImageEditorPage() {
       toast.error(t('pages.imageEditor.errLoadFailed'))
     }
   }, [image, state, imageCache, history, t])
+
+  // ── Image > Image Size ────────────────────────────────────────────────
+  const [imageSizeOpen, setImageSizeOpen] = useState(false)
+  const handleImageSizeApply = useCallback(
+    async (next: { w: number; h: number }) => {
+      if (!image) return
+      setImageSizeOpen(false)
+      const oldW = image.naturalWidth
+      const oldH = image.naturalHeight
+      // Compute preview-pixel scale ratio. Layer coords live in preview
+      // space — and previewScale ITSELF changes when the image's
+      // larger-dimension crosses PREVIEW_MAX, so naively using
+      // (newW / oldW) under-/over-shoots when the threshold is crossed.
+      const oldPreviewScale = Math.min(1, PREVIEW_MAX / Math.max(oldW, oldH, 1))
+      const newPreviewScale = Math.min(1, PREVIEW_MAX / Math.max(next.w, next.h, 1))
+      const previewSx = (next.w * newPreviewScale) / (oldW * oldPreviewScale)
+      const previewSy = (next.h * newPreviewScale) / (oldH * oldPreviewScale)
+      // Resample the underlying image at the new resolution. We render via a
+      // plain canvas (not flattenToDataUrl) because we want only the image
+      // pixels, not the baked layers — layers stay non-destructive.
+      const tmp = document.createElement('canvas')
+      tmp.width = next.w
+      tmp.height = next.h
+      const tctx = tmp.getContext('2d')
+      if (!tctx) return
+      tctx.imageSmoothingEnabled = true
+      tctx.imageSmoothingQuality = 'high'
+      tctx.drawImage(image, 0, 0, next.w, next.h)
+      try {
+        const img = await loadImageFromUrl(tmp.toDataURL('image/png'))
+        setImage(img)
+        history.set({
+          ...state,
+          layers: state.layers.map((l) => scaleLayer(l, previewSx, previewSy)),
+          selection: state.selection
+            ? {
+                x: state.selection.x * previewSx,
+                y: state.selection.y * previewSy,
+                w: state.selection.w * previewSx,
+                h: state.selection.h * previewSy,
+              }
+            : undefined,
+          selectionPath: state.selectionPath?.map((p) => ({
+            x: p.x * previewSx,
+            y: p.y * previewSy,
+          })),
+          cropRect: state.cropRect
+            ? {
+                x: state.cropRect.x * previewSx,
+                y: state.cropRect.y * previewSy,
+                w: state.cropRect.w * previewSx,
+                h: state.cropRect.h * previewSy,
+              }
+            : undefined,
+        })
+        toast.success(t('pages.imageEditor.imageSize.applied'))
+      } catch {
+        toast.error(t('pages.imageEditor.errLoadFailed'))
+      }
+    },
+    [image, state, history, t],
+  )
+
+  // ── Image > Canvas Size ───────────────────────────────────────────────
+  const [canvasSizeOpen, setCanvasSizeOpen] = useState(false)
+  const handleCanvasSizeApply = useCallback(
+    async (args: { w: number; h: number; anchor: Anchor9; bgColor: string }) => {
+      if (!image) return
+      setCanvasSizeOpen(false)
+      const { w: newW, h: newH, anchor, bgColor } = args
+      const oldW = image.naturalWidth
+      const oldH = image.naturalHeight
+      // Anchor → offset where to place the OLD image inside the new canvas
+      // (source-pixel delta for the drawImage call).
+      const dxSrc = anchorOffset(anchor, 'x') * (newW - oldW)
+      const dySrc = anchorOffset(anchor, 'y') * (newH - oldH)
+      // translateLayer operates in preview-pixel space — convert.
+      const newPreviewScale = Math.min(1, PREVIEW_MAX / Math.max(newW, newH, 1))
+      const dxPreview = dxSrc * newPreviewScale
+      const dyPreview = dySrc * newPreviewScale
+      const tmp = document.createElement('canvas')
+      tmp.width = newW
+      tmp.height = newH
+      const tctx = tmp.getContext('2d')
+      if (!tctx) return
+      tctx.fillStyle = bgColor
+      tctx.fillRect(0, 0, newW, newH)
+      tctx.drawImage(image, dxSrc, dySrc)
+      try {
+        const img = await loadImageFromUrl(tmp.toDataURL('image/png'))
+        setImage(img)
+        history.set({
+          ...state,
+          layers: state.layers.map((l) => translateLayer(l, dxPreview, dyPreview)),
+          // Cleared crop / selection — the canvas resize invalidates them.
+          cropRect: undefined,
+          selection: undefined,
+          selectionPath: undefined,
+        })
+        toast.success(t('pages.imageEditor.canvasSize.applied'))
+      } catch {
+        toast.error(t('pages.imageEditor.errLoadFailed'))
+      }
+    },
+    [image, state, history, t],
+  )
+
+  // ── Image > Trim ───────────────────────────────────────────────────────
+  // Detect a transparent / uniform-edge-colour border by scanning all four
+  // sides of the rendered composite. Sets `cropRect` to the trimmed region
+  // (non-destructive — Reveal All restores).
+  const handleTrim = useCallback(() => {
+    if (!image) return
+    if (state.cropRect) {
+      // V1: Trim assumes original-image coords. With an active crop,
+      // renderEditorToCanvas returns the cropped frame and the resulting
+      // bbox would land in the wrong coord space. Ask the user to clear
+      // the crop first via Reveal All.
+      toast.message(t('pages.imageEditor.imageMenu.trimNeedsRevealAll'))
+      return
+    }
+    const canvas = renderEditorToCanvas(image, state, imageCache, {
+      includeImageBackground: true,
+    })
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    let data: ImageData
+    try {
+      data = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    } catch {
+      toast.error(t('pages.imageEditor.imageMenu.trimFailed'))
+      return
+    }
+    const bbox = findTrimBBox(data)
+    if (!bbox) {
+      toast.message(t('pages.imageEditor.imageMenu.trimNothing'))
+      return
+    }
+    // Convert source-pixel bbox to preview-pixel cropRect.
+    const { previewScale } = previewDimsOf(image, state)
+    history.set({
+      ...state,
+      cropRect: {
+        x: bbox.x * previewScale,
+        y: bbox.y * previewScale,
+        w: bbox.w * previewScale,
+        h: bbox.h * previewScale,
+      },
+    })
+    toast.success(t('pages.imageEditor.imageMenu.trimmed'))
+  }, [image, state, imageCache, history, t])
+
+  // ── Image > Reveal All ─────────────────────────────────────────────────
+  // Clears any active crop, revealing the full image area.
+  const handleRevealAll = useCallback(() => {
+    if (!state.cropRect) {
+      toast.message(t('pages.imageEditor.imageMenu.noCropToReveal'))
+      return
+    }
+    history.set({ ...state, cropRect: undefined })
+    toast.success(t('pages.imageEditor.imageMenu.revealed'))
+  }, [state, history, t])
+
+  // ── Image > Image Rotation > Arbitrary ────────────────────────────────
+  const [rotateOpen, setRotateOpen] = useState(false)
+  // Color picker target: 'fg' / 'bg' for FG/BG swatches; null = closed.
+  const [colorPicker, setColorPicker] = useState<'fg' | 'bg' | null>(null)
+  const handleRotateArbitraryApply = useCallback(
+    async (degrees: number) => {
+      setRotateOpen(false)
+      if (!image || degrees === 0) return
+      // Rasterize the whole editor first (so adjust / layers bake in), then
+      // rotate. Output canvas is sized to fit the rotated bbox of the
+      // existing image dims.
+      const r = (degrees * Math.PI) / 180
+      const sin = Math.abs(Math.sin(r))
+      const cos = Math.abs(Math.cos(r))
+      const newW = Math.round(image.naturalWidth * cos + image.naturalHeight * sin)
+      const newH = Math.round(image.naturalWidth * sin + image.naturalHeight * cos)
+      const dataUrl = flattenToDataUrl(image, state, imageCache)
+      if (!dataUrl) return
+      try {
+        const src = await loadImageFromUrl(dataUrl)
+        const tmp = document.createElement('canvas')
+        tmp.width = newW
+        tmp.height = newH
+        const tctx = tmp.getContext('2d')
+        if (!tctx) return
+        tctx.translate(newW / 2, newH / 2)
+        tctx.rotate(r)
+        tctx.drawImage(src, -src.naturalWidth / 2, -src.naturalHeight / 2)
+        const out = await loadImageFromUrl(tmp.toDataURL('image/png'))
+        setImage(out)
+        history.reset(initialState())
+        setSelectedLayerId('image')
+        toast.success(t('pages.imageEditor.rotateArbitrary.applied'))
+      } catch {
+        toast.error(t('pages.imageEditor.errLoadFailed'))
+      }
+    },
+    [image, state, imageCache, history, t],
+  )
 
   useEffect(() => {
     duplicateRef.current = () => {
@@ -1756,6 +1991,11 @@ export function ImageEditorPage() {
               }),
             flipH: () => setTransforms({ ...state.transforms, flipH: !state.transforms.flipH }),
             flipV: () => setTransforms({ ...state.transforms, flipV: !state.transforms.flipV }),
+            rotateArbitrary: () => setRotateOpen(true),
+            imageSize: () => setImageSizeOpen(true),
+            canvasSize: () => setCanvasSizeOpen(true),
+            trim: handleTrim,
+            revealAll: handleRevealAll,
             openAdjustment: (kind: AdjustmentKind) => setOpenAdjustment(kind),
             openFilter: (kind: FilterKind) => setOpenFilter(kind),
             duplicateLayer: () => duplicateRef.current(),
@@ -1796,6 +2036,12 @@ export function ImageEditorPage() {
             zoomIn,
             zoomOut,
             zoomFit: zoomReset,
+            zoomActualPixels,
+            zoomFitScreen,
+            toggleGrid: () => setShowGrid((v) => !v),
+            toggleSnap: () => setSnapToGrid((v) => !v),
+            showGrid,
+            snapToGrid,
             toggleFocus: () => setFocused((v) => !v),
           }}
         />
@@ -1833,6 +2079,7 @@ export function ImageEditorPage() {
           swapColors={swapColors}
           resetColors={resetColors}
           onStubClick={stubMsg}
+          onOpenColorPicker={(which) => setColorPicker(which)}
         />
 
         <div className="pf-canvas-wrap">
@@ -1906,6 +2153,8 @@ export function ImageEditorPage() {
               cloneSource={cloneSource}
               onCloneNeedSource={handleCloneNeedSource}
               extraPreviewLayer={adjustmentDraft ?? filterDraft ?? undefined}
+              showGrid={showGrid}
+              gridStep={gridStep}
             />
           </Workspace>
         </div>
@@ -1977,6 +2226,37 @@ export function ImageEditorPage() {
         onApply={handleLayerStyleApply}
         onCancel={() => setOpenLayerStyle(null)}
       />
+      {image && (
+        <ImageSizeDialog
+          open={imageSizeOpen}
+          current={{ w: image.naturalWidth, h: image.naturalHeight }}
+          onApply={handleImageSizeApply}
+          onCancel={() => setImageSizeOpen(false)}
+        />
+      )}
+      {image && (
+        <CanvasSizeDialog
+          open={canvasSizeOpen}
+          current={{ w: image.naturalWidth, h: image.naturalHeight }}
+          onApply={handleCanvasSizeApply}
+          onCancel={() => setCanvasSizeOpen(false)}
+        />
+      )}
+      <RotateArbitraryDialog
+        open={rotateOpen}
+        onApply={handleRotateArbitraryApply}
+        onCancel={() => setRotateOpen(false)}
+      />
+      <ColorPickerDialog
+        open={colorPicker !== null}
+        initial={colorPicker === 'bg' ? colors.bg : colors.fg}
+        onApply={(hex) => {
+          if (colorPicker === 'bg') setColors((s) => ({ ...s, bg: hex }))
+          else if (colorPicker === 'fg') setColors((s) => ({ ...s, fg: hex }))
+          setColorPicker(null)
+        }}
+        onCancel={() => setColorPicker(null)}
+      />
       {contextMenu && (
         <ContextMenu
           x={contextMenu.x}
@@ -2009,4 +2289,46 @@ function pickFile(accept: string): Promise<File | null> {
     input.onchange = () => resolve(input.files?.[0] ?? null)
     input.click()
   })
+}
+
+/**
+ * 9-point anchor → axis offset multiplier (0 = origin/start, 0.5 = centre,
+ * 1 = far edge). Used by Canvas Size to position the old image inside the
+ * new canvas bounds.
+ */
+function anchorOffset(anchor: Anchor9, axis: 'x' | 'y'): number {
+  if (axis === 'x') {
+    if (anchor === 'nw' || anchor === 'w' || anchor === 'sw') return 0
+    if (anchor === 'n' || anchor === 'c' || anchor === 's') return 0.5
+    return 1
+  }
+  if (anchor === 'nw' || anchor === 'n' || anchor === 'ne') return 0
+  if (anchor === 'w' || anchor === 'c' || anchor === 'e') return 0.5
+  return 1
+}
+
+/**
+ * Scan `data` for the bounding rectangle of non-transparent pixels.
+ * Returns null if everything is transparent (nothing to trim).
+ */
+function findTrimBBox(data: ImageData): { x: number; y: number; w: number; h: number } | null {
+  const { width, height } = data
+  const px = data.data
+  let minX = width
+  let minY = height
+  let maxX = -1
+  let maxY = -1
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const a = px[(y * width + x) * 4 + 3]
+      if (a !== 0) {
+        if (x < minX) minX = x
+        if (y < minY) minY = y
+        if (x > maxX) maxX = x
+        if (y > maxY) maxY = y
+      }
+    }
+  }
+  if (maxX < 0) return null
+  return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 }
 }
