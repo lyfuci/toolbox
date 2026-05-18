@@ -6,6 +6,7 @@ import { Canvas, type CanvasHandle } from '@/components/image-editor/Canvas'
 import { DropZone } from '@/components/image-editor/DropZone'
 import { FillDialog } from '@/components/image-editor/FillDialog'
 import { FilterDialog } from '@/components/image-editor/FilterDialog'
+import { LayerStyleDialog } from '@/components/image-editor/LayerStyleDialog'
 import { MenuBar } from '@/components/image-editor/MenuBar'
 import { OptionsBar } from '@/components/image-editor/OptionsBar'
 import { RightSidebar } from '@/components/image-editor/RightSidebar'
@@ -71,6 +72,8 @@ import type {
   FilterParams,
   GroupLayer,
   Layer,
+  LayerEffect,
+  LayerEffectKind,
   OutputFormat,
   Point,
   Tool,
@@ -680,7 +683,7 @@ export function ImageEditorPage() {
       bbox: { x: 0, y: 0, w, h },
       name: layer.name,
     })
-    // Carry over visibility / opacity / blend / shadow / clip from the orig.
+    // Carry over visibility / opacity / blend / fx / clip from the orig.
     const merged: Layer = {
       ...replacement,
       id: layer.id,
@@ -689,6 +692,7 @@ export function ImageEditorPage() {
       opacity: layer.opacity,
       blend: layer.blend,
       shadow: layer.shadow,
+      effects: layer.effects,
       clipRect: layer.clipRect,
       clipPath: layer.clipPath,
       clipInverse: layer.clipInverse,
@@ -1153,6 +1157,45 @@ export function ImageEditorPage() {
     setOpenFilter(null)
   }, [])
 
+  // ── Layer Style dialog ────────────────────────────────────────────────
+  // `openLayerStyle` is { layerId, kind? } — opens the modal targeting that
+  // layer (defaulting to the currently selected layer when invoked from the
+  // menu). On Apply we patch the layer's `effects` and clear any legacy
+  // `shadow` so the two don't double-render.
+  const [openLayerStyle, setOpenLayerStyle] = useState<{
+    layerId: string
+    kind?: LayerEffectKind
+  } | null>(null)
+  const handleOpenLayerStyle = useCallback(
+    (kind?: LayerEffectKind) => {
+      // Image background can't carry effects (no overlay surface in its render
+      // path). Adjustment / filter / mask layers also can't render effects —
+      // they consume pixels rather than emit their own. Silently no-op rather
+      // than presenting a dialog that won't visibly do anything.
+      if (!selectedLayerId || selectedLayerId === 'image') return
+      const target = findLayerById(state.layers, selectedLayerId)
+      if (!target) return
+      if (target.kind !== 'annotation' && target.kind !== 'group') {
+        toast.message(t('pages.imageEditor.layerStyle.unsupportedKind'))
+        return
+      }
+      setOpenLayerStyle({ layerId: selectedLayerId, kind })
+    },
+    [selectedLayerId, state.layers, t],
+  )
+  const layerStyleTarget: Layer | null = openLayerStyle
+    ? findLayerById(state.layers, openLayerStyle.layerId)
+    : null
+  const layerStyleInitial: LayerEffect[] = layerStyleTarget?.effects ?? []
+  const handleLayerStyleApply = useCallback(
+    (next: LayerEffect[]) => {
+      if (!openLayerStyle) return
+      patchLayer(openLayerStyle.layerId, { effects: next, shadow: undefined })
+      setOpenLayerStyle(null)
+    },
+    [openLayerStyle, patchLayer],
+  )
+
   // ── Sample-pixel tools (Spot Heal / Clone Stamp / History Brush) ──────
   // All three are drag-paint: Canvas owns the snapshot + offscreen + stamp
   // loop; the parent's only jobs are the Clone Stamp source toast + the
@@ -1506,6 +1549,7 @@ export function ImageEditorPage() {
             mergeDown: handleMergeDown,
             mergeVisible: handleMergeVisible,
             flatten: handleFlatten,
+            openLayerStyle: handleOpenLayerStyle,
             zoomIn,
             zoomOut,
             zoomFit: zoomReset,
@@ -1634,6 +1678,10 @@ export function ImageEditorPage() {
           setTransforms={setTransforms}
           setAdjust={(adjust) => history.set({ ...state, adjust })}
           zoom={zoom}
+          onOpenStyle={(id) => {
+            setSelectedLayerId(id)
+            setOpenLayerStyle({ layerId: id })
+          }}
         />
 
         <StatusBar
@@ -1676,6 +1724,13 @@ export function ImageEditorPage() {
         fgColor={colors.fg}
         onApply={handleStrokeApply}
         onCancel={() => setStrokeOpen(false)}
+      />
+      <LayerStyleDialog
+        open={!!openLayerStyle}
+        initial={layerStyleInitial}
+        initialKind={openLayerStyle?.kind}
+        onApply={handleLayerStyleApply}
+        onCancel={() => setOpenLayerStyle(null)}
       />
     </div>
   )

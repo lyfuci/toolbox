@@ -3,9 +3,16 @@ import { drawShape, type ImageCache } from './drawing'
 import { applyFilter, scaleFilterParams } from './filter-ops'
 import { filterString } from './filters'
 import { getHandles, getLayerBBox, normalizeRect } from './hit'
+import {
+  buildEffectContribution,
+  effectIsBehindContent,
+  effectsOf,
+  hasEffects,
+} from './layer-effects'
 import { translateLayer } from './transform'
 import type {
   AdjustmentLayer,
+  AnnotationLayer,
   BlendMode,
   EditorState,
   FilterLayer,
@@ -14,7 +21,6 @@ import type {
   MaskLayer,
   Point,
   Rect,
-  Shadow,
 } from './types'
 
 export type RenderInput = {
@@ -271,10 +277,17 @@ function renderLayer(
     return
   }
   if (layer.kind === 'annotation') {
+    // Slow path: any fx (modern effects or legacy shadow) → render through
+    // the layer-effects pipeline so we get inner shadow / glow / stroke /
+    // color overlay etc. Layer-clip + opacity + blend apply once at the
+    // composite stage, identical to the fast path's semantics.
+    if (hasEffects(layer)) {
+      renderAnnotationWithEffects(canvas, ctx, layer, rc)
+      return
+    }
     ctx.save()
     ctx.globalAlpha = layer.opacity / 100
     ctx.globalCompositeOperation = blendModeToOp(layer.blend)
-    applyShadow(ctx, layer.shadow, rc.annoScale)
     applyLayerClip(ctx, layer, rc.annoScale)
     // Mosaic + Blur both sample the underlying composite — snapshot first
     // so they read pre-shape pixels rather than their own output.
@@ -321,17 +334,93 @@ function renderGroupLayer(
   offscreen.height = canvas.height
   const octx = offscreen.getContext('2d')
   if (!octx) return
+  // Group's own clip applies BEFORE children render — children inherit it
+  // via the canvas clip stack across their own save/restore pairs. fx like
+  // stroke / inner glow then trace the *clipped* silhouette, matching PS.
+  applyLayerClip(octx, layer, rc.annoScale)
   for (const child of layer.children) {
     renderLayer(offscreen, octx, child, rc)
   }
+  compositeLayerWithEffects(canvas, ctx, layer, offscreen, rc)
+}
+
+/**
+ * Annotation render path used whenever the layer carries any fx (modern
+ * effects array or legacy shadow). Identical math to the fast path: the
+ * shape is drawn onto an offscreen the size of the destination canvas, so
+ * `applyLayerClip` and "mosaic / blur snapshot the underlying composite"
+ * both keep working — we just snapshot the destination *before* drawing the
+ * fx layer (which is what the fast path effectively does too, since it
+ * draws straight onto the destination).
+ */
+function renderAnnotationWithEffects(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  layer: AnnotationLayer,
+  rc: PerLayerCtx,
+): void {
+  if (canvas.width < 1 || canvas.height < 1) return
+  const offscreen = document.createElement('canvas')
+  offscreen.width = canvas.width
+  offscreen.height = canvas.height
+  const octx = offscreen.getContext('2d')
+  if (!octx) return
+  // Layer clip applies INSIDE the offscreen so the fx pipeline sees the
+  // post-clip silhouette (stroke / inner glow trace the clipped edge).
+  applyLayerClip(octx, layer, rc.annoScale)
+  const needsUnderlying = layer.shape.kind === 'mosaic' || layer.shape.kind === 'blur'
+  // Pixel-sampling shapes (mosaic / blur) read the *destination* canvas, not
+  // their own offscreen — same as the fast path's "snapshot before draw".
+  const underlying = needsUnderlying ? snapshotCanvas(canvas) : offscreen
+  drawShape(octx, layer.shape, rc.annoScale, underlying, rc.imageCache)
+  compositeLayerWithEffects(canvas, ctx, layer, offscreen, rc)
+}
+
+/**
+ * Shared composite step for both annotation + group: take the layer's
+ * already-rendered offscreen `content`, then composite onto the destination
+ * in PS order: BEHIND effects → content → IN-FRONT effects. Each effect
+ * draws DIRECTLY onto the destination with its own blend mode so it
+ * correctly interacts with what's below the layer (a multiply drop shadow
+ * darkens the destination, not just an empty stack). Layer opacity dims
+ * the whole stack uniformly; layer blend applies to the content only.
+ */
+function compositeLayerWithEffects(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  layer: Layer,
+  content: HTMLCanvasElement,
+  rc: PerLayerCtx,
+): void {
+  const fx = effectsOf(layer)
+  const layerAlpha = layer.opacity / 100
+  const dims = { w: canvas.width, h: canvas.height }
+
+  const drawContribution = (e: typeof fx[number]) => {
+    const contrib = buildEffectContribution(e, dims, content, rc.annoScale)
+    if (!contrib) return
+    ctx.save()
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.globalAlpha = layerAlpha * (e.opacity / 100)
+    ctx.globalCompositeOperation = blendModeToOp(e.blend)
+    ctx.drawImage(contrib, 0, 0)
+    ctx.restore()
+  }
+
+  for (const e of fx) {
+    if (effectIsBehindContent(e)) drawContribution(e)
+  }
+
   ctx.save()
   ctx.setTransform(1, 0, 0, 1, 0, 0)
-  ctx.globalAlpha = layer.opacity / 100
+  ctx.globalAlpha = layerAlpha
   ctx.globalCompositeOperation = blendModeToOp(layer.blend)
-  applyShadow(ctx, layer.shadow, rc.annoScale)
-  applyLayerClip(ctx, layer, rc.annoScale)
-  ctx.drawImage(offscreen, 0, 0)
+  ctx.drawImage(content, 0, 0)
   ctx.restore()
+
+  for (const e of fx) {
+    if (!effectIsBehindContent(e)) drawContribution(e)
+  }
 }
 
 /**
@@ -463,23 +552,6 @@ function drawSelectionChrome(
     ctx.strokeRect(hx, hy, size, size)
   }
   ctx.restore()
-}
-
-/**
- * Apply a layer's drop shadow to the canvas context. Shadow offsets are stored
- * in preview-pixel space; multiply by `scale` to convert to target pixels.
- * No-op when the shadow is undefined or disabled.
- */
-function applyShadow(
-  ctx: CanvasRenderingContext2D,
-  shadow: Shadow | undefined,
-  scale: number,
-) {
-  if (!shadow || !shadow.enabled) return
-  ctx.shadowColor = shadow.color
-  ctx.shadowOffsetX = shadow.offsetX * scale
-  ctx.shadowOffsetY = shadow.offsetY * scale
-  ctx.shadowBlur = shadow.blur * scale
 }
 
 function blendModeToOp(b: BlendMode): GlobalCompositeOperation {

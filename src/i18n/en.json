@@ -567,6 +567,7 @@
         "pasteInPlace": "Paste in Place",
         "fill": "Fill",
         "stroke": "Stroke",
+        "blendingOptions": "Blending Options",
         "zoomIn": "Zoom In",
         "zoomOut": "Zoom Out",
         "zoomFit": "Fit on Screen",
@@ -735,7 +736,33 @@
         "collapse": "Collapse group",
         "dropInto": "Drop into group",
         "dropOutside": "Drop here to move out of group",
-        "resizeHandle": "Drag to resize Layers panel"
+        "resizeHandle": "Drag to resize Layers panel",
+        "editStyle": "Edit Layer Style"
+      },
+      "layerStyle": {
+        "title": "Layer Style",
+        "unsupportedKind": "Layer Style only applies to shape layers and groups.",
+        "pickFromList": "Tick an effect on the left to configure it.",
+        "color": "Color",
+        "distance": "Distance",
+        "angle": "Angle",
+        "size": "Size",
+        "width": "Width",
+        "position": "Position",
+        "colorOverlayHint": "Fills the layer's alpha with the chosen colour at the given opacity / blend.",
+        "strokePos": {
+          "outside": "Outside",
+          "center": "Center",
+          "inside": "Inside"
+        },
+        "kind": {
+          "dropShadow": "Drop Shadow",
+          "innerShadow": "Inner Shadow",
+          "outerGlow": "Outer Glow",
+          "innerGlow": "Inner Glow",
+          "stroke": "Stroke",
+          "colorOverlay": "Color Overlay"
+        }
       },
       "project": "Project",
       "projectSave": "Save project (.json)",

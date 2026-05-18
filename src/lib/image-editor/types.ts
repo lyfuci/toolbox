@@ -263,7 +263,9 @@ export type Shape =
   | FrameShape
   | PathShape
 
-/** Drop shadow applied to a layer at render time via canvas shadow* properties. */
+/** Legacy single drop-shadow field. Kept for backward-compat with projects
+ *  saved before the LayerEffects system; on render it is transparently
+ *  upgraded to a single `dropShadow` effect. New code should use `effects`. */
 export type Shadow = {
   enabled: boolean
   offsetX: number // preview-canvas pixels
@@ -272,13 +274,161 @@ export type Shadow = {
   color: string // any valid CSS color (we use rgba for opacity control)
 }
 
+// ── Layer effects (PS-aligned "fx") ──────────────────────────────────────
+//
+// All spatial fields (offset / blur / size) are in **preview-canvas pixels**
+// — same convention as filter radius / brush width — so the renderer
+// multiplies by `scale` (annoScale) at draw time and a "10px shadow" looks
+// identical on the live canvas and on a 1:1 export.
+
+/** Drop shadow — coloured silhouette behind the layer, offset and blurred. */
+export type DropShadowEffect = {
+  kind: 'dropShadow'
+  enabled: boolean
+  color: string
+  opacity: number // 0..100
+  blend: BlendMode
+  /** Distance from layer in preview-canvas pixels. */
+  distance: number // 0..200
+  /** Direction from layer, degrees. 90° = light from above (shadow below-right). */
+  angle: number // -180..180
+  /** Gaussian blur radius in preview-canvas pixels. */
+  size: number // 0..100
+}
+
+/** Inner shadow — same parameters as drop shadow, but the shadow lands
+ *  *inside* the layer's alpha (as if the layer were a hole in a wall). */
+export type InnerShadowEffect = {
+  kind: 'innerShadow'
+  enabled: boolean
+  color: string
+  opacity: number // 0..100
+  blend: BlendMode
+  distance: number
+  angle: number
+  size: number
+}
+
+/** Outer glow — coloured halo radiating outward from the layer's alpha edge. */
+export type OuterGlowEffect = {
+  kind: 'outerGlow'
+  enabled: boolean
+  color: string
+  opacity: number // 0..100
+  blend: BlendMode
+  /** Spread distance + falloff blur, in preview-canvas pixels. */
+  size: number // 0..100
+}
+
+/** Inner glow — coloured halo radiating inward from the layer's alpha edge. */
+export type InnerGlowEffect = {
+  kind: 'innerGlow'
+  enabled: boolean
+  color: string
+  opacity: number // 0..100
+  blend: BlendMode
+  size: number
+}
+
+/** Stroke — outline traced along the layer's alpha edge.
+ *  `position` controls whether the stroke sits inside the edge, centred on
+ *  the edge, or outside the edge (PS terminology). */
+export type StrokeEffect = {
+  kind: 'stroke'
+  enabled: boolean
+  color: string
+  opacity: number // 0..100
+  blend: BlendMode
+  width: number // preview-canvas px, 1..50
+  position: 'inside' | 'center' | 'outside'
+}
+
+/** Color overlay — solid colour filling the entire layer alpha. */
+export type ColorOverlayEffect = {
+  kind: 'colorOverlay'
+  enabled: boolean
+  color: string
+  opacity: number // 0..100
+  blend: BlendMode
+}
+
+export type LayerEffect =
+  | DropShadowEffect
+  | InnerShadowEffect
+  | OuterGlowEffect
+  | InnerGlowEffect
+  | StrokeEffect
+  | ColorOverlayEffect
+
+export type LayerEffectKind = LayerEffect['kind']
+
+/** Canonical PS defaults for each effect kind — used when adding via the
+ *  Layer Style dialog or Layer > Layer Style menu. */
+export const DEFAULT_EFFECTS: { [K in LayerEffectKind]: Extract<LayerEffect, { kind: K }> } = {
+  dropShadow: {
+    kind: 'dropShadow',
+    enabled: true,
+    color: '#000000',
+    opacity: 75,
+    blend: 'multiply',
+    distance: 5,
+    angle: 135,
+    size: 5,
+  },
+  innerShadow: {
+    kind: 'innerShadow',
+    enabled: true,
+    color: '#000000',
+    opacity: 75,
+    blend: 'multiply',
+    distance: 5,
+    angle: 135,
+    size: 5,
+  },
+  outerGlow: {
+    kind: 'outerGlow',
+    enabled: true,
+    color: '#ffff66',
+    opacity: 75,
+    blend: 'screen',
+    size: 10,
+  },
+  innerGlow: {
+    kind: 'innerGlow',
+    enabled: true,
+    color: '#ffff66',
+    opacity: 75,
+    blend: 'screen',
+    size: 10,
+  },
+  stroke: {
+    kind: 'stroke',
+    enabled: true,
+    color: '#000000',
+    opacity: 100,
+    blend: 'normal',
+    width: 3,
+    position: 'outside',
+  },
+  colorOverlay: {
+    kind: 'colorOverlay',
+    enabled: true,
+    color: '#ff0000',
+    opacity: 100,
+    blend: 'normal',
+  },
+}
+
 type LayerCommon = {
   id: string
   name: string
   visible: boolean
   opacity: number // 0-100
   blend: BlendMode
+  /** Legacy single drop shadow. Transparently upgraded to `effects` at render time. */
   shadow?: Shadow
+  /** Modern fx stack. Render order is fixed (PS-aligned); see `effectsOf()`. */
+  effects?: LayerEffect[]
   /**
    * Optional clip baked in at commit time when a marquee/lasso selection was
    * active. Confines the layer's drawn pixels to this region — matches PS

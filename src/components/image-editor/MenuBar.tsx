@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { AdjustmentKind, FilterKind } from '@/lib/image-editor/types'
+import type { AdjustmentKind, FilterKind, LayerEffectKind } from '@/lib/image-editor/types'
 
 /**
  * PS-style menu bar — File / Edit / Image / Layer / View menus across the
@@ -73,6 +73,8 @@ type Props = {
     mergeDown?: () => void
     mergeVisible?: () => void
     flatten?: () => void
+    /** Open Layer Style dialog. `kind` preselects an effect; undefined = "Blending Options" (no preselect). */
+    openLayerStyle?: (kind?: LayerEffectKind) => void
     zoomIn?: () => void
     zoomOut?: () => void
     zoomFit?: () => void
@@ -388,6 +390,44 @@ export function MenuBar({ handlers }: Props) {
             id: 'newGroup',
             label: t('pages.imageEditor.menu.newGroup'),
             onClick: handlers.newGroup,
+          },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'ls-blending',
+            label: t('pages.imageEditor.menu.blendingOptions') + '…',
+            onClick: () => handlers.openLayerStyle?.(),
+          },
+          {
+            id: 'ls-dropShadow',
+            label: t('pages.imageEditor.layerStyle.kind.dropShadow') + '…',
+            onClick: () => handlers.openLayerStyle?.('dropShadow'),
+          },
+          {
+            id: 'ls-innerShadow',
+            label: t('pages.imageEditor.layerStyle.kind.innerShadow') + '…',
+            onClick: () => handlers.openLayerStyle?.('innerShadow'),
+          },
+          {
+            id: 'ls-outerGlow',
+            label: t('pages.imageEditor.layerStyle.kind.outerGlow') + '…',
+            onClick: () => handlers.openLayerStyle?.('outerGlow'),
+          },
+          {
+            id: 'ls-innerGlow',
+            label: t('pages.imageEditor.layerStyle.kind.innerGlow') + '…',
+            onClick: () => handlers.openLayerStyle?.('innerGlow'),
+          },
+          {
+            id: 'ls-stroke',
+            label: t('pages.imageEditor.layerStyle.kind.stroke') + '…',
+            onClick: () => handlers.openLayerStyle?.('stroke'),
+          },
+          {
+            id: 'ls-colorOverlay',
+            label: t('pages.imageEditor.layerStyle.kind.colorOverlay') + '…',
+            onClick: () => handlers.openLayerStyle?.('colorOverlay'),
           },
         ],
         { sep: true },
