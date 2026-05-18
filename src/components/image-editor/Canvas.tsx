@@ -29,6 +29,7 @@ import type {
   MaskLayer,
   PathAnchor,
   Point,
+  TextOptions,
   Tool,
 } from '@/lib/image-editor/types'
 
@@ -65,6 +66,7 @@ type Props = {
    * ignore `opacity` (they keep their hardcoded subtle build-up exposure).
    */
   brushOptions: BrushOptions
+  textOptions: TextOptions
   /** Currently selected layer id (or 'image' for the background). */
   selectedId: string
   onSelect: (id: string) => void
@@ -228,6 +230,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     toolColor,
     toolStrokeWidth,
     brushOptions,
+    textOptions,
     selectedId,
     onSelect,
     onCommitLayer,
@@ -1002,7 +1005,21 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
           opacity: 100,
           blend: 'normal',
           kind: 'annotation',
-          shape: { kind: 'text', x: p.x, y: p.y, text, color: toolColor, fontSize: 24 },
+          shape: {
+            kind: 'text',
+            x: p.x,
+            y: p.y,
+            text,
+            color: toolColor,
+            fontSize: textOptions.fontSize,
+            fontFamily: textOptions.fontFamily,
+            fontWeight: textOptions.fontWeight,
+            fontStyle: textOptions.fontStyle,
+            align: textOptions.align,
+            letterSpacing: textOptions.letterSpacing,
+            lineHeight: textOptions.lineHeight,
+            underline: textOptions.underline,
+          },
         } as AnnotationLayer)
       }
     }

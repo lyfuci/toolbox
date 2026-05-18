@@ -1,5 +1,25 @@
 import { useTranslation } from 'react-i18next'
-import type { BrushOptions, Tool } from '@/lib/image-editor/types'
+import type { BrushOptions, FontStyle, FontWeight, TextAlign, TextOptions, Tool } from '@/lib/image-editor/types'
+
+/** Curated web-safe font families. Browsers fall back per the CSS spec
+ *  if a family isn't installed. Adding custom @font-face declarations is
+ *  a follow-up; the curated list keeps the dropdown short and predictable. */
+const FONT_FAMILIES = [
+  'sans-serif',
+  'serif',
+  'monospace',
+  'cursive',
+  'system-ui',
+  'Helvetica',
+  'Arial',
+  'Georgia',
+  'Times New Roman',
+  'Courier New',
+  'Verdana',
+  'Tahoma',
+  'Trebuchet MS',
+  'Impact',
+]
 
 type Props = {
   tool: Tool
@@ -11,6 +31,8 @@ type Props = {
   setStrokeWidth: (n: number) => void
   brushOptions: BrushOptions
   setBrushOptions: (b: BrushOptions) => void
+  textOptions: TextOptions
+  setTextOptions: (t: TextOptions) => void
   bucketTolerance: number
   setBucketTolerance: (n: number) => void
   wandTolerance: number
@@ -44,6 +66,8 @@ export function OptionsBar({
   setStrokeWidth,
   brushOptions,
   setBrushOptions,
+  textOptions,
+  setTextOptions,
   bucketTolerance,
   setBucketTolerance,
   wandTolerance,
@@ -396,6 +420,8 @@ export function OptionsBar({
   }
 
   if (tool === 'text') {
+    const setOpt = (patch: Partial<TextOptions>) =>
+      setTextOptions({ ...textOptions, ...patch })
     return (
       <div className="pf-options">
         <div className="pf-opt-group">
@@ -415,10 +441,97 @@ export function OptionsBar({
             }}
           />
         </div>
+        <div className="pf-opt-group">
+          <select
+            value={textOptions.fontFamily}
+            onChange={(e) => setOpt({ fontFamily: e.target.value })}
+            className="h-6 rounded border border-input bg-background px-1 text-xs"
+            title={t('pages.imageEditor.text.fontFamily')}
+          >
+            {FONT_FAMILIES.map((f) => (
+              <option key={f} value={f} style={{ fontFamily: f }}>
+                {f}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            min={6}
+            max={400}
+            value={textOptions.fontSize}
+            onChange={(e) => setOpt({ fontSize: Math.max(1, Number(e.target.value) || 1) })}
+            className="h-6 w-14 rounded border border-input bg-background px-1 text-xs"
+            title={t('pages.imageEditor.text.fontSize')}
+          />
+        </div>
+        <div className="pf-opt-group">
+          <button
+            onClick={() =>
+              setOpt({
+                fontWeight: (textOptions.fontWeight === 'bold' ? 'normal' : 'bold') as FontWeight,
+              })
+            }
+            className={`pf-opt-btn ${textOptions.fontWeight === 'bold' ? 'pf-active' : ''}`}
+            style={{ fontWeight: 'bold' }}
+            title={t('pages.imageEditor.text.bold')}
+          >
+            B
+          </button>
+          <button
+            onClick={() =>
+              setOpt({
+                fontStyle: (textOptions.fontStyle === 'italic'
+                  ? 'normal'
+                  : 'italic') as FontStyle,
+              })
+            }
+            className={`pf-opt-btn ${textOptions.fontStyle === 'italic' ? 'pf-active' : ''}`}
+            style={{ fontStyle: 'italic' }}
+            title={t('pages.imageEditor.text.italic')}
+          >
+            I
+          </button>
+          <button
+            onClick={() => setOpt({ underline: !textOptions.underline })}
+            className={`pf-opt-btn ${textOptions.underline ? 'pf-active' : ''}`}
+            style={{ textDecoration: 'underline' }}
+            title={t('pages.imageEditor.text.underline')}
+          >
+            U
+          </button>
+        </div>
+        <div className="pf-opt-group">
+          {(['left', 'center', 'right'] as TextAlign[]).map((a) => (
+            <button
+              key={a}
+              onClick={() => setOpt({ align: a })}
+              className={`pf-opt-btn ${textOptions.align === a ? 'pf-active' : ''}`}
+              title={t(`pages.imageEditor.text.align${a[0].toUpperCase() + a.slice(1)}`)}
+            >
+              {a === 'left' ? '⫷' : a === 'center' ? '☰' : '⫸'}
+            </button>
+          ))}
+        </div>
         <div className="pf-opt-group" style={{ borderRight: 0 }}>
-          <span className="pf-opt-label" style={{ marginRight: 0 }}>
-            {t('pages.imageEditor.textToolHint')}
-          </span>
+          <span className="pf-opt-label">{t('pages.imageEditor.text.lineHeight')}:</span>
+          <input
+            type="number"
+            min={0.5}
+            max={4}
+            step={0.1}
+            value={textOptions.lineHeight}
+            onChange={(e) => setOpt({ lineHeight: Math.max(0.1, Number(e.target.value) || 1.2) })}
+            className="h-6 w-14 rounded border border-input bg-background px-1 text-xs"
+          />
+          <span className="pf-opt-label">{t('pages.imageEditor.text.tracking')}:</span>
+          <input
+            type="number"
+            min={-20}
+            max={50}
+            value={textOptions.letterSpacing}
+            onChange={(e) => setOpt({ letterSpacing: Number(e.target.value) || 0 })}
+            className="h-6 w-14 rounded border border-input bg-background px-1 text-xs"
+          />
         </div>
       </div>
     )

@@ -196,9 +196,7 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
     imageCache: input.imageCache,
     smartSources: state.smartSources ?? {},
   }
-  for (const layer of state.layers) {
-    renderLayer(canvas, ctx, shiftForCrop(layer), renderCtx)
-  }
+  renderLayerStack(canvas, ctx, state.layers.map(shiftForCrop), renderCtx)
 
   // In-progress preview (a layer not yet committed to state.layers).
   if (drawingPreview) {
@@ -356,6 +354,35 @@ function renderSmartObjectLayer(
   const cached = rc.imageCache.get(src.dataUrl)
   if (!cached) return // source not loaded yet; caller's ensureImage call
                      // populates the cache then triggers a re-render
+  // Build the (optionally filtered) source canvas. If no smart filters,
+  // we draw directly from the cached HTMLImageElement to avoid an extra
+  // copy; otherwise stage onto a source-sized canvas and apply filters
+  // before transform-drawing.
+  let sourceDraw: CanvasImageSource = cached
+  const sf = layer.bakedFilters
+  if (sf && sf.length > 0) {
+    const fc = document.createElement('canvas')
+    fc.width = cached.naturalWidth
+    fc.height = cached.naturalHeight
+    const fctx = fc.getContext('2d')
+    if (fctx) {
+      fctx.drawImage(cached, 0, 0)
+      try {
+        const data = fctx.getImageData(0, 0, fc.width, fc.height)
+        for (const params of sf) {
+          // Filters store spatial radii in preview-px; scale to source-px
+          // here so a "10px blur" looks identical regardless of the SO's
+          // transform.w/h.
+          const scaled = scaleFilterParams(params, 1)
+          applyFilter(data.data, data.width, data.height, scaled)
+        }
+        fctx.putImageData(data, 0, 0)
+        sourceDraw = fc
+      } catch {
+        // CORS-tainted source — leave sourceDraw as the raw cached image.
+      }
+    }
+  }
   const offscreen = document.createElement('canvas')
   offscreen.width = canvas.width
   offscreen.height = canvas.height
@@ -369,12 +396,10 @@ function renderSmartObjectLayer(
   octx.translate(ax, ay)
   if (t.rotation !== 0) octx.rotate((t.rotation * Math.PI) / 180)
   octx.translate(-ax, -ay)
-  // Smoothing on for a non-destructive feel — quality preserved across
-  // scale-down then scale-up because we keep re-sampling from `src`.
   octx.imageSmoothingEnabled = true
   octx.imageSmoothingQuality = 'high'
   octx.drawImage(
-    cached,
+    sourceDraw,
     t.x * rc.annoScale,
     t.y * rc.annoScale,
     t.w * rc.annoScale,
@@ -400,10 +425,71 @@ function renderGroupLayer(
   // via the canvas clip stack across their own save/restore pairs. fx like
   // stroke / inner glow then trace the *clipped* silhouette, matching PS.
   applyLayerClip(octx, layer, rc.annoScale)
-  for (const child of layer.children) {
-    renderLayer(offscreen, octx, child, rc)
-  }
+  renderLayerStack(offscreen, octx, layer.children, rc)
   compositeLayerWithEffects(canvas, ctx, layer, offscreen, rc)
+}
+
+/**
+ * Render a sequence of sibling layers in PS clipping-mask-aware order:
+ *
+ *   - A layer with `clipping: true` is masked by the alpha of the nearest
+ *     non-clipping sibling below it. Multiple stacked clipping layers
+ *     chain against the same base.
+ *   - Adjustment / filter / mask layers can be clippers but never serve as
+ *     bases (no isolated alpha to mask against).
+ *
+ * Implementation: maintain a `baseAlpha` snapshot of the most recent
+ * eligible base layer (re-rendered in isolation onto a sibling offscreen).
+ * Clipping layers render into their own offscreen, mask via
+ * destination-in, then composite onto the destination.
+ */
+function renderLayerStack(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  layers: Layer[],
+  rc: PerLayerCtx,
+): void {
+  let baseAlpha: HTMLCanvasElement | null = null
+  for (const layer of layers) {
+    if (!layer.visible) continue
+    if (layer.clipping && baseAlpha) {
+      // Render the clipping layer's contribution onto an isolated offscreen,
+      // then keep only the pixels that overlap the base alpha (PS-style).
+      const layerCanvas = document.createElement('canvas')
+      layerCanvas.width = canvas.width
+      layerCanvas.height = canvas.height
+      const lctx = layerCanvas.getContext('2d')
+      if (!lctx) continue
+      renderLayer(layerCanvas, lctx, layer, rc)
+      lctx.globalCompositeOperation = 'destination-in'
+      lctx.drawImage(baseAlpha, 0, 0)
+      ctx.save()
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.drawImage(layerCanvas, 0, 0)
+      ctx.restore()
+      continue
+    }
+    // Non-clipping (or first-in-chain) layer: render onto main canvas.
+    renderLayer(canvas, ctx, layer, rc)
+    // Pre-build a fresh alpha for the *next* clipping chain — only for
+    // pixel-emitting layer kinds. Adjustment / filter / mask layers
+    // operate on what's below; rendering them in isolation onto an empty
+    // canvas yields nothing useful, so we leave baseAlpha as-is.
+    if (
+      layer.kind === 'annotation' ||
+      layer.kind === 'smartObject' ||
+      layer.kind === 'group'
+    ) {
+      const alpha = document.createElement('canvas')
+      alpha.width = canvas.width
+      alpha.height = canvas.height
+      const actx = alpha.getContext('2d')
+      if (actx) {
+        renderLayer(alpha, actx, layer, rc)
+        baseAlpha = alpha
+      }
+    }
+  }
 }
 
 /**

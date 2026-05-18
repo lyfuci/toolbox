@@ -463,6 +463,29 @@
   z-index: 40;
 }
 
+/* Small button used in the Type tool's options bar (B / I / U / align). */
+.pf-opt-btn {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--pf-line);
+  background: var(--pf-bg-1);
+  color: var(--pf-fg);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+}
+.pf-opt-btn:hover {
+  background: var(--pf-bg-3);
+}
+.pf-opt-btn.pf-active {
+  background: var(--pf-bg-4);
+  border-color: var(--pf-accent);
+}
+
 /* Right-click contextual menus (LayersPanel rows, canvas). */
 .pf-context-menu {
   min-width: 220px;

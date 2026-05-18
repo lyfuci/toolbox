@@ -563,6 +563,8 @@
         "flatten": "拼合图像",
         "convertToSmartObject": "转换为智能对象",
         "replaceSmartObjectContents": "替换内容",
+        "createClippingMask": "创建剪贴蒙版",
+        "releaseClippingMask": "释放剪贴蒙版",
         "imageSize": "图像大小",
         "canvasSize": "画布大小",
         "rotateArbitrary": "任意角度旋转",
@@ -655,6 +657,16 @@
       "colorPicker": {
         "title": "拾色器"
       },
+      "clippingMask": {
+        "created": "已创建剪贴蒙版 —— 图层被下方图层蒙版剪贴",
+        "released": "已释放剪贴蒙版",
+        "unsupportedKind": "剪贴蒙版仅适用于形状、智能对象和图层组。"
+      },
+      "smartFilters": {
+        "title": "智能滤镜",
+        "added": "已添加滤镜到智能对象（非破坏性）",
+        "remove": "移除此智能滤镜"
+      },
       "imageMenu": {
         "trimmed": "已裁修图像",
         "trimNothing": "没有可裁修的区域 —— 图像没有透明边缘。",
@@ -706,6 +718,18 @@
       "deselect": "取消选区",
       "rotateViewHint": "旋转视图 (R)：每次点击旋转工作区 90°，仅影响显示，不修改像素。",
       "textToolHint": "文字 (T)：在画布上单击以新增文字。",
+      "text": {
+        "fontFamily": "字体",
+        "fontSize": "字号",
+        "bold": "粗体",
+        "italic": "斜体",
+        "underline": "下划线",
+        "alignLeft": "左对齐",
+        "alignCenter": "居中对齐",
+        "alignRight": "右对齐",
+        "lineHeight": "行距",
+        "tracking": "字距"
+      },
       "toolStubHint": "{{tool}} 仅作占位 —— 工具栏按钮是为了对齐 Photoshop 而保留，但功能尚未实现。",
       "toolStubToast": "{{tool}} 暂未实现。",
       "statusTip": "工具：{{tool}} · 按住空格平移，Z 切换缩放工具",

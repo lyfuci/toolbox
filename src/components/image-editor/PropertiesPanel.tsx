@@ -143,6 +143,12 @@ function SmartObjectSection({
   const t0 = layer.transform
   const patchTransform = (patch: Partial<typeof t0>) =>
     patchLayer(layer.id, { transform: { ...t0, ...patch } })
+  const filters = layer.bakedFilters ?? []
+  const removeFilter = (i: number) => {
+    const next = [...filters]
+    next.splice(i, 1)
+    patchLayer(layer.id, { bakedFilters: next })
+  }
   return (
     <div className="space-y-2 border-t border-border pt-3">
       <div className="text-xs text-muted-foreground">
@@ -204,6 +210,30 @@ function SmartObjectSection({
       >
         {t('pages.imageEditor.smartObject.replaceBtn')}
       </button>
+      {filters.length > 0 && (
+        <div className="space-y-1 border-t border-border pt-2">
+          <div className="text-xs text-muted-foreground">
+            {t('pages.imageEditor.smartFilters.title')}
+          </div>
+          {filters.map((f, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between rounded border border-border/60 px-2 py-1 text-[11px]"
+            >
+              <span className="truncate">
+                {t(`pages.imageEditor.filters.${f.kind}`)}
+              </span>
+              <button
+                onClick={() => removeFilter(i)}
+                className="text-muted-foreground hover:text-destructive"
+                title={t('pages.imageEditor.smartFilters.remove')}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

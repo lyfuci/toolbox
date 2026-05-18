@@ -303,9 +303,46 @@ function drawArrow(ctx: CanvasRenderingContext2D, s: ArrowShape, scale: number) 
 
 function drawText(ctx: CanvasRenderingContext2D, s: TextShape, scale: number) {
   ctx.fillStyle = s.color
-  ctx.font = `${Math.round(s.fontSize * scale)}px sans-serif`
+  const family = s.fontFamily ?? 'sans-serif'
+  const weight = s.fontWeight ?? 'normal'
+  const style = s.fontStyle ?? 'normal'
+  const sizePx = Math.round(s.fontSize * scale)
+  ctx.font = `${style} ${weight} ${sizePx}px ${family}`
   ctx.textBaseline = 'top'
-  ctx.fillText(s.text, s.x * scale, s.y * scale)
+  const align = s.align ?? 'left'
+  ctx.textAlign = align === 'center' ? 'center' : align === 'right' ? 'right' : 'left'
+  // letterSpacing is supported on most modern browsers. TS doesn't carry
+  // the lib type for it on older targets — cast via Record so older lib
+  // configs don't error, and wrap in try/catch for very old browsers.
+  try {
+    ;(ctx as unknown as Record<string, unknown>).letterSpacing =
+      `${(s.letterSpacing ?? 0) * scale}px`
+  } catch {
+    // Older browsers silently skip; layout regresses to default kerning.
+  }
+  const lineHeight = (s.lineHeight ?? 1.2) * sizePx
+  // Multi-line: split on \n. Each line drawn at its own y.
+  const lines = (s.text ?? '').split('\n')
+  const baseX = s.x * scale
+  const baseY = s.y * scale
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const y = baseY + i * lineHeight
+    ctx.fillText(line, baseX, y)
+    if (s.underline) {
+      const m = ctx.measureText(line)
+      const w = m.width
+      const ulY = y + sizePx + 1
+      const ulX = align === 'center' ? baseX - w / 2 : align === 'right' ? baseX - w : baseX
+      ctx.fillRect(ulX, ulY, w, Math.max(1, Math.round(sizePx / 16)))
+    }
+  }
+  // Reset letterSpacing so it doesn't leak into the next ctx user.
+  try {
+    ;(ctx as unknown as Record<string, unknown>).letterSpacing = '0px'
+  } catch {
+    /* noop */
+  }
 }
 
 function drawImageShape(
