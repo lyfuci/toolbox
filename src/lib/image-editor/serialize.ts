@@ -50,6 +50,7 @@ export function parseProject(text: string): Project {
       cropRect: obj.state.cropRect,
       selection: obj.state.selection,
       selectionPath: obj.state.selectionPath,
+      smartSources: obj.state.smartSources ?? {},
     },
   }
 }

@@ -21,6 +21,8 @@ import type {
   MaskLayer,
   Point,
   Rect,
+  SmartObjectLayer,
+  SmartSource,
 } from './types'
 
 export type RenderInput = {
@@ -192,6 +194,7 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
     annoScale,
     liveCanvas: !!input.liveCanvas,
     imageCache: input.imageCache,
+    smartSources: state.smartSources ?? {},
   }
   for (const layer of state.layers) {
     renderLayer(canvas, ctx, shiftForCrop(layer), renderCtx)
@@ -247,6 +250,10 @@ type PerLayerCtx = {
   annoScale: number
   liveCanvas: boolean
   imageCache: ImageCache | undefined
+  /** Smart Object source pool keyed by sourceRef. Threaded through so the
+   *  group-recursive render path can resolve SO sources without re-passing
+   *  EditorState everywhere. Empty object if state has none. */
+  smartSources: { [id: string]: SmartSource }
 }
 
 /**
@@ -309,6 +316,10 @@ function renderLayer(
     applyFilterLayer(canvas, ctx, layer, rc.annoScale)
     return
   }
+  if (layer.kind === 'smartObject') {
+    renderSmartObjectLayer(canvas, ctx, layer, rc)
+    return
+  }
   if (layer.kind === 'group') {
     renderGroupLayer(canvas, ctx, layer, rc)
     return
@@ -322,6 +333,57 @@ function renderLayer(
  * blur) and `getImageData(offscreen)` (adjustment / filter), so they only
  * see other layers within the same group — "normal mode" group semantics.
  */
+/**
+ * Render a Smart Object layer. The source dataUrl is resolved through the
+ * `imageCache` so it's loaded asynchronously (same pattern as image-shape
+ * annotations); first paint after a Smart Object is added may briefly show
+ * nothing until the cache populates and a re-render fires.
+ *
+ * Pipeline mirrors annotation-with-effects: rasterize transformed source
+ * onto an offscreen of destination dims (so layer-clip, layer-blend, and
+ * the layer-effects stack all work uniformly), then composite. Rotation
+ * pivots around `transform.anchorX/Y` in absolute preview-pixel space.
+ */
+function renderSmartObjectLayer(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  layer: SmartObjectLayer,
+  rc: PerLayerCtx,
+): void {
+  if (canvas.width < 1 || canvas.height < 1) return
+  const src = rc.smartSources[layer.sourceRef]
+  if (!src || !rc.imageCache) return
+  const cached = rc.imageCache.get(src.dataUrl)
+  if (!cached) return // source not loaded yet; caller's ensureImage call
+                     // populates the cache then triggers a re-render
+  const offscreen = document.createElement('canvas')
+  offscreen.width = canvas.width
+  offscreen.height = canvas.height
+  const octx = offscreen.getContext('2d')
+  if (!octx) return
+  applyLayerClip(octx, layer, rc.annoScale)
+  const t = layer.transform
+  const ax = t.anchorX * rc.annoScale
+  const ay = t.anchorY * rc.annoScale
+  octx.save()
+  octx.translate(ax, ay)
+  if (t.rotation !== 0) octx.rotate((t.rotation * Math.PI) / 180)
+  octx.translate(-ax, -ay)
+  // Smoothing on for a non-destructive feel — quality preserved across
+  // scale-down then scale-up because we keep re-sampling from `src`.
+  octx.imageSmoothingEnabled = true
+  octx.imageSmoothingQuality = 'high'
+  octx.drawImage(
+    cached,
+    t.x * rc.annoScale,
+    t.y * rc.annoScale,
+    t.w * rc.annoScale,
+    t.h * rc.annoScale,
+  )
+  octx.restore()
+  compositeLayerWithEffects(canvas, ctx, layer, offscreen, rc)
+}
+
 function renderGroupLayer(
   canvas: HTMLCanvasElement,
   ctx: CanvasRenderingContext2D,
@@ -397,7 +459,7 @@ function compositeLayerWithEffects(
   const dims = { w: canvas.width, h: canvas.height }
 
   const drawContribution = (e: typeof fx[number]) => {
-    const contrib = buildEffectContribution(e, dims, content, rc.annoScale)
+    const contrib = buildEffectContribution(e, dims, content, rc.annoScale, rc.imageCache)
     if (!contrib) return
     ctx.save()
     ctx.setTransform(1, 0, 0, 1, 0, 0)

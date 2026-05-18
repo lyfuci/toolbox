@@ -13,13 +13,17 @@ import { Slider } from './Slider'
 import {
   BLEND_MODES,
   DEFAULT_EFFECTS,
+  type BevelEmbossEffect,
   type BlendMode,
   type DropShadowEffect,
+  type GradientOverlayEffect,
   type InnerGlowEffect,
   type InnerShadowEffect,
   type LayerEffect,
   type LayerEffectKind,
   type OuterGlowEffect,
+  type PatternOverlayEffect,
+  type SatinEffect,
   type StrokeEffect,
 } from '@/lib/image-editor/types'
 
@@ -74,6 +78,10 @@ const KINDS: LayerEffectKind[] = [
   'innerGlow',
   'stroke',
   'colorOverlay',
+  'gradientOverlay',
+  'patternOverlay',
+  'satin',
+  'bevelEmboss',
 ]
 
 function Inner({
@@ -280,11 +288,185 @@ function EffectPanel({
           {t('pages.imageEditor.layerStyle.colorOverlayHint')}
         </div>
       )}
+      {effect.kind === 'gradientOverlay' && (
+        <>
+          <div className="flex items-center gap-2">
+            <Label className="w-16 text-xs text-muted-foreground">
+              {t('pages.imageEditor.layerStyle.endColor')}
+            </Label>
+            <input
+              type="color"
+              value={hexFromColor(effect.endColor)}
+              onChange={(e) =>
+                onChange({ ...effect, endColor: e.target.value } as GradientOverlayEffect)
+              }
+              className="h-7 w-12 cursor-pointer rounded border border-input bg-transparent"
+            />
+          </div>
+          <Slider
+            label={t('pages.imageEditor.layerStyle.angle')}
+            value={effect.angle}
+            min={-180}
+            max={180}
+            unit="°"
+            onChange={(v) => onChange({ ...effect, angle: v } as GradientOverlayEffect)}
+          />
+          <Slider
+            label={t('pages.imageEditor.layerStyle.scale')}
+            value={effect.scale}
+            min={10}
+            max={200}
+            unit="%"
+            onChange={(v) => onChange({ ...effect, scale: v } as GradientOverlayEffect)}
+          />
+        </>
+      )}
+      {effect.kind === 'patternOverlay' && (
+        <>
+          <div className="text-xs text-muted-foreground">
+            {t('pages.imageEditor.layerStyle.patternHint')}
+          </div>
+          <Slider
+            label={t('pages.imageEditor.layerStyle.scale')}
+            value={effect.scale}
+            min={10}
+            max={200}
+            unit="%"
+            onChange={(v) => onChange({ ...effect, scale: v } as PatternOverlayEffect)}
+          />
+        </>
+      )}
+      {effect.kind === 'satin' && (
+        <>
+          <Slider
+            label={t('pages.imageEditor.layerStyle.angle')}
+            value={effect.angle}
+            min={-180}
+            max={180}
+            unit="°"
+            onChange={(v) => onChange({ ...effect, angle: v } as SatinEffect)}
+          />
+          <Slider
+            label={t('pages.imageEditor.layerStyle.distance')}
+            value={effect.distance}
+            min={0}
+            max={100}
+            unit="px"
+            onChange={(v) => onChange({ ...effect, distance: v } as SatinEffect)}
+          />
+          <Slider
+            label={t('pages.imageEditor.layerStyle.size')}
+            value={effect.size}
+            min={0}
+            max={100}
+            unit="px"
+            onChange={(v) => onChange({ ...effect, size: v } as SatinEffect)}
+          />
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={effect.invert}
+              onChange={(e) =>
+                onChange({ ...effect, invert: e.target.checked } as SatinEffect)
+              }
+              className="h-3.5 w-3.5 accent-primary"
+            />
+            {t('pages.imageEditor.layerStyle.invert')}
+          </label>
+        </>
+      )}
+      {effect.kind === 'bevelEmboss' && (
+        <>
+          <div className="flex items-center gap-2">
+            <Label className="w-16 text-xs text-muted-foreground">
+              {t('pages.imageEditor.layerStyle.style')}
+            </Label>
+            <select
+              value={effect.style}
+              onChange={(e) =>
+                onChange({
+                  ...effect,
+                  style: e.target.value as BevelEmbossEffect['style'],
+                } as BevelEmbossEffect)
+              }
+              className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+            >
+              {(['innerBevel', 'outerBevel', 'emboss', 'pillowEmboss'] as const).map(
+                (s) => (
+                  <option key={s} value={s} disabled={s !== 'innerBevel'}>
+                    {t(`pages.imageEditor.layerStyle.bevelStyle.${s}`)}
+                    {s !== 'innerBevel' ? ' (v2)' : ''}
+                  </option>
+                ),
+              )}
+            </select>
+          </div>
+          <Slider
+            label={t('pages.imageEditor.layerStyle.depth')}
+            value={effect.depth}
+            min={1}
+            max={100}
+            onChange={(v) => onChange({ ...effect, depth: v } as BevelEmbossEffect)}
+          />
+          <Slider
+            label={t('pages.imageEditor.layerStyle.size')}
+            value={effect.size}
+            min={0}
+            max={50}
+            unit="px"
+            onChange={(v) => onChange({ ...effect, size: v } as BevelEmbossEffect)}
+          />
+          <Slider
+            label={t('pages.imageEditor.layerStyle.angle')}
+            value={effect.angle}
+            min={-180}
+            max={180}
+            unit="°"
+            onChange={(v) => onChange({ ...effect, angle: v } as BevelEmbossEffect)}
+          />
+          <Slider
+            label={t('pages.imageEditor.layerStyle.altitude')}
+            value={effect.altitude}
+            min={0}
+            max={90}
+            unit="°"
+            onChange={(v) => onChange({ ...effect, altitude: v } as BevelEmbossEffect)}
+          />
+          <div className="flex items-center gap-2">
+            <Label className="w-16 text-xs text-muted-foreground">
+              {t('pages.imageEditor.layerStyle.highlightColor')}
+            </Label>
+            <input
+              type="color"
+              value={hexFromColor(effect.highlightColor)}
+              onChange={(e) =>
+                onChange({ ...effect, highlightColor: e.target.value } as BevelEmbossEffect)
+              }
+              className="h-7 w-12 cursor-pointer rounded border border-input bg-transparent"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Label className="w-16 text-xs text-muted-foreground">
+              {t('pages.imageEditor.layerStyle.shadowColor')}
+            </Label>
+            <input
+              type="color"
+              value={hexFromColor(effect.shadowColor)}
+              onChange={(e) =>
+                onChange({ ...effect, shadowColor: e.target.value } as BevelEmbossEffect)
+              }
+              className="h-7 w-12 cursor-pointer rounded border border-input bg-transparent"
+            />
+          </div>
+        </>
+      )}
     </div>
   )
 }
 
-/** Color + opacity + blend controls — every effect has these. */
+/** Color + opacity + blend controls. `color` is omitted for effects that
+ *  don't carry a single colour field (pattern overlay, bevel/emboss, gradient
+ *  — those expose their own colour pickers in their specialised panes). */
 function CommonRow({
   effect,
   onChange,
@@ -293,21 +475,26 @@ function CommonRow({
   onChange: (e: LayerEffect) => void
 }) {
   const { t } = useTranslation()
+  // Discriminate against the only effect without a top-level `color`.
+  const hasColor =
+    effect.kind !== 'patternOverlay' && effect.kind !== 'bevelEmboss'
   return (
     <>
-      <div className="flex items-center gap-2">
-        <Label className="w-16 text-xs text-muted-foreground">
-          {t('pages.imageEditor.layerStyle.color')}
-        </Label>
-        <input
-          type="color"
-          value={hexFromColor(effect.color)}
-          onChange={(e) =>
-            onChange({ ...effect, color: e.target.value } as LayerEffect)
-          }
-          className="h-7 w-12 cursor-pointer rounded border border-input bg-transparent"
-        />
-      </div>
+      {hasColor && 'color' in effect && (
+        <div className="flex items-center gap-2">
+          <Label className="w-16 text-xs text-muted-foreground">
+            {t('pages.imageEditor.layerStyle.color')}
+          </Label>
+          <input
+            type="color"
+            value={hexFromColor(effect.color)}
+            onChange={(e) =>
+              onChange({ ...effect, color: e.target.value } as LayerEffect)
+            }
+            className="h-7 w-12 cursor-pointer rounded border border-input bg-transparent"
+          />
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <Label className="w-16 text-xs text-muted-foreground">
           {t('pages.imageEditor.blend')}

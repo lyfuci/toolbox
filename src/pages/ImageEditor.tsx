@@ -6,6 +6,7 @@ import { Canvas, type CanvasHandle } from '@/components/image-editor/Canvas'
 import { DropZone } from '@/components/image-editor/DropZone'
 import { FillDialog } from '@/components/image-editor/FillDialog'
 import { FilterDialog } from '@/components/image-editor/FilterDialog'
+import { ContextMenu, type ContextMenuItem } from '@/components/image-editor/ContextMenu'
 import { LayerStyleDialog } from '@/components/image-editor/LayerStyleDialog'
 import { MenuBar } from '@/components/image-editor/MenuBar'
 import { OptionsBar } from '@/components/image-editor/OptionsBar'
@@ -22,10 +23,12 @@ import { Workspace, type WorkspaceHandle } from '@/components/image-editor/Works
 import '@/components/image-editor/pixelforge.css'
 import {
   buildImageShapeLayer,
+  buildSmartObject,
   extractRegion,
   flattenToDataUrl,
   mergeLayersToImageLayer,
   previewDimsOf,
+  rasterizeLayer,
   regionFromSelection,
   renderEditorToCanvas,
 } from '@/lib/image-editor/composite-ops'
@@ -45,6 +48,7 @@ import {
   removeLayerById,
   reorderSibling,
 } from '@/lib/image-editor/layer-tree'
+import { getLayerBBox } from '@/lib/image-editor/hit'
 import { dimsAfterRotation, renderTo } from '@/lib/image-editor/render'
 import {
   contractSelection,
@@ -75,6 +79,7 @@ import type {
   LayerEffect,
   LayerEffectKind,
   OutputFormat,
+  SmartSource,
   Point,
   Tool,
   Transforms,
@@ -158,6 +163,7 @@ export function ImageEditorPage() {
   const pasteInPlaceRef = useRef<() => void>(() => {})
   const mergeDownRef = useRef<() => void>(() => {})
   const mergeVisibleRef = useRef<() => void>(() => {})
+  const stampVisibleRef = useRef<() => void>(() => {})
 
   // Zoom + pan + Space-held pan mode.
   const [zoom, setZoom] = useState(1)
@@ -279,10 +285,14 @@ export function ImageEditorPage() {
           else pasteRef.current()
           return
         }
-        // Layer menu merge shortcuts.
+        // Layer menu merge shortcuts. PS conventions:
+        //   ⌘E       — Merge Down
+        //   ⇧⌘E      — Merge Visible
+        //   ⌥⇧⌘E     — Stamp Visible (merge visible into NEW top layer, keep originals)
         if (e.key === 'e' || e.key === 'E') {
           e.preventDefault()
-          if (e.shiftKey) mergeVisibleRef.current()
+          if (e.shiftKey && e.altKey) stampVisibleRef.current()
+          else if (e.shiftKey) mergeVisibleRef.current()
           else mergeDownRef.current()
           return
         }
@@ -860,6 +870,144 @@ export function ImageEditorPage() {
     toast.success(t('pages.imageEditor.layerMenu.mergedVisible'))
   }, [image, state, imageCache, history, t])
 
+  /**
+   * Stamp Visible (PS: Cmd+Shift+Alt+E). Like Merge Visible, but the source
+   * layers are PRESERVED — the merged composite is appended as a new layer
+   * on top of the stack. PS also bakes in the image background here (since
+   * the snapshot represents "everything you currently see"), so we pass
+   * includeImageBackground = true.
+   */
+  const handleStampVisible = useCallback(() => {
+    if (!image) return
+    const visibleIds = new Set<string>()
+    const collectVisible = (layers: Layer[]) => {
+      for (const l of layers) {
+        if (!l.visible) continue
+        if (l.kind === 'group') collectVisible(l.children)
+        visibleIds.add(l.id)
+      }
+    }
+    collectVisible(state.layers)
+    const stamped = mergeLayersToImageLayer({
+      image,
+      state,
+      imageCache,
+      pred: (l) => visibleIds.has(l.id),
+      name: t('pages.imageEditor.annoLabel.stamped'),
+      includeImageBackground: state.imageLayer.visible,
+    })
+    if (!stamped) return
+    history.set({ ...state, layers: [...state.layers, stamped] })
+    setSelectedLayerId(stamped.id)
+    toast.success(t('pages.imageEditor.layerMenu.stamped'))
+  }, [image, state, imageCache, history, t])
+
+  /**
+   * Convert selected layer to a Smart Object. Pipeline:
+   *   1. Rasterize the current layer (post effects / clip / opacity / blend)
+   *      cropped to its bbox via composite-ops.rasterizeLayer.
+   *   2. Register a new SmartSource pointing at that dataUrl.
+   *   3. Replace the original layer in-place with a SmartObjectLayer at its
+   *      original bbox; the SO inherits visibility / opacity / blend so the
+   *      visual result is unchanged at identity transform.
+   * The user can then non-destructively scale / rotate via Free Transform.
+   * Image background, mask, adjustment, and filter layers are not convertible
+   * (no pixel silhouette to embed).
+   */
+  const handleConvertToSmartObject = useCallback(() => {
+    if (!image || !selectedLayerId || selectedLayerId === 'image') return
+    const layer = findLayerById(state.layers, selectedLayerId)
+    if (!layer) return
+    if (layer.kind === 'mask' || layer.kind === 'adjustment' || layer.kind === 'filter') {
+      toast.message(t('pages.imageEditor.smartObject.unsupportedKind'))
+      return
+    }
+    if (layer.kind === 'smartObject') {
+      toast.message(t('pages.imageEditor.smartObject.alreadySO'))
+      return
+    }
+    const bbox = getLayerBBox(layer)
+    if (!bbox || bbox.w <= 0 || bbox.h <= 0) {
+      toast.message(t('pages.imageEditor.smartObject.noBbox'))
+      return
+    }
+    const rast = rasterizeLayer({
+      image,
+      state,
+      imageCache,
+      layerId: layer.id,
+      crop: bbox,
+    })
+    if (!rast) {
+      toast.error(t('pages.imageEditor.smartObject.rasterFailed'))
+      return
+    }
+    const { layer: soLayer, sourceId, source } = buildSmartObject({
+      source: {
+        dataUrl: rast.dataUrl,
+        w: rast.sourcePixelW,
+        h: rast.sourcePixelH,
+        name: layer.name,
+      },
+      name: layer.name,
+      place: { kind: 'sourceBbox', bbox: rast.bbox },
+    })
+    // Preserve original layer's display fields (visibility / opacity / blend /
+    // clip / effects) so the visual stays identical at conversion time.
+    const merged: Layer = {
+      ...soLayer,
+      visible: layer.visible,
+      opacity: layer.opacity,
+      blend: layer.blend,
+      effects: layer.effects,
+      shadow: layer.shadow,
+      clipRect: layer.clipRect,
+      clipPath: layer.clipPath,
+      clipInverse: layer.clipInverse,
+    }
+    // Preload the dataUrl into imageCache so the first render after commit
+    // can resolve src immediately (otherwise SO renders nothing for a tick).
+    ensureImage(rast.dataUrl).catch(() => {})
+    history.set({
+      ...state,
+      layers: mapLayerById(state.layers, layer.id, () => merged),
+      smartSources: { ...(state.smartSources ?? {}), [sourceId]: source },
+    })
+    setSelectedLayerId(merged.id)
+    toast.success(t('pages.imageEditor.smartObject.converted'))
+  }, [image, selectedLayerId, state, imageCache, ensureImage, history, t])
+
+  /**
+   * Replace Contents — pick a new image file, update the SO's source dataUrl
+   * (and dims). All other SO layers referencing the same sourceRef update
+   * simultaneously (PS linked-instance semantics).
+   */
+  const handleReplaceContents = useCallback(async () => {
+    if (!image || !selectedLayerId) return
+    const layer = findLayerById(state.layers, selectedLayerId)
+    if (!layer || layer.kind !== 'smartObject') return
+    const file = await pickFile('image/*')
+    if (!file) return
+    try {
+      const dataUrl = await fileToDataUrl(file)
+      const img = await ensureImage(dataUrl)
+      const sources = state.smartSources ?? {}
+      const updated: SmartSource = {
+        dataUrl,
+        w: img.naturalWidth,
+        h: img.naturalHeight,
+        name: file.name || sources[layer.sourceRef]?.name || 'Source',
+      }
+      history.set({
+        ...state,
+        smartSources: { ...sources, [layer.sourceRef]: updated },
+      })
+      toast.success(t('pages.imageEditor.smartObject.replaced'))
+    } catch {
+      toast.error(t('pages.imageEditor.errLoadFailed'))
+    }
+  }, [image, selectedLayerId, state, ensureImage, history, t])
+
   const handleFlatten = useCallback(async () => {
     if (!image) return
     const dataUrl = flattenToDataUrl(image, state, imageCache)
@@ -920,6 +1068,7 @@ export function ImageEditorPage() {
     pasteInPlaceRef.current = handlePasteInPlace
     mergeDownRef.current = handleMergeDown
     mergeVisibleRef.current = handleMergeVisible
+    stampVisibleRef.current = handleStampVisible
   })
 
   // ── Crop ─────────────────────────────────────────────────────────────────
@@ -1175,7 +1324,11 @@ export function ImageEditorPage() {
       if (!selectedLayerId || selectedLayerId === 'image') return
       const target = findLayerById(state.layers, selectedLayerId)
       if (!target) return
-      if (target.kind !== 'annotation' && target.kind !== 'group') {
+      if (
+        target.kind !== 'annotation' &&
+        target.kind !== 'group' &&
+        target.kind !== 'smartObject'
+      ) {
         toast.message(t('pages.imageEditor.layerStyle.unsupportedKind'))
         return
       }
@@ -1187,6 +1340,80 @@ export function ImageEditorPage() {
     ? findLayerById(state.layers, openLayerStyle.layerId)
     : null
   const layerStyleInitial: LayerEffect[] = layerStyleTarget?.effects ?? []
+  // ── Right-click context menus ─────────────────────────────────────────
+  // Single shared open-menu state; either layer (LayersPanel row) or canvas
+  // (in-canvas right-click). When both kinds need to differ in items, we
+  // dispatch via `source` here without two separate state machines.
+  const [contextMenu, setContextMenu] = useState<{
+    x: number
+    y: number
+    items: ContextMenuItem[]
+    header?: string
+  } | null>(null)
+  const openLayerContextMenu = useCallback(
+    (id: string, x: number, y: number) => {
+      const target = findLayerById(state.layers, id)
+      if (!target) return
+      const isSO = target.kind === 'smartObject'
+      const isGroupTarget = target.kind === 'group'
+      const canHaveFx =
+        target.kind === 'annotation' || isSO || isGroupTarget
+      const items: ContextMenuItem[] = [
+        {
+          id: 'ls',
+          label: t('pages.imageEditor.layerStyle.title') + '…',
+          onClick: () => {
+            setSelectedLayerId(id)
+            setOpenLayerStyle({ layerId: id })
+          },
+          disabled: !canHaveFx,
+        },
+        { sep: true },
+        {
+          id: 'dup',
+          label: t('pages.imageEditor.menu.duplicateLayer'),
+          shortcut: '⌘J',
+          onClick: () => duplicateRef.current(),
+        },
+        {
+          id: 'del',
+          label: t('pages.imageEditor.menu.deleteLayer'),
+          shortcut: '⌫',
+          onClick: () => deleteLayerRef.current(),
+          danger: true,
+        },
+        { sep: true },
+        {
+          id: 'convertSO',
+          label: t('pages.imageEditor.menu.convertToSmartObject'),
+          onClick: handleConvertToSmartObject,
+          disabled: isSO,
+        },
+        {
+          id: 'replaceSO',
+          label: t('pages.imageEditor.menu.replaceSmartObjectContents') + '…',
+          onClick: handleReplaceContents,
+          disabled: !isSO,
+        },
+        { sep: true },
+        {
+          id: 'mergeDown',
+          label: t('pages.imageEditor.menu.mergeDown'),
+          shortcut: '⌘E',
+          onClick: () => mergeDownRef.current(),
+        },
+        {
+          id: 'mergeVisible',
+          label: t('pages.imageEditor.menu.mergeVisible'),
+          shortcut: '⇧⌘E',
+          onClick: () => mergeVisibleRef.current(),
+        },
+      ]
+      setContextMenu({ x, y, items, header: target.name })
+    },
+    [state.layers, t, handleConvertToSmartObject, handleReplaceContents],
+  )
+
   const handleLayerStyleApply = useCallback(
     (next: LayerEffect[]) => {
       if (!openLayerStyle) return
@@ -1224,6 +1451,15 @@ export function ImageEditorPage() {
           const img = await loadImageFromUrl(project.source.dataUrl)
           setImage(img)
           setFilename(project.source.name.replace(/\.[^./]+$/, ''))
+          // Preload Smart Object source dataUrls into the image cache so SO
+          // layers render on first paint (otherwise renderSmartObjectLayer
+          // sees an empty cache and silently no-ops until edits trigger a
+          // re-render). Run in parallel; ignore individual failures so one
+          // bad source doesn't block the project from loading.
+          const sources = project.state.smartSources ?? {}
+          for (const id of Object.keys(sources)) {
+            ensureImage(sources[id].dataUrl).catch(() => {})
+          }
           history.reset(project.state)
           setSelectedLayerId('image')
           toast.success(t('pages.imageEditor.projectLoaded'))
@@ -1249,7 +1485,7 @@ export function ImageEditorPage() {
         URL.revokeObjectURL(url)
       }
     },
-    [history, t],
+    [history, t, ensureImage],
   )
 
   const replaceInputRef = useRef<HTMLInputElement | null>(null)
@@ -1548,7 +1784,14 @@ export function ImageEditorPage() {
             canPaste: !!clipboard,
             mergeDown: handleMergeDown,
             mergeVisible: handleMergeVisible,
+            stampVisible: handleStampVisible,
             flatten: handleFlatten,
+            convertToSmartObject: handleConvertToSmartObject,
+            replaceSmartObjectContents: handleReplaceContents,
+            isSmartObjectSelected:
+              !!selectedLayerId &&
+              selectedLayerId !== 'image' &&
+              findLayerById(state.layers, selectedLayerId)?.kind === 'smartObject',
             openLayerStyle: handleOpenLayerStyle,
             zoomIn,
             zoomOut,
@@ -1682,6 +1925,8 @@ export function ImageEditorPage() {
             setSelectedLayerId(id)
             setOpenLayerStyle({ layerId: id })
           }}
+          onReplaceSmartObjectContents={handleReplaceContents}
+          onLayerContextMenu={openLayerContextMenu}
         />
 
         <StatusBar
@@ -1732,6 +1977,15 @@ export function ImageEditorPage() {
         onApply={handleLayerStyleApply}
         onCancel={() => setOpenLayerStyle(null)}
       />
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenu.items}
+          header={contextMenu.header}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   )
 }
@@ -1743,4 +1997,16 @@ function triggerDownload(blob: Blob, name: string) {
   a.download = name
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1500)
+}
+
+/** Lightweight one-shot file picker — programmatic alternative to wiring a
+ *  hidden <input> element. Used by Smart Object > Replace Contents. */
+function pickFile(accept: string): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = accept
+    input.onchange = () => resolve(input.files?.[0] ?? null)
+    input.click()
+  })
 }

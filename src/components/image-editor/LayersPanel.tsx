@@ -32,6 +32,8 @@ type Props = {
   deleteLayer: (id: string) => void
   /** Open the Layer Style dialog for `id`. Triggered by the fx badge on a row. */
   onOpenStyle: (id: string) => void
+  /** Right-click on a layer row. Caller opens a ContextMenu at (x, y). */
+  onLayerContextMenu?: (id: string, x: number, y: number) => void
 }
 
 type DropMode = 'into' | 'sibling' | 'top'
@@ -59,6 +61,7 @@ export function LayersPanel({
   patchImageLayer,
   deleteLayer,
   onOpenStyle,
+  onLayerContextMenu,
 }: Props) {
   const { t } = useTranslation()
 
@@ -147,6 +150,7 @@ export function LayersPanel({
           onDelete={handleDelete}
           onDrop={(dragId, targetId, mode) => moveLayer(dragId, targetId, mode)}
           onOpenStyle={onOpenStyle}
+          onLayerContextMenu={onLayerContextMenu}
         />
       ))}
 
@@ -214,6 +218,7 @@ function LayerSubtree({
   onDelete,
   onDrop,
   onOpenStyle,
+  onLayerContextMenu,
 }: {
   layer: Layer
   depth: number
@@ -225,6 +230,7 @@ function LayerSubtree({
   onDelete: (id: string) => void
   onDrop: (dragId: string, targetId: string, mode: 'into' | 'sibling') => void
   onOpenStyle: (id: string) => void
+  onLayerContextMenu?: (id: string, x: number, y: number) => void
 }) {
   const group = isGroup(layer) ? layer : null
   return (
@@ -242,6 +248,7 @@ function LayerSubtree({
         onDelete={() => onDelete(layer.id)}
         onDrop={(dragId, mode) => onDrop(dragId, layer.id, mode)}
         onOpenStyle={() => onOpenStyle(layer.id)}
+        onContextMenu={(x, y) => onLayerContextMenu?.(layer.id, x, y)}
       />
       {group && group.expanded &&
         [...group.children].reverse().map((c) => (
@@ -257,6 +264,7 @@ function LayerSubtree({
             onDelete={onDelete}
             onDrop={onDrop}
             onOpenStyle={onOpenStyle}
+            onLayerContextMenu={onLayerContextMenu}
           />
         ))}
     </>
@@ -285,6 +293,7 @@ function LayerRow({
   onDelete,
   onDrop,
   onOpenStyle,
+  onContextMenu,
 }: {
   layer: Layer
   depth: number
@@ -298,6 +307,7 @@ function LayerRow({
   onDelete: () => void
   onDrop: (dragId: string, mode: 'into' | 'sibling') => void
   onOpenStyle: () => void
+  onContextMenu?: (x: number, y: number) => void
 }) {
   const { t } = useTranslation()
   const showFx = hasEffects(layer)
@@ -327,6 +337,13 @@ function LayerRow({
         onDrop(id, 'sibling')
       }}
       onClick={onSelect}
+      onContextMenu={(e) => {
+        if (!onContextMenu) return
+        e.preventDefault()
+        // Select first so menu items act on this row even if it wasn't selected.
+        onSelect()
+        onContextMenu(e.clientX, e.clientY)
+      }}
       className={`flex cursor-pointer items-center gap-2 rounded border px-2 py-1 text-xs ${
         selected
           ? 'border-primary bg-accent/40'
@@ -413,6 +430,9 @@ function layerLabelKey(layer: Layer): string {
   }
   if (layer.kind === 'group') {
     return 'pages.imageEditor.annoLabel.group'
+  }
+  if (layer.kind === 'smartObject') {
+    return 'pages.imageEditor.annoLabel.smartObject'
   }
   switch (layer.shape.kind) {
     case 'rect':

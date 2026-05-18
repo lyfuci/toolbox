@@ -2,7 +2,16 @@ import type { ImageCache } from './drawing'
 import { PREVIEW_MAX } from './defaults'
 import { normalizeRect } from './hit'
 import { dimsAfterRotation, renderTo } from './render'
-import type { AnnotationLayer, EditorState, ImageShape, Layer, Point, Rect } from './types'
+import type {
+  AnnotationLayer,
+  EditorState,
+  ImageShape,
+  Layer,
+  Point,
+  Rect,
+  SmartObjectLayer,
+  SmartSource,
+} from './types'
 
 /**
  * Composite helpers shared by Edit (Cut / Copy / Paste / Fill / Stroke) and
@@ -188,6 +197,141 @@ function regionFullBBox(r: { kind: 'full'; dims: { w: number; h: number } }): Re
 }
 
 /**
+ * Build a Smart Object layer + its source entry for "Convert to Smart
+ * Object" / "Place Embedded". The caller is responsible for inserting the
+ * returned `{ layer, sourceId, source }` into state — appending to
+ * `smartSources[sourceId]` and replacing or inserting the layer.
+ *
+ * `place` selects how the SO is positioned:
+ *   - 'fit': fill the entire preview canvas (used by Place Embedded with a
+ *     fresh image — common case for opening an image as SO inside a doc).
+ *   - 'sourceBbox': position the source at the given (x, y) at its natural
+ *     pixel resolution (used by Convert from existing layer; we use the
+ *     layer's pre-conversion bbox).
+ */
+export function buildSmartObject(args: {
+  source: SmartSource
+  name: string
+  place:
+    | { kind: 'fit'; canvasW: number; canvasH: number }
+    | { kind: 'sourceBbox'; bbox: Rect }
+}): { layer: SmartObjectLayer; sourceId: string; source: SmartSource } {
+  const sourceId = crypto.randomUUID()
+  let bbox: Rect
+  if (args.place.kind === 'fit') {
+    bbox = { x: 0, y: 0, w: args.place.canvasW, h: args.place.canvasH }
+  } else {
+    bbox = normalizeRect(args.place.bbox)
+  }
+  const layer: SmartObjectLayer = {
+    id: crypto.randomUUID(),
+    name: args.name,
+    visible: true,
+    opacity: 100,
+    blend: 'normal',
+    kind: 'smartObject',
+    sourceRef: sourceId,
+    transform: {
+      x: bbox.x,
+      y: bbox.y,
+      w: bbox.w,
+      h: bbox.h,
+      rotation: 0,
+      anchorX: bbox.x + bbox.w / 2,
+      anchorY: bbox.y + bbox.h / 2,
+    },
+  }
+  return { layer, sourceId, source: args.source }
+}
+
+/**
+ * Render a single layer (and any nested children) to a fresh source-pixel
+ * canvas and return both the dataUrl + bbox. Used by Convert to Smart
+ * Object: take the existing layer, rasterize what's currently visible
+ * (effects, clip, transforms all included via renderEditorToCanvas), then
+ * the caller swaps in a fresh SmartObjectLayer pointing at the new source.
+ */
+export function rasterizeLayer(args: {
+  image: HTMLImageElement
+  state: EditorState
+  imageCache: ImageCache | undefined
+  layerId: string
+  /** Optional crop in preview-pixel space; the resulting raster covers only
+   *  this region (translated to the raster's origin). Used by Convert to
+   *  Smart Object so the source contains just the layer's bbox, not the
+   *  full canvas. Omit to keep the full canvas. */
+  crop?: Rect
+}): { dataUrl: string; bbox: Rect; sourcePixelW: number; sourcePixelH: number } | null {
+  const { image, state, imageCache, layerId, crop } = args
+  const { previewScale, w: canvasW, h: canvasH } = previewDimsOf(image, state)
+  if (canvasW <= 0 || canvasH <= 0) return null
+  const target = findLayerInTree(state.layers, layerId)
+  if (!target) return null
+  const allowed = collectIdsIncludingDescendants(target)
+  const fullCanvas = renderEditorToCanvas(image, state, imageCache, {
+    layerFilter: (l) => allowed.has(l.id),
+    includeImageBackground: false,
+  })
+  let outCanvas: HTMLCanvasElement = fullCanvas
+  let outBbox: Rect = { x: 0, y: 0, w: canvasW, h: canvasH }
+  if (crop) {
+    const c = normalizeRect(crop)
+    // Convert preview-pixel crop to source-pixel coords on fullCanvas (which
+    // was rendered at scale=1 in source pixels via renderEditorToCanvas's
+    // internal logic — see how that helper sets scale=1 then previewScale).
+    const sx = Math.max(0, Math.floor(c.x / previewScale))
+    const sy = Math.max(0, Math.floor(c.y / previewScale))
+    const sw = Math.max(1, Math.ceil(c.w / previewScale))
+    const sh = Math.max(1, Math.ceil(c.h / previewScale))
+    const tmp = document.createElement('canvas')
+    tmp.width = sw
+    tmp.height = sh
+    const tctx = tmp.getContext('2d')
+    if (!tctx) return null
+    tctx.drawImage(fullCanvas, sx, sy, sw, sh, 0, 0, sw, sh)
+    outCanvas = tmp
+    outBbox = c
+  }
+  let dataUrl: string
+  try {
+    dataUrl = outCanvas.toDataURL('image/png')
+  } catch {
+    return null
+  }
+  return {
+    dataUrl,
+    bbox: outBbox,
+    sourcePixelW: outCanvas.width,
+    sourcePixelH: outCanvas.height,
+  }
+}
+
+/** Find a layer in a tree by id (DFS). Local copy to avoid the layer-tree
+ *  import cycle that pulls in more than this module needs. */
+function findLayerInTree(layers: Layer[], id: string): Layer | null {
+  for (const l of layers) {
+    if (l.id === id) return l
+    if (l.kind === 'group') {
+      const sub = findLayerInTree(l.children, id)
+      if (sub) return sub
+    }
+  }
+  return null
+}
+
+/** Set of layer ids for `layer` and (if a group) every descendant — used
+ *  when rasterizing a group so its children render too. */
+function collectIdsIncludingDescendants(layer: Layer): Set<string> {
+  const set = new Set<string>()
+  const walk = (l: Layer) => {
+    set.add(l.id)
+    if (l.kind === 'group') for (const c of l.children) walk(c)
+  }
+  walk(layer)
+  return set
+}
+
+/**
  * Build a new annotation layer carrying `dataUrl` at the given bbox. Used by
  * Copy (after extractRegion), Paste, Fill, Stroke, and the merge operations.
  * The name is included in the layer's display label.
@@ -218,10 +362,16 @@ export function buildImageShapeLayer(args: {
 
 /**
  * Composite all visible layers (matching `pred`) into a single image-shape
- * annotation layer. Used by Merge Down / Merge Visible. The output covers
- * the entire preview canvas (full-bleed) — callers can crop later if
- * needed, but this keeps the merged layer in the same coordinate frame as
- * the original layers.
+ * annotation layer. Used by Merge Down / Merge Visible / Stamp Visible. The
+ * output covers the entire preview canvas (full-bleed) — callers can crop
+ * later if needed, but this keeps the merged layer in the same coordinate
+ * frame as the original layers.
+ *
+ * `includeImageBackground` is opt-in (defaults false) because Merge Down /
+ * Merge Visible should not bake the underlying image into the new layer
+ * (that would double-render the image once the merged layer is composited
+ * on top). Stamp Visible (Cmd+Shift+Alt+E in PS) does the opposite: it
+ * produces a snapshot of *everything currently visible*, image included.
  */
 export function mergeLayersToImageLayer(args: {
   image: HTMLImageElement
@@ -229,13 +379,14 @@ export function mergeLayersToImageLayer(args: {
   imageCache: ImageCache | undefined
   pred: (l: Layer) => boolean
   name: string
+  includeImageBackground?: boolean
 }): AnnotationLayer | null {
-  const { image, state, imageCache, pred, name } = args
+  const { image, state, imageCache, pred, name, includeImageBackground = false } = args
   const { w, h } = previewDimsOf(image, state)
   if (w <= 0 || h <= 0) return null
   const canvas = renderEditorToCanvas(image, state, imageCache, {
     layerFilter: pred,
-    includeImageBackground: false,
+    includeImageBackground,
   })
   let dataUrl: string
   try {

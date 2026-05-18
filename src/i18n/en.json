@@ -559,7 +559,10 @@
         "ungroupLayers": "Ungroup Layer",
         "mergeDown": "Merge Down",
         "mergeVisible": "Merge Visible",
+        "stampVisible": "Stamp Visible",
         "flatten": "Flatten Image",
+        "convertToSmartObject": "Convert to Smart Object",
+        "replaceSmartObjectContents": "Replace Contents",
         "cut": "Cut",
         "copy": "Copy",
         "copyMerged": "Copy Merged",
@@ -614,7 +617,21 @@
         "mergedDown": "Merged down",
         "mergeVisibleNone": "No visible layers to merge",
         "mergedVisible": "Visible layers merged",
+        "stamped": "Visible layers stamped to new layer",
         "flattened": "Image flattened"
+      },
+      "smartObject": {
+        "title": "Smart Object",
+        "width": "Width",
+        "height": "Height",
+        "rotation": "Rotation",
+        "replaceBtn": "Replace Contents…",
+        "converted": "Layer converted to Smart Object",
+        "replaced": "Smart Object contents replaced",
+        "unsupportedKind": "Mask / adjustment / filter layers can't be converted to Smart Objects.",
+        "alreadySO": "Layer is already a Smart Object.",
+        "noBbox": "Layer has no measurable bounds — can't convert.",
+        "rasterFailed": "Failed to rasterize the layer for the Smart Object source."
       },
       "panelLayers": "Layers",
       "panelChannels": "Channels",
@@ -726,10 +743,12 @@
         "frame": "Frame",
         "path": "Path",
         "group": "Group",
+        "smartObject": "Smart Object",
         "paste": "Pasted",
         "fill": "Fill",
         "stroke": "Stroke",
-        "merged": "Merged"
+        "merged": "Merged",
+        "stamped": "Stamped"
       },
       "layers": {
         "expand": "Expand group",
@@ -741,19 +760,34 @@
       },
       "layerStyle": {
         "title": "Layer Style",
-        "unsupportedKind": "Layer Style only applies to shape layers and groups.",
+        "unsupportedKind": "Layer Style only applies to shape layers, groups, and Smart Objects.",
         "pickFromList": "Tick an effect on the left to configure it.",
         "color": "Color",
+        "endColor": "End Color",
+        "highlightColor": "Highlight",
+        "shadowColor": "Shadow",
         "distance": "Distance",
         "angle": "Angle",
+        "altitude": "Altitude",
         "size": "Size",
+        "scale": "Scale",
+        "depth": "Depth",
         "width": "Width",
         "position": "Position",
+        "style": "Style",
+        "invert": "Invert",
         "colorOverlayHint": "Fills the layer's alpha with the chosen colour at the given opacity / blend.",
+        "patternHint": "v1 ships a built-in checker pattern; custom patterns coming in a follow-up.",
         "strokePos": {
           "outside": "Outside",
           "center": "Center",
           "inside": "Inside"
+        },
+        "bevelStyle": {
+          "innerBevel": "Inner Bevel",
+          "outerBevel": "Outer Bevel",
+          "emboss": "Emboss",
+          "pillowEmboss": "Pillow Emboss"
         },
         "kind": {
           "dropShadow": "Drop Shadow",
@@ -761,7 +795,11 @@
           "outerGlow": "Outer Glow",
           "innerGlow": "Inner Glow",
           "stroke": "Stroke",
-          "colorOverlay": "Color Overlay"
+          "colorOverlay": "Color Overlay",
+          "gradientOverlay": "Gradient Overlay",
+          "patternOverlay": "Pattern Overlay",
+          "satin": "Satin",
+          "bevelEmboss": "Bevel & Emboss"
         }
       },
       "project": "Project",

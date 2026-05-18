@@ -559,7 +559,10 @@
         "ungroupLayers": "取消图层编组",
         "mergeDown": "向下合并",
         "mergeVisible": "合并可见图层",
+        "stampVisible": "盖印可见图层",
         "flatten": "拼合图像",
+        "convertToSmartObject": "转换为智能对象",
+        "replaceSmartObjectContents": "替换内容",
         "cut": "剪切",
         "copy": "拷贝",
         "copyMerged": "合并拷贝",
@@ -614,7 +617,21 @@
         "mergedDown": "已向下合并",
         "mergeVisibleNone": "没有可见图层可合并",
         "mergedVisible": "已合并可见图层",
+        "stamped": "已盖印可见图层到新图层",
         "flattened": "已拼合图像"
+      },
+      "smartObject": {
+        "title": "智能对象",
+        "width": "宽度",
+        "height": "高度",
+        "rotation": "旋转",
+        "replaceBtn": "替换内容…",
+        "converted": "已转换为智能对象",
+        "replaced": "已替换智能对象内容",
+        "unsupportedKind": "蒙版/调整/滤镜图层无法转换为智能对象。",
+        "alreadySO": "该图层已是智能对象。",
+        "noBbox": "图层无可测量边界，无法转换。",
+        "rasterFailed": "为智能对象栅格化图层失败。"
       },
       "panelLayers": "图层",
       "panelChannels": "通道",
@@ -726,10 +743,12 @@
         "frame": "画框",
         "path": "路径",
         "group": "图层组",
+        "smartObject": "智能对象",
         "paste": "粘贴",
         "fill": "填充",
         "stroke": "描边",
-        "merged": "已合并"
+        "merged": "已合并",
+        "stamped": "盖印"
       },
       "layers": {
         "expand": "展开组",
@@ -741,19 +760,34 @@
       },
       "layerStyle": {
         "title": "图层样式",
-        "unsupportedKind": "图层样式仅适用于形状图层和组。",
+        "unsupportedKind": "图层样式仅适用于形状图层、图层组和智能对象。",
         "pickFromList": "在左侧勾选效果以进行配置。",
         "color": "颜色",
+        "endColor": "结束颜色",
+        "highlightColor": "高光",
+        "shadowColor": "阴影",
         "distance": "距离",
         "angle": "角度",
+        "altitude": "高度",
         "size": "大小",
+        "scale": "缩放",
+        "depth": "深度",
         "width": "宽度",
         "position": "位置",
+        "style": "样式",
+        "invert": "反相",
         "colorOverlayHint": "用所选颜色按指定不透明度与混合模式填充图层的不透明区域。",
+        "patternHint": "v1 内置棋盘格图案；自定义图案将在后续版本支持。",
         "strokePos": {
           "outside": "外部",
           "center": "居中",
           "inside": "内部"
+        },
+        "bevelStyle": {
+          "innerBevel": "内斜面",
+          "outerBevel": "外斜面",
+          "emboss": "浮雕",
+          "pillowEmboss": "枕状浮雕"
         },
         "kind": {
           "dropShadow": "投影",
@@ -761,7 +795,11 @@
           "outerGlow": "外发光",
           "innerGlow": "内发光",
           "stroke": "描边",
-          "colorOverlay": "颜色叠加"
+          "colorOverlay": "颜色叠加",
+          "gradientOverlay": "渐变叠加",
+          "patternOverlay": "图案叠加",
+          "satin": "光泽",
+          "bevelEmboss": "斜面与浮雕"
         }
       },
       "project": "项目",

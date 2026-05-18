@@ -72,9 +72,15 @@ type Props = {
     canPaste?: boolean
     mergeDown?: () => void
     mergeVisible?: () => void
+    stampVisible?: () => void
     flatten?: () => void
     /** Open Layer Style dialog. `kind` preselects an effect; undefined = "Blending Options" (no preselect). */
     openLayerStyle?: (kind?: LayerEffectKind) => void
+    /** Smart Object commands. */
+    convertToSmartObject?: () => void
+    replaceSmartObjectContents?: () => void
+    /** True when selected layer is a SmartObjectLayer (enables Replace Contents). */
+    isSmartObjectSelected?: boolean
     zoomIn?: () => void
     zoomOut?: () => void
     zoomFit?: () => void
@@ -429,6 +435,26 @@ export function MenuBar({ handlers }: Props) {
             label: t('pages.imageEditor.layerStyle.kind.colorOverlay') + '…',
             onClick: () => handlers.openLayerStyle?.('colorOverlay'),
           },
+          {
+            id: 'ls-gradientOverlay',
+            label: t('pages.imageEditor.layerStyle.kind.gradientOverlay') + '…',
+            onClick: () => handlers.openLayerStyle?.('gradientOverlay'),
+          },
+          {
+            id: 'ls-patternOverlay',
+            label: t('pages.imageEditor.layerStyle.kind.patternOverlay') + '…',
+            onClick: () => handlers.openLayerStyle?.('patternOverlay'),
+          },
+          {
+            id: 'ls-satin',
+            label: t('pages.imageEditor.layerStyle.kind.satin') + '…',
+            onClick: () => handlers.openLayerStyle?.('satin'),
+          },
+          {
+            id: 'ls-bevelEmboss',
+            label: t('pages.imageEditor.layerStyle.kind.bevelEmboss') + '…',
+            onClick: () => handlers.openLayerStyle?.('bevelEmboss'),
+          },
         ],
         { sep: true },
         [
@@ -477,9 +503,29 @@ export function MenuBar({ handlers }: Props) {
             onClick: handlers.mergeVisible,
           },
           {
+            id: 'stampVisible',
+            label: t('pages.imageEditor.menu.stampVisible'),
+            shortcut: '⌥⇧⌘E',
+            onClick: handlers.stampVisible,
+          },
+          {
             id: 'flatten',
             label: t('pages.imageEditor.menu.flatten'),
             onClick: handlers.flatten,
+          },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'convertSO',
+            label: t('pages.imageEditor.menu.convertToSmartObject'),
+            onClick: handlers.convertToSmartObject,
+          },
+          {
+            id: 'replaceSO',
+            label: t('pages.imageEditor.menu.replaceSmartObjectContents') + '…',
+            onClick: handlers.replaceSmartObjectContents,
+            disabled: !handlers.isSmartObjectSelected,
           },
         ],
       ],

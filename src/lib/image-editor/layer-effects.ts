@@ -11,13 +11,17 @@
 // the `scale` (= annoScale) so we can convert to target pixels.
 
 import type {
+  BevelEmbossEffect,
   ColorOverlayEffect,
   DropShadowEffect,
+  GradientOverlayEffect,
   InnerGlowEffect,
   InnerShadowEffect,
   Layer,
   LayerEffect,
   OuterGlowEffect,
+  PatternOverlayEffect,
+  SatinEffect,
   Shadow,
   StrokeEffect,
 } from './types'
@@ -62,14 +66,19 @@ function shadowToDropShadow(s: Shadow): DropShadowEffect {
   }
 }
 
+// PS render order, lowest-numbered first (back→front).
 const ORDER: { [K in LayerEffect['kind']]: number } = {
   dropShadow: 0,
   outerGlow: 1,
-  // stroke handled separately by position
+  // stroke handled separately by position (outside vs inside/center)
   stroke: 2,
   innerShadow: 3,
   innerGlow: 4,
-  colorOverlay: 5,
+  satin: 5,
+  colorOverlay: 6,
+  gradientOverlay: 7,
+  patternOverlay: 8,
+  bevelEmboss: 9,
 }
 
 function sortByRenderOrder(list: LayerEffect[]): LayerEffect[] {
@@ -99,6 +108,9 @@ export function buildEffectContribution(
   dims: { w: number; h: number },
   layerContent: HTMLCanvasElement,
   scale: number,
+  /** Resolved Image cache — needed by Pattern Overlay. May be omitted by
+   *  callers that don't expect pattern fx (then patternOverlay no-ops). */
+  imageCache?: Map<string, HTMLImageElement>,
 ): HTMLCanvasElement | null {
   switch (effect.kind) {
     case 'dropShadow':
@@ -113,6 +125,14 @@ export function buildEffectContribution(
       return drawColorOverlay(dims, layerContent, effect)
     case 'stroke':
       return drawStroke(dims, layerContent, effect, scale)
+    case 'gradientOverlay':
+      return drawGradientOverlay(dims, layerContent, effect, scale)
+    case 'patternOverlay':
+      return drawPatternOverlay(dims, layerContent, effect, scale, imageCache)
+    case 'satin':
+      return drawSatin(dims, layerContent, effect, scale)
+    case 'bevelEmboss':
+      return drawBevelEmboss(dims, layerContent, effect, scale)
   }
 }
 
@@ -413,6 +433,250 @@ function makeErodedSilhouette(
   ectx.globalCompositeOperation = 'destination-out'
   ectx.drawImage(dilatedInverse, 0, 0)
   return eroded
+}
+
+/**
+ * Gradient overlay — linear two-stop gradient swept across the layer's
+ * bbox at `effect.angle`, scaled by `effect.scale`. Then masked to the
+ * layer's alpha via destination-in. Computed in target pixels.
+ */
+function drawGradientOverlay(
+  dims: { w: number; h: number },
+  layer: HTMLCanvasElement,
+  fx: GradientOverlayEffect,
+  // `scale` is accepted for signature uniformity with other effects; this one
+  // doesn't currently use it (the gradient stretches to the bbox in target
+  // pixels regardless).
+  _scale: number,
+): HTMLCanvasElement | null {
+  void _scale
+  const out = makeCanvas(dims)
+  const ctx = out.getContext('2d')
+  if (!ctx) return null
+  // Gradient line endpoints — angled across the bbox diagonal. Apply
+  // `scale` as a length multiplier around the bbox centre.
+  const cx = dims.w / 2
+  const cy = dims.h / 2
+  const diag = Math.hypot(dims.w, dims.h)
+  const halfLen = (diag * (fx.scale / 100)) / 2
+  const r = (fx.angle * Math.PI) / 180
+  const dx = Math.cos(r) * halfLen
+  const dy = Math.sin(r) * halfLen
+  const grad = ctx.createLinearGradient(cx - dx, cy - dy, cx + dx, cy + dy)
+  grad.addColorStop(0, fx.color)
+  grad.addColorStop(1, fx.endColor)
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, dims.w, dims.h)
+  ctx.globalCompositeOperation = 'destination-in'
+  ctx.drawImage(layer, 0, 0)
+  return out
+}
+
+/**
+ * Pattern overlay — tile a cached pattern image (or built-in checker
+ * fallback) across the layer's alpha. Pattern tiles at `effect.scale`
+ * percent of the source pattern's natural pixel size.
+ *
+ * Async pattern loading: if `patternDataUrl` is set but the cache misses,
+ * caller is responsible for ensuring it loads; we draw nothing this frame
+ * and the next render after cache populate will succeed.
+ */
+function drawPatternOverlay(
+  dims: { w: number; h: number },
+  layer: HTMLCanvasElement,
+  fx: PatternOverlayEffect,
+  scale: number,
+  imageCache?: Map<string, HTMLImageElement>,
+): HTMLCanvasElement | null {
+  let patternImg: HTMLImageElement | HTMLCanvasElement | null = null
+  if (fx.patternDataUrl) {
+    patternImg = imageCache?.get(fx.patternDataUrl) ?? null
+    if (!patternImg) return null
+  } else {
+    patternImg = makeCheckerTile()
+  }
+  const out = makeCanvas(dims)
+  const ctx = out.getContext('2d')
+  if (!ctx) return null
+  const tileScale = (fx.scale / 100) * scale
+  if (tileScale !== 1 && patternImg instanceof HTMLImageElement) {
+    // For non-unit scale we'd need to pre-resize the tile because
+    // createPattern doesn't honor a transform on the source. Render the
+    // tile at the target scale onto a small canvas first.
+    const w = Math.max(1, Math.round(patternImg.naturalWidth * tileScale))
+    const h = Math.max(1, Math.round(patternImg.naturalHeight * tileScale))
+    const tmp = makeCanvas({ w, h })
+    const tctx = tmp.getContext('2d')
+    if (!tctx) return null
+    tctx.imageSmoothingEnabled = true
+    tctx.drawImage(patternImg, 0, 0, w, h)
+    patternImg = tmp
+  }
+  const pat = ctx.createPattern(patternImg, 'repeat')
+  if (!pat) return null
+  ctx.fillStyle = pat
+  ctx.fillRect(0, 0, dims.w, dims.h)
+  ctx.globalCompositeOperation = 'destination-in'
+  ctx.drawImage(layer, 0, 0)
+  return out
+}
+
+/** 16×16 checker tile used as Pattern Overlay's default fallback. */
+let cachedCheckerTile: HTMLCanvasElement | null = null
+function makeCheckerTile(): HTMLCanvasElement {
+  if (cachedCheckerTile) return cachedCheckerTile
+  const c = document.createElement('canvas')
+  c.width = 16
+  c.height = 16
+  const ctx = c.getContext('2d')!
+  ctx.fillStyle = '#cccccc'
+  ctx.fillRect(0, 0, 16, 16)
+  ctx.fillStyle = '#999999'
+  ctx.fillRect(0, 0, 8, 8)
+  ctx.fillRect(8, 8, 8, 8)
+  cachedCheckerTile = c
+  return c
+}
+
+/**
+ * Satin — silhouette XOR'd with its self-shifted copy, blurred. Result
+ * lives inside the layer alpha; visible as a wavy interior contour. PS's
+ * Satin uses a specific blur kernel; we approximate by combining two
+ * opposing inner-shadow contributions.
+ */
+function drawSatin(
+  dims: { w: number; h: number },
+  layer: HTMLCanvasElement,
+  fx: SatinEffect,
+  scale: number,
+): HTMLCanvasElement | null {
+  const out = makeCanvas(dims)
+  const ctx = out.getContext('2d')
+  if (!ctx) return null
+  const r = (fx.angle * Math.PI) / 180
+  const dx = Math.cos(r) * fx.distance * scale
+  const dy = -Math.sin(r) * fx.distance * scale
+
+  // Two shifted silhouettes drawn with shadowBlur, then their intersection
+  // produces the satin-like contour.
+  const drawShifted = (sx: number, sy: number): HTMLCanvasElement | null => {
+    const c = makeCanvas(dims)
+    const cctx = c.getContext('2d')
+    if (!cctx) return null
+    cctx.shadowColor = fx.color
+    cctx.shadowOffsetX = sx
+    cctx.shadowOffsetY = sy
+    cctx.shadowBlur = fx.size * scale
+    cctx.drawImage(layer, 0, 0)
+    cctx.shadowColor = 'transparent'
+    cctx.shadowBlur = 0
+    cctx.shadowOffsetX = 0
+    cctx.shadowOffsetY = 0
+    cctx.globalCompositeOperation = 'destination-out'
+    cctx.drawImage(layer, 0, 0)
+    return c
+  }
+  const a = drawShifted(dx, dy)
+  const b = drawShifted(-dx, -dy)
+  if (!a || !b) return null
+  // Combine: take the difference (xor-ish) — use destination-out then add.
+  ctx.drawImage(a, 0, 0)
+  if (fx.invert) {
+    ctx.globalCompositeOperation = 'source-over'
+  } else {
+    ctx.globalCompositeOperation = 'destination-out'
+  }
+  ctx.drawImage(b, 0, 0)
+  ctx.globalCompositeOperation = 'destination-in'
+  ctx.drawImage(layer, 0, 0)
+  return out
+}
+
+/**
+ * Bevel & Emboss — paired highlight + shadow shifted along the light
+ * angle (a unit vector derived from `angle` + `altitude`), each masked
+ * appropriately by the layer's silhouette to produce the chiselled look.
+ *
+ * The four PS bevel styles differ in WHERE the highlight/shadow lands:
+ *   - innerBevel: inside the alpha, both
+ *   - outerBevel: outside the alpha, both
+ *   - emboss:     half inside / half outside
+ *   - pillowEmboss: like emboss but with inverted shadow position
+ *
+ * v1 implements innerBevel only (the most common); the other styles fall
+ * back to it. Future revision can branch on `fx.style`.
+ */
+function drawBevelEmboss(
+  dims: { w: number; h: number },
+  layer: HTMLCanvasElement,
+  fx: BevelEmbossEffect,
+  scale: number,
+): HTMLCanvasElement | null {
+  const out = makeCanvas(dims)
+  const ctx = out.getContext('2d')
+  if (!ctx) return null
+  // Light vector — `altitude` flattens the horizontal offset toward zero
+  // as it approaches 90° (light from straight above).
+  const angleRad = (fx.angle * Math.PI) / 180
+  const altRad = (fx.altitude * Math.PI) / 180
+  const horiz = Math.cos(altRad)
+  const offset = (fx.depth / 10) * scale * horiz
+  const lx = Math.cos(angleRad) * offset
+  const ly = -Math.sin(angleRad) * offset
+
+  // Highlight = stamp colour offset toward light, masked to interior alpha
+  const makeShifted = (
+    color: string,
+    ox: number,
+    oy: number,
+  ): HTMLCanvasElement | null => {
+    const c = makeCanvas(dims)
+    const cctx = c.getContext('2d')
+    if (!cctx) return null
+    cctx.shadowColor = color
+    cctx.shadowOffsetX = ox
+    cctx.shadowOffsetY = oy
+    cctx.shadowBlur = fx.size * scale
+    cctx.drawImage(layer, 0, 0)
+    cctx.shadowColor = 'transparent'
+    cctx.shadowBlur = 0
+    cctx.shadowOffsetX = 0
+    cctx.shadowOffsetY = 0
+    cctx.globalCompositeOperation = 'destination-out'
+    cctx.drawImage(layer, 0, 0)
+    cctx.globalCompositeOperation = 'destination-in'
+    cctx.drawImage(layer, 0, 0)
+    return c
+  }
+  const highlight = makeShifted(fx.highlightColor, lx, ly)
+  const shadow = makeShifted(fx.shadowColor, -lx, -ly)
+  if (!highlight || !shadow) return null
+
+  ctx.globalAlpha = fx.shadowOpacity / 100
+  ctx.globalCompositeOperation = blendModeToOp(fx.shadowBlend)
+  ctx.drawImage(shadow, 0, 0)
+
+  ctx.globalAlpha = fx.highlightOpacity / 100
+  ctx.globalCompositeOperation = blendModeToOp(fx.highlightBlend)
+  ctx.drawImage(highlight, 0, 0)
+  return out
+}
+
+function blendModeToOp(b: LayerEffect['blend']): GlobalCompositeOperation {
+  switch (b) {
+    case 'normal':
+      return 'source-over'
+    case 'multiply':
+      return 'multiply'
+    case 'screen':
+      return 'screen'
+    case 'overlay':
+      return 'overlay'
+    case 'darken':
+      return 'darken'
+    case 'lighten':
+      return 'lighten'
+  }
 }
 
 function makeCanvas(dims: { w: number; h: number }): HTMLCanvasElement {
