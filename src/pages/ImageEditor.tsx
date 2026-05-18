@@ -171,6 +171,7 @@ export function ImageEditorPage() {
   const mergeVisibleRef = useRef<() => void>(() => {})
   const stampVisibleRef = useRef<() => void>(() => {})
   const clippingMaskRef = useRef<() => void>(() => {})
+  const saveProjectRef = useRef<() => void>(() => {})
 
   // View menu toggles (UI-only, not part of EditorState or project save).
   // Grid + snap travel together: snap is a no-op when the grid is hidden.
@@ -294,6 +295,55 @@ export function ImageEditorPage() {
         if (e.key === '0') { e.preventDefault(); zoomFitScreen(); return }
         if (e.key === '1') { e.preventDefault(); zoomActualPixels(); return }
         if (e.key === 'j' || e.key === 'J') { e.preventDefault(); duplicateRef.current(); return }
+        // Undo / redo. Ctrl+Z = undo; Ctrl+Shift+Z or Ctrl+Y = redo (PS conventions).
+        if (e.key === 'z' || e.key === 'Z') {
+          e.preventDefault()
+          if (e.shiftKey) history.redo()
+          else history.undo()
+          return
+        }
+        if (e.key === 'y' || e.key === 'Y') {
+          e.preventDefault()
+          history.redo()
+          return
+        }
+        // File menu shortcuts.
+        if (e.key === 's' || e.key === 'S') {
+          e.preventDefault()
+          saveProjectRef.current()
+          return
+        }
+        if (e.key === 'o' || e.key === 'O') {
+          e.preventDefault()
+          replaceInputRef.current?.click()
+          return
+        }
+        // Free Transform — currently only meaningful for Smart Objects
+        // (which already expose the handle set via selection chrome).
+        // Selecting the SO is enough; the hint surfaces via toast.
+        if (e.key === 't' || e.key === 'T') {
+          e.preventDefault()
+          if (selectedLayerId && selectedLayerId !== 'image') {
+            const sel = findLayerById(state.layers, selectedLayerId)
+            if (sel?.kind === 'smartObject') {
+              toast.message(t('pages.imageEditor.freeTransform.useSOHandles'))
+            } else {
+              toast.message(t('pages.imageEditor.freeTransform.onlySO'))
+            }
+          }
+          return
+        }
+        // View menu toggles via shortcuts.
+        if (e.key === "'") {
+          e.preventDefault()
+          setShowGrid((v) => !v)
+          return
+        }
+        if (e.key === ';') {
+          e.preventDefault()
+          setSnapToGrid((v) => !v)
+          return
+        }
         if (e.key === ']') { e.preventDefault(); moveLayerRef.current(e.shiftKey ? 'front' : 'forward'); return }
         if (e.key === '[') { e.preventDefault(); moveLayerRef.current(e.shiftKey ? 'back' : 'backward'); return }
         if (e.key === 'g' || e.key === 'G') {
@@ -441,7 +491,7 @@ export function ImageEditorPage() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [focused, zoomIn, zoomOut, zoomReset, zoomActualPixels, zoomFitScreen, swapColors, resetColors, selectedLayerId, trySetTool, history, state, image])
+  }, [focused, zoomIn, zoomOut, zoomReset, zoomActualPixels, zoomFitScreen, swapColors, resetColors, selectedLayerId, trySetTool, history, state, image, t])
 
   // ── Layer state helpers ──────────────────────────────────────────────────
   // All of these are tree-aware — `state.layers` is a nested tree once groups
@@ -1019,6 +1069,48 @@ export function ImageEditorPage() {
    * (and dims). All other SO layers referencing the same sourceRef update
    * simultaneously (PS linked-instance semantics).
    */
+  // ── Layer Comps (panel) ────────────────────────────────────────────────
+  const handleSaveLayerComp = useCallback(
+    (name: string) => {
+      const comp = {
+        id: crypto.randomUUID(),
+        name,
+        createdAt: new Date().toISOString(),
+        // Deep-clone via JSON round-trip so the comp isn't aliased to the
+        // live state (which would mutate through history).
+        layers: JSON.parse(JSON.stringify(state.layers)) as Layer[],
+        imageLayer: { ...state.imageLayer },
+      }
+      history.set({
+        ...state,
+        layerComps: [...(state.layerComps ?? []), comp],
+      })
+      toast.success(t('pages.imageEditor.layerComps.saved'))
+    },
+    [state, history, t],
+  )
+  const handleApplyLayerComp = useCallback(
+    (comp: { id: string; name: string; layers: Layer[]; imageLayer: EditorState['imageLayer'] }) => {
+      history.set({
+        ...state,
+        // Deep-clone so subsequent edits don't mutate the saved comp.
+        layers: JSON.parse(JSON.stringify(comp.layers)) as Layer[],
+        imageLayer: { ...comp.imageLayer },
+      })
+      toast.success(t('pages.imageEditor.layerComps.applied', { name: comp.name }))
+    },
+    [state, history, t],
+  )
+  const handleDeleteLayerComp = useCallback(
+    (id: string) => {
+      history.set({
+        ...state,
+        layerComps: (state.layerComps ?? []).filter((c) => c.id !== id),
+      })
+    },
+    [state, history],
+  )
+
   /** Toggle PS clipping mask on the selected layer. */
   const handleToggleClippingMask = useCallback(() => {
     if (!selectedLayerId || selectedLayerId === 'image') return
@@ -1978,6 +2070,13 @@ export function ImageEditorPage() {
     triggerDownload(blob, `${filename}.toolbox-image.json`)
     toast.success(t('pages.imageEditor.projectSaved'))
   }, [image, filename, state, t])
+  useEffect(() => {
+    // Ref-update for the Ctrl+S keyboard shortcut. Lives here (after the
+    // handler declaration) so React's hook-static-analysis doesn't flag
+    // "used before declared" — the earlier ref-batch effect is hoisted
+    // above the function declaration.
+    saveProjectRef.current = handleSaveProject
+  })
 
   const setTransforms = useCallback(
     (transforms: Transforms) => history.set({ ...state, transforms }),
@@ -2235,6 +2334,21 @@ export function ImageEditorPage() {
           }}
           onReplaceSmartObjectContents={handleReplaceContents}
           onLayerContextMenu={openLayerContextMenu}
+          image={image}
+          imageCache={imageCache}
+          history={{
+            totalLength: history.totalLength,
+            currentIndex: history.currentIndex,
+            jumpTo: history.jumpTo,
+          }}
+          onSaveLayerComp={handleSaveLayerComp}
+          onApplyLayerComp={handleApplyLayerComp}
+          onDeleteLayerComp={handleDeleteLayerComp}
+          currentBrush={{ strokeWidth, options: brushOptions }}
+          onPickBrushPreset={(p) => {
+            setStrokeWidth(p.strokeWidth)
+            setBrushOptions(p.options)
+          }}
         />
 
         <StatusBar
