@@ -19,6 +19,7 @@ import {
   parentPathOf,
   removeAtPath,
 } from '@/lib/image-editor/layer-tree'
+import { hasEffects } from '@/lib/image-editor/layer-effects'
 import type { EditorState, GroupLayer, Layer } from '@/lib/image-editor/types'
 
 type Props = {
@@ -29,6 +30,8 @@ type Props = {
   patchLayer: (id: string, patch: Partial<Layer>) => void
   patchImageLayer: (patch: Partial<EditorState['imageLayer']>) => void
   deleteLayer: (id: string) => void
+  /** Open the Layer Style dialog for `id`. Triggered by the fx badge on a row. */
+  onOpenStyle: (id: string) => void
 }
 
 type DropMode = 'into' | 'sibling' | 'top'
@@ -55,6 +58,7 @@ export function LayersPanel({
   patchLayer,
   patchImageLayer,
   deleteLayer,
+  onOpenStyle,
 }: Props) {
   const { t } = useTranslation()
 
@@ -142,6 +146,7 @@ export function LayersPanel({
           onToggleExpanded={handleToggleExpanded}
           onDelete={handleDelete}
           onDrop={(dragId, targetId, mode) => moveLayer(dragId, targetId, mode)}
+          onOpenStyle={onOpenStyle}
         />
       ))}
 
@@ -208,6 +213,7 @@ function LayerSubtree({
   onToggleExpanded,
   onDelete,
   onDrop,
+  onOpenStyle,
 }: {
   layer: Layer
   depth: number
@@ -218,6 +224,7 @@ function LayerSubtree({
   onToggleExpanded: (id: string) => void
   onDelete: (id: string) => void
   onDrop: (dragId: string, targetId: string, mode: 'into' | 'sibling') => void
+  onOpenStyle: (id: string) => void
 }) {
   const group = isGroup(layer) ? layer : null
   return (
@@ -234,6 +241,7 @@ function LayerSubtree({
         onToggleExpanded={() => onToggleExpanded(layer.id)}
         onDelete={() => onDelete(layer.id)}
         onDrop={(dragId, mode) => onDrop(dragId, layer.id, mode)}
+        onOpenStyle={() => onOpenStyle(layer.id)}
       />
       {group && group.expanded &&
         [...group.children].reverse().map((c) => (
@@ -248,6 +256,7 @@ function LayerSubtree({
             onToggleExpanded={onToggleExpanded}
             onDelete={onDelete}
             onDrop={onDrop}
+            onOpenStyle={onOpenStyle}
           />
         ))}
     </>
@@ -275,6 +284,7 @@ function LayerRow({
   onToggleExpanded,
   onDelete,
   onDrop,
+  onOpenStyle,
 }: {
   layer: Layer
   depth: number
@@ -287,8 +297,10 @@ function LayerRow({
   onToggleExpanded: () => void
   onDelete: () => void
   onDrop: (dragId: string, mode: 'into' | 'sibling') => void
+  onOpenStyle: () => void
 }) {
   const { t } = useTranslation()
+  const showFx = hasEffects(layer)
   const labelKey = layerLabelKey(layer)
   const labelArgs =
     layer.kind === 'annotation' && layer.shape.kind === 'text'
@@ -365,6 +377,18 @@ function LayerRow({
         </span>
       )}
       <span className="flex-1 truncate">{t(labelKey, labelArgs)}</span>
+      {showFx && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onOpenStyle()
+          }}
+          className="rounded border border-border/60 px-1 font-mono text-[10px] italic text-primary hover:bg-accent/50"
+          title={t('pages.imageEditor.layers.editStyle')}
+        >
+          fx
+        </button>
+      )}
       <span className="font-mono text-muted-foreground">#{index}</span>
       <button
         onClick={(e) => {

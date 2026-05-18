@@ -20,6 +20,8 @@ type Props = {
   setTransforms: (t: Transforms) => void
   setAdjust: (a: Adjustments) => void
   zoom: number
+  /** Open the Layer Style dialog for the given layer id. */
+  onOpenStyle: (id: string) => void
 }
 
 /**
@@ -41,6 +43,7 @@ export function RightSidebar({
   setTransforms,
   setAdjust,
   zoom,
+  onOpenStyle,
 }: Props) {
   const { t } = useTranslation()
   const [g1, setG1] = useState<'layers' | 'channels' | 'paths'>('layers')
@@ -105,6 +108,7 @@ export function RightSidebar({
               patchLayer={patchLayer}
               patchImageLayer={patchImageLayer}
               deleteLayer={deleteLayer}
+              onOpenStyle={onOpenStyle}
             />
           </div>
         )}
@@ -133,6 +137,7 @@ export function RightSidebar({
               selectedId={selectedId}
               patchLayer={patchLayer}
               patchImageLayer={patchImageLayer}
+              onOpenStyle={onOpenStyle}
             />
           </div>
         )}

@@ -567,6 +567,7 @@
         "pasteInPlace": "原位粘贴",
         "fill": "填充",
         "stroke": "描边",
+        "blendingOptions": "混合选项",
         "zoomIn": "放大",
         "zoomOut": "缩小",
         "zoomFit": "适合屏幕",
@@ -735,7 +736,33 @@
         "collapse": "折叠组",
         "dropInto": "拖入组",
         "dropOutside": "拖到此处移出组",
-        "resizeHandle": "拖动调整图层面板高度"
+        "resizeHandle": "拖动调整图层面板高度",
+        "editStyle": "编辑图层样式"
+      },
+      "layerStyle": {
+        "title": "图层样式",
+        "unsupportedKind": "图层样式仅适用于形状图层和组。",
+        "pickFromList": "在左侧勾选效果以进行配置。",
+        "color": "颜色",
+        "distance": "距离",
+        "angle": "角度",
+        "size": "大小",
+        "width": "宽度",
+        "position": "位置",
+        "colorOverlayHint": "用所选颜色按指定不透明度与混合模式填充图层的不透明区域。",
+        "strokePos": {
+          "outside": "外部",
+          "center": "居中",
+          "inside": "内部"
+        },
+        "kind": {
+          "dropShadow": "投影",
+          "innerShadow": "内阴影",
+          "outerGlow": "外发光",
+          "innerGlow": "内发光",
+          "stroke": "描边",
+          "colorOverlay": "颜色叠加"
+        }
       },
       "project": "项目",
       "projectSave": "保存项目 (.json)",

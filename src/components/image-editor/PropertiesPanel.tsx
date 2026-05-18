@@ -2,12 +2,12 @@ import { useTranslation } from 'react-i18next'
 import { Label } from '@/components/ui/label'
 import { Slider } from './Slider'
 import { findLayerById } from '@/lib/image-editor/layer-tree'
+import { effectsOf } from '@/lib/image-editor/layer-effects'
 import {
   BLEND_MODES,
   type BlendMode,
   type EditorState,
   type Layer,
-  type Shadow,
 } from '@/lib/image-editor/types'
 
 type Props = {
@@ -15,14 +15,9 @@ type Props = {
   selectedId: string
   patchLayer: (id: string, patch: Partial<Layer>) => void
   patchImageLayer: (patch: Partial<EditorState['imageLayer']>) => void
-}
-
-const DEFAULT_SHADOW: Shadow = {
-  enabled: true,
-  offsetX: 4,
-  offsetY: 4,
-  blur: 8,
-  color: 'rgba(0, 0, 0, 0.5)',
+  /** Open the Layer Style dialog for the currently selected layer.
+   *  Hidden when the image background is selected (no fx support there). */
+  onOpenStyle: (id: string) => void
 }
 
 /**
@@ -35,6 +30,7 @@ export function PropertiesPanel({
   selectedId,
   patchLayer,
   patchImageLayer,
+  onOpenStyle,
 }: Props) {
   const { t } = useTranslation()
   const selected: Layer | EditorState['imageLayer'] | null =
@@ -49,6 +45,12 @@ export function PropertiesPanel({
       </div>
     )
   }
+
+  // Effects only apply to user layers — image background renders through the
+  // crop/transform path which doesn't go through the per-layer effects stack.
+  const isUserLayer = selectedId !== 'image'
+  const layerForFx = isUserLayer ? (selected as Layer) : null
+  const fxCount = layerForFx ? effectsOf(layerForFx).length : 0
 
   return (
     <div className="space-y-3">
@@ -85,90 +87,26 @@ export function PropertiesPanel({
         </select>
       </div>
 
-      <ShadowControls
-        shadow={selected.shadow}
-        onChange={(next) => {
-          if (selectedId === 'image') patchImageLayer({ shadow: next })
-          else patchLayer(selectedId, { shadow: next })
-        }}
-      />
-    </div>
-  )
-}
-
-function ShadowControls({
-  shadow,
-  onChange,
-}: {
-  shadow: Shadow | undefined
-  onChange: (s: Shadow | undefined) => void
-}) {
-  const { t } = useTranslation()
-  const enabled = shadow?.enabled ?? false
-  const s: Shadow = shadow ?? DEFAULT_SHADOW
-  return (
-    <div className="space-y-2 border-t border-border pt-3">
-      <label className="flex items-center gap-2 text-xs text-muted-foreground">
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) =>
-            onChange(e.target.checked ? { ...s, enabled: true } : undefined)
-          }
-          className="h-3.5 w-3.5 accent-primary"
-        />
-        {t('pages.imageEditor.dropShadow')}
-      </label>
-      {enabled && (
-        <>
-          <Slider
-            label={t('pages.imageEditor.shadowX')}
-            value={s.offsetX}
-            min={-50}
-            max={50}
-            onChange={(v) => onChange({ ...s, offsetX: v })}
-          />
-          <Slider
-            label={t('pages.imageEditor.shadowY')}
-            value={s.offsetY}
-            min={-50}
-            max={50}
-            onChange={(v) => onChange({ ...s, offsetY: v })}
-          />
-          <Slider
-            label={t('pages.imageEditor.shadowBlur')}
-            value={s.blur}
-            min={0}
-            max={50}
-            onChange={(v) => onChange({ ...s, blur: v })}
-          />
-          <div className="flex items-center gap-2">
-            <Label className="w-16 text-xs text-muted-foreground">
-              {t('pages.imageEditor.shadowColor')}
-            </Label>
-            {/* Color input doesn't accept rgba, so we keep the alpha implicit
-                in the default and let the user pick a hex color. Stripping
-                alpha = solid shadow on hex change. */}
-            <input
-              type="color"
-              value={hexFromColor(s.color)}
-              onChange={(e) => onChange({ ...s, color: e.target.value })}
-              className="h-7 w-12 cursor-pointer rounded border border-input bg-transparent"
-            />
-          </div>
-        </>
+      {isUserLayer && (
+        <div className="space-y-2 border-t border-border pt-3">
+          <button
+            onClick={() => onOpenStyle(selectedId)}
+            className="flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-xs text-foreground hover:bg-accent/40"
+          >
+            <span className="flex items-center gap-2">
+              <span className="rounded border border-border/60 px-1 font-mono text-[10px] italic text-primary">
+                fx
+              </span>
+              {t('pages.imageEditor.layerStyle.title')}
+            </span>
+            {fxCount > 0 && (
+              <span className="font-mono text-[10px] text-muted-foreground">
+                ×{fxCount}
+              </span>
+            )}
+          </button>
+        </div>
       )}
     </div>
   )
-}
-
-/** Best-effort: pull a #rrggbb out of rgba()/hex/etc for the color input. */
-function hexFromColor(c: string): string {
-  if (c.startsWith('#') && c.length >= 7) return c.slice(0, 7)
-  const m = c.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/)
-  if (m) {
-    const hex = (n: string) => Number(n).toString(16).padStart(2, '0')
-    return `#${hex(m[1])}${hex(m[2])}${hex(m[3])}`
-  }
-  return '#000000'
 }
