@@ -35,6 +35,7 @@ type Props = {
     saveAs?: () => void
     download?: () => void
     exportPng?: () => void
+    saveForWeb?: () => void
     exportJpeg?: () => void
     exportWebp?: () => void
     undo?: () => void
@@ -94,6 +95,9 @@ type Props = {
     convertMaskToRaster?: () => void
     /** True when selected layer is a MaskLayer with `rects` and no dataUrl yet. */
     isRectMaskSelected?: boolean
+    /** Add a per-adjustment / per-filter raster mask to the selected layer. */
+    addAdjustmentMask?: () => void
+    isAdjustmentOrFilterSelected?: boolean
     zoomIn?: () => void
     zoomOut?: () => void
     zoomFit?: () => void
@@ -140,6 +144,12 @@ export function MenuBar({ handlers }: Props) {
           { id: 'png', label: t('pages.imageEditor.menu.exportPng'), shortcut: '⌘E', onClick: handlers.exportPng ?? handlers.download },
           { id: 'jpg', label: t('pages.imageEditor.menu.exportJpeg'), onClick: handlers.exportJpeg },
           { id: 'webp', label: t('pages.imageEditor.menu.exportWebp'), onClick: handlers.exportWebp },
+          {
+            id: 'saveForWeb',
+            label: t('pages.imageEditor.menu.saveForWeb') + '…',
+            shortcut: '⌥⇧⌘S',
+            onClick: handlers.saveForWeb,
+          },
         ],
       ],
     },
@@ -593,6 +603,12 @@ export function MenuBar({ handlers }: Props) {
             label: t('pages.imageEditor.menu.convertMaskToRaster'),
             onClick: handlers.convertMaskToRaster,
             disabled: !handlers.isRectMaskSelected,
+          },
+          {
+            id: 'addAdjustmentMask',
+            label: t('pages.imageEditor.menu.addAdjustmentMask'),
+            onClick: handlers.addAdjustmentMask,
+            disabled: !handlers.isAdjustmentOrFilterSelected,
           },
           {
             id: 'replaceSO',

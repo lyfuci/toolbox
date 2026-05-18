@@ -85,6 +85,30 @@ function Inner({
             }}
             className="h-8 flex-1 rounded-md border border-input bg-background px-2 font-mono text-xs text-foreground"
           />
+          {/* Browser EyeDropper API (Chromium-only — Firefox / Safari
+              fall through to the noop toast). Picks any pixel on screen
+              while the API's overlay is active. */}
+          {typeof window !== 'undefined' && hasEyeDropperApi() && (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const picked = await openEyeDropper()
+                  if (!picked) return
+                  const next = hexToHsv(picked)
+                  setH(next.h)
+                  setS(next.s)
+                  setV(next.v)
+                } catch {
+                  /* user cancelled or error — ignore */
+                }
+              }}
+              className="h-8 rounded border border-input bg-background px-2 text-xs text-foreground hover:bg-accent/40"
+              title={t('pages.imageEditor.colorPicker.eyedropper')}
+            >
+              💧
+            </button>
+          )}
         </div>
         <div className="grid grid-cols-3 gap-2">
           {(['r', 'g', 'b'] as const).map((k) => (
@@ -217,6 +241,32 @@ function HueStrip({ h, onChange }: { h: number; onChange: (h: number) => void })
       />
     </div>
   )
+}
+
+// ── Eye-dropper (browser API) ───────────────────────────────────────────
+
+/** Does the current browser ship the EyeDropper API? Chromium-only as of
+ *  2024 (Chrome 95+, Edge, Brave, Opera). Firefox / Safari return false. */
+function hasEyeDropperApi(): boolean {
+  return typeof window !== 'undefined' && 'EyeDropper' in window
+}
+
+/** Open the browser's eye-dropper overlay and return the picked sRGB hex,
+ *  or null if the user cancelled / the API rejected. */
+async function openEyeDropper(): Promise<string | null> {
+  const Ctor = (
+    window as unknown as {
+      EyeDropper?: new () => { open(): Promise<{ sRGBHex: string }> }
+    }
+  ).EyeDropper
+  if (!Ctor) return null
+  try {
+    const ed = new Ctor()
+    const result = await ed.open()
+    return result?.sRGBHex ?? null
+  } catch {
+    return null
+  }
 }
 
 // ── Color math helpers ──────────────────────────────────────────────────

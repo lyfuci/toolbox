@@ -307,11 +307,11 @@ function renderLayer(
     return
   }
   if (layer.kind === 'adjustment') {
-    applyAdjustmentLayer(canvas, ctx, layer, rc.annoScale)
+    applyAdjustmentLayer(canvas, ctx, layer, rc.annoScale, rc.imageCache)
     return
   }
   if (layer.kind === 'filter') {
-    applyFilterLayer(canvas, ctx, layer, rc.annoScale)
+    applyFilterLayer(canvas, ctx, layer, rc.annoScale, rc.imageCache)
     return
   }
   if (layer.kind === 'smartObject') {
@@ -824,8 +824,9 @@ function applyAdjustmentLayer(
   ctx: CanvasRenderingContext2D,
   layer: AdjustmentLayer,
   scale: number,
+  imageCache: ImageCache | undefined,
 ) {
-  applyPixelTransformLayer(canvas, ctx, layer, scale, (data) =>
+  applyPixelTransformLayer(canvas, ctx, layer, scale, imageCache, (data) =>
     applyAdjustment(data, layer.params),
   )
 }
@@ -842,9 +843,10 @@ function applyFilterLayer(
   ctx: CanvasRenderingContext2D,
   layer: FilterLayer,
   scale: number,
+  imageCache: ImageCache | undefined,
 ) {
   const params = scaleFilterParams(layer.params, scale)
-  applyPixelTransformLayer(canvas, ctx, layer, scale, (data, w, h) =>
+  applyPixelTransformLayer(canvas, ctx, layer, scale, imageCache, (data, w, h) =>
     applyFilter(data, w, h, params),
   )
 }
@@ -862,8 +864,16 @@ function applyFilterLayer(
 function applyPixelTransformLayer(
   canvas: HTMLCanvasElement,
   ctx: CanvasRenderingContext2D,
-  layer: { clipRect?: Rect; clipPath?: Point[]; opacity: number },
+  layer: {
+    clipRect?: Rect
+    clipPath?: Point[]
+    opacity: number
+    maskDataUrl?: string
+    maskW?: number
+    maskH?: number
+  },
   scale: number,
+  imageCache: ImageCache | undefined,
   transform: (data: Uint8ClampedArray, width: number, height: number) => void,
 ) {
   if (canvas.width < 1 || canvas.height < 1) return
@@ -881,6 +891,20 @@ function applyPixelTransformLayer(
   }
   transform(imageData.data, imageData.width, imageData.height)
   actx.putImageData(imageData, 0, 0)
+  // Optional per-layer raster mask: gate the adjusted pixels by mask alpha
+  // (white = full effect, black = original). Applied via destination-in on
+  // the `adjusted` canvas so only masked pixels survive when composited
+  // back. The non-masked pixels come through the original canvas below.
+  if (layer.maskDataUrl && imageCache) {
+    const cached = imageCache.get(layer.maskDataUrl)
+    if (cached) {
+      actx.save()
+      actx.setTransform(1, 0, 0, 1, 0, 0)
+      actx.globalCompositeOperation = 'destination-in'
+      actx.drawImage(cached, 0, 0, adjusted.width, adjusted.height)
+      actx.restore()
+    }
+  }
   ctx.save()
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.globalAlpha = layer.opacity / 100
