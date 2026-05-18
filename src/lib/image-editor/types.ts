@@ -682,6 +682,30 @@ export type ExposureParams = {
   offset: number // -0.5..0.5
   gamma: number // 0.1..10, 1 = identity
 }
+/**
+ * Channel Mixer — re-combine output channels as weighted sums of input
+ * channels. The standard PS feature; lets you build custom B&W
+ * conversions ("rOutR + rOutG + rOutB = grayscale recipe") or shift
+ * colour balance per-channel. Weights in percent (typical sane range
+ * -200..200, identity is 100 for the matching input and 0 for others).
+ * `constant` is an additive offset per output channel (-100..100,
+ * mapped to ±128 of 0..255 output range).
+ */
+export type ChannelMixerParams = {
+  kind: 'channelMixer'
+  rOutR: number
+  rOutG: number
+  rOutB: number
+  rConstant: number
+  gOutR: number
+  gOutG: number
+  gOutB: number
+  gConstant: number
+  bOutR: number
+  bOutG: number
+  bOutB: number
+  bConstant: number
+}
 export type AdjustmentParams =
   | LevelsParams
   | CurvesParams
@@ -693,6 +717,7 @@ export type AdjustmentParams =
   | InvertParams
   | VibranceParams
   | ExposureParams
+  | ChannelMixerParams
 
 export type AdjustmentKind = AdjustmentParams['kind']
 

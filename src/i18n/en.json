@@ -455,6 +455,13 @@
         "invert": "Invert",
         "vibrance": "Vibrance",
         "exposure": "Exposure",
+        "channelMixer": {
+          "title": "Channel Mixer",
+          "outR": "Output: Red",
+          "outG": "Output: Green",
+          "outB": "Output: Blue",
+          "constant": "Constant"
+        },
         "inputBlack": "Input black",
         "inputWhite": "Input white",
         "outputBlack": "Output black",
@@ -733,7 +740,13 @@
         "applied": "Applied comp \"{{name}}\""
       },
       "brushes": {
-        "customHint": "Built-in presets. Custom brush presets are v2."
+        "customHint": "Built-in presets. Custom brush presets are v2.",
+        "builtIn": "Built-in",
+        "custom": "Custom",
+        "saveCurrent": "Save",
+        "defaultName": "Brush {{n}}",
+        "emptyCustom": "Save the current brush settings as a preset.",
+        "deleteCustom": "Delete preset"
       },
       "moveToolHint": "Move (V): drag layers; Cmd/Ctrl+J duplicate; Delete remove.",
       "zoomToolHint": "Zoom (Z): click to zoom in 2×, Alt-click to zoom out. Cmd/Ctrl+wheel zooms at cursor.",
@@ -913,6 +926,7 @@
       "projectLoaded": "Project loaded",
       "projectInvalid": "Not a valid project file",
       "textPrompt": "Annotation text",
+      "textInlinePrompt": "Type — ⌘Enter to commit, Esc to cancel",
       "errNotImage": "Not an image file",
       "errLoadFailed": "Failed to load image",
       "errExport": "Export failed",

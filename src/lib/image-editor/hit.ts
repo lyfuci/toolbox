@@ -12,6 +12,7 @@ export type HandleId =
   | 'rotate' // rotation handle floating above the bbox
   | 'start'
   | 'end' // arrow endpoint handles
+  | `path-anchor-${number}` // direct-selection handles on a PathShape
 
 export type Handle = { id: HandleId; x: number; y: number }
 
@@ -236,13 +237,20 @@ export function getHandles(layer: Layer): Handle[] {
         { id: 'start', x: layer.shape.x1, y: layer.shape.y1 },
         { id: 'end', x: layer.shape.x2, y: layer.shape.y2 },
       ]
+    case 'path':
+      // Direct selection: one handle per anchor. Anchor handles are
+      // returned with the same Handle type as resize handles; the
+      // template-literal HandleId (`path-anchor-${n}`) lets pickHandle
+      // and resizeLayer dispatch on it without a new helper.
+      return layer.shape.anchors.map((a, i) => ({
+        id: `path-anchor-${i}` as HandleId,
+        x: a.x,
+        y: a.y,
+      }))
     case 'text':
     case 'brush':
     case 'note':
-    case 'path':
-      // Path: per-anchor handles arrive when full vector editing lands; v1
-      // is move-only. Note: move-only by design (resizing a 16-px icon makes
-      // little sense).
+      // Move-only by design (resizing a 16-px icon makes little sense).
       return []
   }
 }

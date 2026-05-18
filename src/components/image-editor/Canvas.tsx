@@ -221,6 +221,15 @@ type Interaction =
       layerName: string
       layerOpacity: number // 0..100
     }
+  /**
+   * In-canvas text editing. Triggered by mousedown with the Type tool —
+   * positions a <textarea> overlay at the click point and accepts input
+   * until commit (blur / ⌘Enter) or cancel (Esc). On commit we build a
+   * TextShape annotation with the current textOptions; on cancel we
+   * discard. The textarea is sized to a sensible default that grows with
+   * content via auto-resize on input.
+   */
+  | { kind: 'text-editing'; point: Point; value: string }
 
 export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
   {
@@ -996,32 +1005,9 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
         } as MaskLayer,
       })
     } else if (tool === 'text') {
-      const text = window.prompt(t('pages.imageEditor.textPrompt'), '') ?? ''
-      if (text.trim()) {
-        onCommitLayer({
-          id,
-          name: 'Text',
-          visible: true,
-          opacity: 100,
-          blend: 'normal',
-          kind: 'annotation',
-          shape: {
-            kind: 'text',
-            x: p.x,
-            y: p.y,
-            text,
-            color: toolColor,
-            fontSize: textOptions.fontSize,
-            fontFamily: textOptions.fontFamily,
-            fontWeight: textOptions.fontWeight,
-            fontStyle: textOptions.fontStyle,
-            align: textOptions.align,
-            letterSpacing: textOptions.letterSpacing,
-            lineHeight: textOptions.lineHeight,
-            underline: textOptions.underline,
-          },
-        } as AnnotationLayer)
-      }
+      // Enter in-canvas editing mode — actual commit happens on blur /
+      // ⌘Enter via the overlay textarea (see render section below).
+      setInteraction({ kind: 'text-editing', point: p, value: '' })
     }
   }
 
@@ -1327,32 +1313,129 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     setHoverCursor(picked ? 'move' : 'default')
   }
 
-  return (
-    <canvas
-      ref={canvasRef}
-      onMouseDown={handleMouseDown}
-      onMouseMove={(e) => {
-        handleMouseMove(e)
-        handleHover(e)
-      }}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      style={
-        {
-          cursor:
-            interaction.kind === 'moving'
-              ? 'grabbing'
-              : interaction.kind === 'resizing'
-                ? cursorForHandleId(interaction.handleId)
-                : hoverCursor,
-          display: 'block',
-          maxWidth: '100%',
-          maxHeight: '100%',
-          height: 'auto',
-          aspectRatio: previewW > 0 ? `${previewW} / ${previewH}` : undefined,
-        } as CSSProperties
+  // Text-editing overlay coordinates: convert preview-pixel point to a
+  // CSS-pixel position INSIDE the canvas's visual rect. The textarea sits
+  // in a relative wrapper so the canvas's own dimensions drive layout.
+  const renderTextEditor = () => {
+    if (interaction.kind !== 'text-editing') return null
+    const c = canvasRef.current
+    if (!c) return null
+    // Canvas bitmap is `previewW × previewH`; CSS rect is c.getBoundingClientRect().
+    // Inside the wrapper, position is relative to the canvas top-left.
+    const rect = c.getBoundingClientRect()
+    const sx = rect.width / Math.max(1, c.width)
+    const sy = rect.height / Math.max(1, c.height)
+    const left = interaction.point.x * sx
+    const top = interaction.point.y * sy
+    const commit = () => {
+      const text = interaction.value
+      if (text.trim().length > 0) {
+        onCommitLayer({
+          id: crypto.randomUUID(),
+          name: 'Text',
+          visible: true,
+          opacity: 100,
+          blend: 'normal',
+          kind: 'annotation',
+          shape: {
+            kind: 'text',
+            x: interaction.point.x,
+            y: interaction.point.y,
+            text,
+            color: toolColor,
+            fontSize: textOptions.fontSize,
+            fontFamily: textOptions.fontFamily,
+            fontWeight: textOptions.fontWeight,
+            fontStyle: textOptions.fontStyle,
+            align: textOptions.align,
+            letterSpacing: textOptions.letterSpacing,
+            lineHeight: textOptions.lineHeight,
+            underline: textOptions.underline,
+          },
+        } as AnnotationLayer)
       }
-    />
+      setInteraction({ kind: 'idle' })
+    }
+    return (
+      <textarea
+        autoFocus
+        value={interaction.value}
+        onChange={(e) =>
+          setInteraction({ ...interaction, value: e.target.value })
+        }
+        // No onBlur=commit — that would commit partial / unwanted text the
+        // moment the user clicked another tool or panel. Commit is explicit:
+        // ⌘/Ctrl+Enter to confirm, Esc to cancel.
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault()
+            setInteraction({ kind: 'idle' })
+            return
+          }
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault()
+            commit()
+          }
+        }}
+        placeholder={t('pages.imageEditor.textInlinePrompt')}
+        style={{
+          position: 'absolute',
+          left,
+          top,
+          color: toolColor,
+          fontFamily: textOptions.fontFamily,
+          fontWeight: textOptions.fontWeight,
+          fontStyle: textOptions.fontStyle,
+          fontSize: `${textOptions.fontSize * sx}px`,
+          lineHeight: textOptions.lineHeight,
+          letterSpacing: `${textOptions.letterSpacing * sx}px`,
+          textAlign: textOptions.align,
+          textDecoration: textOptions.underline ? 'underline' : 'none',
+          minWidth: 80,
+          minHeight: 24,
+          padding: 2,
+          margin: 0,
+          background: 'rgba(255,255,255,0.08)',
+          border: '1px dashed currentColor',
+          outline: 'none',
+          resize: 'none',
+          overflow: 'hidden',
+          whiteSpace: 'pre',
+        }}
+        rows={Math.max(1, interaction.value.split('\n').length)}
+      />
+    )
+  }
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', maxHeight: '100%' }}>
+      <canvas
+        ref={canvasRef}
+        onMouseDown={handleMouseDown}
+        onMouseMove={(e) => {
+          handleMouseMove(e)
+          handleHover(e)
+        }}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        style={
+          {
+            cursor:
+              interaction.kind === 'moving'
+                ? 'grabbing'
+                : interaction.kind === 'resizing'
+                  ? cursorForHandleId(interaction.handleId)
+                  : hoverCursor,
+            display: 'block',
+            maxWidth: '100%',
+            maxHeight: '100%',
+            height: 'auto',
+            aspectRatio: previewW > 0 ? `${previewW} / ${previewH}` : undefined,
+          } as CSSProperties
+        }
+      />
+      {renderTextEditor()}
+    </div>
   )
 })
 
@@ -1361,6 +1444,7 @@ function cursorForHandle(h: Handle): string {
 }
 
 function cursorForHandleId(id: HandleId): string {
+  if (typeof id === 'string' && id.startsWith('path-anchor-')) return 'move'
   switch (id) {
     case 'nw':
     case 'se':
@@ -1380,6 +1464,7 @@ function cursorForHandleId(id: HandleId): string {
     case 'end':
       return 'crosshair'
   }
+  return 'default'
 }
 
 function shouldDiscardDrawing(layer: Layer): boolean {

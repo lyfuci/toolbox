@@ -46,9 +46,12 @@ type Props = {
   onSaveLayerComp: (name: string) => void
   onApplyLayerComp: (comp: LayerComp) => void
   onDeleteLayerComp: (id: string) => void
-  /** Brushes panel — pick a preset. */
+  /** Brushes panel — pick a preset / save current / delete custom. */
   currentBrush: { strokeWidth: number; options: BrushOptions }
+  customBrushPresets: BrushPreset[]
   onPickBrushPreset: (preset: BrushPreset) => void
+  onSaveCurrentBrush: (name: string) => void
+  onDeleteCustomBrush: (id: string) => void
 }
 
 /**
@@ -80,7 +83,10 @@ export function RightSidebar({
   onApplyLayerComp,
   onDeleteLayerComp,
   currentBrush,
+  customBrushPresets,
   onPickBrushPreset,
+  onSaveCurrentBrush,
+  onDeleteCustomBrush,
 }: Props) {
   const { t } = useTranslation()
   const [g1, setG1] = useState<'layers' | 'channels' | 'paths'>('layers')
@@ -225,7 +231,13 @@ export function RightSidebar({
           />
         )}
         {g3 === 'brushes' && (
-          <BrushesPanel current={currentBrush} onPick={onPickBrushPreset} />
+          <BrushesPanel
+            current={currentBrush}
+            customPresets={customBrushPresets}
+            onPick={onPickBrushPreset}
+            onSaveCurrent={onSaveCurrentBrush}
+            onDeleteCustom={onDeleteCustomBrush}
+          />
         )}
       </PanelGroup>
     </aside>

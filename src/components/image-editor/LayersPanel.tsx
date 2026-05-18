@@ -423,6 +423,11 @@ function LayerRow({
 function layerLabelKey(layer: Layer): string {
   if (layer.kind === 'mask') return 'pages.imageEditor.annoLabel.mask'
   if (layer.kind === 'adjustment') {
+    // Channel Mixer's i18n is an object (nested labels); others are plain
+    // strings. Special-case to its `.title`.
+    if (layer.params.kind === 'channelMixer') {
+      return 'pages.imageEditor.adjustments.channelMixer.title'
+    }
     return `pages.imageEditor.adjustments.${layer.params.kind}`
   }
   if (layer.kind === 'filter') {

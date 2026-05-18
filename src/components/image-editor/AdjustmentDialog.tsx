@@ -17,6 +17,7 @@ import type {
   BrightnessContrastParams,
   ColorBalanceParams,
   CurvesParams,
+  ChannelMixerParams,
   ExposureParams,
   HueSaturationParams,
   LevelsParams,
@@ -97,7 +98,11 @@ function AdjustmentDialogInner({
     onPreview(next)
   }
 
-  const title = t(`pages.imageEditor.adjustments.${kind}`)
+  const title = t(
+    kind === 'channelMixer'
+      ? 'pages.imageEditor.adjustments.channelMixer.title'
+      : `pages.imageEditor.adjustments.${kind}`,
+  )
 
   return (
     <DialogContent className="sm:max-w-md">
@@ -132,6 +137,9 @@ function AdjustmentDialogInner({
         )}
         {draft.kind === 'exposure' && (
           <ExposureForm value={draft} onChange={update} />
+        )}
+        {draft.kind === 'channelMixer' && (
+          <ChannelMixerForm value={draft} onChange={update} />
         )}
       </div>
       <DialogFooter>
@@ -437,6 +445,75 @@ function ExposureForm({
         step={0.01}
         onChange={(v) => onChange({ gamma: v })}
       />
+    </>
+  )
+}
+
+/**
+ * Channel Mixer — 3 output rows (R / G / B), each with 4 sliders: how much
+ * of input R, G, B contributes, plus an additive constant. Identity =
+ * 100% matching channel + 0% others + 0 constant. Standard PS layout.
+ */
+function ChannelMixerForm({
+  value,
+  onChange,
+}: {
+  value: ChannelMixerParams
+  onChange: (patch: Partial<ChannelMixerParams>) => void
+}) {
+  const { t } = useTranslation()
+  const rows: Array<{
+    label: string
+    src: 'r' | 'g' | 'b'
+  }> = [
+    { label: t('pages.imageEditor.adjustments.channelMixer.outR'), src: 'r' },
+    { label: t('pages.imageEditor.adjustments.channelMixer.outG'), src: 'g' },
+    { label: t('pages.imageEditor.adjustments.channelMixer.outB'), src: 'b' },
+  ]
+  return (
+    <>
+      {rows.map((row) => {
+        const inR = (`${row.src}OutR`) as keyof ChannelMixerParams
+        const inG = (`${row.src}OutG`) as keyof ChannelMixerParams
+        const inB = (`${row.src}OutB`) as keyof ChannelMixerParams
+        const cst = (`${row.src}Constant`) as keyof ChannelMixerParams
+        return (
+          <div key={row.src} className="mt-2 border-t border-border pt-2">
+            <div className="mb-1 text-xs font-medium">{row.label}</div>
+            <Slider
+              label="R"
+              value={value[inR] as number}
+              min={-200}
+              max={200}
+              unit="%"
+              onChange={(v) => onChange({ [inR]: v } as Partial<ChannelMixerParams>)}
+            />
+            <Slider
+              label="G"
+              value={value[inG] as number}
+              min={-200}
+              max={200}
+              unit="%"
+              onChange={(v) => onChange({ [inG]: v } as Partial<ChannelMixerParams>)}
+            />
+            <Slider
+              label="B"
+              value={value[inB] as number}
+              min={-200}
+              max={200}
+              unit="%"
+              onChange={(v) => onChange({ [inB]: v } as Partial<ChannelMixerParams>)}
+            />
+            <Slider
+              label={t('pages.imageEditor.adjustments.channelMixer.constant')}
+              value={value[cst] as number}
+              min={-100}
+              max={100}
+              onChange={(v) => onChange({ [cst]: v } as Partial<ChannelMixerParams>)}
+            />
+          </div>
+        )
+      })}
     </>
   )
 }

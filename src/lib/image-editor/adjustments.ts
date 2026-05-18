@@ -1,6 +1,7 @@
 import type {
   AdjustmentParams,
   BrightnessContrastParams,
+  ChannelMixerParams,
   ColorBalanceParams,
   CurvesParams,
   ExposureParams,
@@ -79,6 +80,12 @@ export const DEFAULT_EXPOSURE: ExposureParams = {
   offset: 0,
   gamma: 1,
 }
+export const DEFAULT_CHANNEL_MIXER: ChannelMixerParams = {
+  kind: 'channelMixer',
+  rOutR: 100, rOutG: 0, rOutB: 0, rConstant: 0,
+  gOutR: 0, gOutG: 100, gOutB: 0, gConstant: 0,
+  bOutR: 0, bOutG: 0, bOutB: 100, bConstant: 0,
+}
 
 export const DEFAULT_FOR_KIND: Record<
   AdjustmentParams['kind'],
@@ -94,6 +101,7 @@ export const DEFAULT_FOR_KIND: Record<
   invert: DEFAULT_INVERT,
   vibrance: DEFAULT_VIBRANCE,
   exposure: DEFAULT_EXPOSURE,
+  channelMixer: DEFAULT_CHANNEL_MIXER,
 }
 
 export function applyAdjustment(
@@ -131,8 +139,33 @@ export function applyAdjustment(
     case 'exposure':
       applyLut(data, exposureLut(params))
       return
+    case 'channelMixer':
+      applyChannelMixer(data, params)
+      return
   }
 }
+
+/**
+ * Channel Mixer — for each pixel, recompute (R, G, B) as a weighted sum
+ * of the input (R, G, B) plus an additive constant. Weights are
+ * percentages; identity = (100, 0, 0, 0) for R-out, etc.
+ *
+ *   r' = (rOutR * r + rOutG * g + rOutB * b) / 100 + rConstant * 1.28
+ */
+function applyChannelMixer(data: Uint8ClampedArray, p: ChannelMixerParams): void {
+  const rR = p.rOutR / 100, rG = p.rOutG / 100, rB = p.rOutB / 100, rC = p.rConstant * 1.28
+  const gR = p.gOutR / 100, gG = p.gOutG / 100, gB = p.gOutB / 100, gC = p.gConstant * 1.28
+  const bR = p.bOutR / 100, bG = p.bOutG / 100, bB = p.bOutB / 100, bC = p.bConstant * 1.28
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i]
+    const g = data[i + 1]
+    const b = data[i + 2]
+    data[i] = clamp255(r * rR + g * rG + b * rB + rC)
+    data[i + 1] = clamp255(r * gR + g * gG + b * gB + gC)
+    data[i + 2] = clamp255(r * bR + g * bG + b * bB + bC)
+  }
+}
+
 
 // ── Per-pixel runners ────────────────────────────────────────────────────
 
