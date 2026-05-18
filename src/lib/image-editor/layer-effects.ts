@@ -594,17 +594,21 @@ function drawSatin(
 
 /**
  * Bevel & Emboss — paired highlight + shadow shifted along the light
- * angle (a unit vector derived from `angle` + `altitude`), each masked
- * appropriately by the layer's silhouette to produce the chiselled look.
+ * angle, each masked to either the inside or the outside of the layer's
+ * alpha (or both) per the chosen style.
  *
- * The four PS bevel styles differ in WHERE the highlight/shadow lands:
- *   - innerBevel: inside the alpha, both
- *   - outerBevel: outside the alpha, both
- *   - emboss:     half inside / half outside
- *   - pillowEmboss: like emboss but with inverted shadow position
+ * Implementation note: the previous version tried to use `drawImage(layer)
+ * + shadow` and then `destination-out` to leave only the shadow. That
+ * works for OUTER projection (outerBevel) but the same operations zero
+ * out the INTERIOR — so innerBevel rendered empty. v2 fixed it: inner
+ * styles use the "colour the inverse, project shadow inward, mask to
+ * layer alpha" pattern (same as innerShadow); outer styles use the
+ * existing stamp-then-erase pattern.
  *
- * v1 implements innerBevel only (the most common); the other styles fall
- * back to it. Future revision can branch on `fx.style`.
+ *   - innerBevel: both highlight + shadow INSIDE alpha
+ *   - outerBevel: both highlight + shadow OUTSIDE alpha
+ *   - emboss: highlight inside, shadow outside (straddles the edge)
+ *   - pillowEmboss: highlight outside, shadow inside (reversed emboss)
  */
 function drawBevelEmboss(
   dims: { w: number; h: number },
@@ -615,28 +619,74 @@ function drawBevelEmboss(
   const out = makeCanvas(dims)
   const ctx = out.getContext('2d')
   if (!ctx) return null
-  // Light vector — `altitude` flattens the horizontal offset toward zero
-  // as it approaches 90° (light from straight above).
   const angleRad = (fx.angle * Math.PI) / 180
   const altRad = (fx.altitude * Math.PI) / 180
   const horiz = Math.cos(altRad)
   const offset = (fx.depth / 10) * scale * horiz
   const lx = Math.cos(angleRad) * offset
   const ly = -Math.sin(angleRad) * offset
+  const blurPx = fx.size * scale
 
-  // Highlight = stamp colour offset toward light, masked to interior alpha
-  const makeShifted = (
-    color: string,
-    ox: number,
-    oy: number,
-  ): HTMLCanvasElement | null => {
+  // Side picks where the highlight or shadow lands:
+  //   - 'inside': projected from the *inverse* of layer, masked to layer
+  //   - 'outside': stamped from layer silhouette, layer erased to keep ring
+  // The four PS styles map to (highlightSide, shadowSide) pairs.
+  const sides: { hl: 'inside' | 'outside'; sh: 'inside' | 'outside' } = (() => {
+    switch (fx.style) {
+      case 'innerBevel':
+        return { hl: 'inside', sh: 'inside' }
+      case 'outerBevel':
+        return { hl: 'outside', sh: 'outside' }
+      case 'emboss':
+        return { hl: 'inside', sh: 'outside' }
+      case 'pillowEmboss':
+        return { hl: 'outside', sh: 'inside' }
+    }
+  })()
+
+  /** Inside projection: color the inverse silhouette, run native shadow
+   *  to push it across the alpha edge, erase the inverse, then mask to
+   *  the original alpha so only the bits *inside* the layer survive. */
+  const insideContribution = (color: string, ox: number, oy: number): HTMLCanvasElement | null => {
+    const inv = makeCanvas(dims)
+    const ictx = inv.getContext('2d')
+    if (!ictx) return null
+    ictx.fillStyle = color
+    ictx.fillRect(0, 0, dims.w, dims.h)
+    ictx.globalCompositeOperation = 'destination-out'
+    ictx.drawImage(layer, 0, 0)
+    ictx.globalCompositeOperation = 'source-over'
+
+    const proj = makeCanvas(dims)
+    const pctx = proj.getContext('2d')
+    if (!pctx) return null
+    pctx.shadowColor = color
+    pctx.shadowOffsetX = ox
+    pctx.shadowOffsetY = oy
+    pctx.shadowBlur = blurPx
+    pctx.drawImage(inv, 0, 0)
+    pctx.shadowColor = 'transparent'
+    pctx.shadowBlur = 0
+    pctx.shadowOffsetX = 0
+    pctx.shadowOffsetY = 0
+    pctx.globalCompositeOperation = 'destination-out'
+    pctx.drawImage(inv, 0, 0)
+    pctx.globalCompositeOperation = 'destination-in'
+    pctx.drawImage(layer, 0, 0)
+    return proj
+  }
+
+  /** Outside projection: stamp the layer silhouette with a coloured shadow
+   *  at offset, then erase the layer silhouette so only the OUTER ring
+   *  of the shadow remains. */
+  const outsideContribution = (color: string, ox: number, oy: number): HTMLCanvasElement | null => {
     const c = makeCanvas(dims)
     const cctx = c.getContext('2d')
     if (!cctx) return null
     cctx.shadowColor = color
     cctx.shadowOffsetX = ox
     cctx.shadowOffsetY = oy
-    cctx.shadowBlur = fx.size * scale
+    cctx.shadowBlur = blurPx
     cctx.drawImage(layer, 0, 0)
     cctx.shadowColor = 'transparent'
     cctx.shadowBlur = 0
@@ -644,12 +694,22 @@ function drawBevelEmboss(
     cctx.shadowOffsetY = 0
     cctx.globalCompositeOperation = 'destination-out'
     cctx.drawImage(layer, 0, 0)
-    cctx.globalCompositeOperation = 'destination-in'
-    cctx.drawImage(layer, 0, 0)
     return c
   }
-  const highlight = makeShifted(fx.highlightColor, lx, ly)
-  const shadow = makeShifted(fx.shadowColor, -lx, -ly)
+
+  const make = (
+    color: string,
+    side: 'inside' | 'outside',
+    ox: number,
+    oy: number,
+  ): HTMLCanvasElement | null =>
+    side === 'inside'
+      ? insideContribution(color, ox, oy)
+      : outsideContribution(color, ox, oy)
+
+  // Highlight points TOWARD the light; shadow points AWAY.
+  const highlight = make(fx.highlightColor, sides.hl, lx, ly)
+  const shadow = make(fx.shadowColor, sides.sh, -lx, -ly)
   if (!highlight || !shadow) return null
 
   ctx.globalAlpha = fx.shadowOpacity / 100
