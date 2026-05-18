@@ -14,6 +14,7 @@ import {
   getHandles,
   pickHandle,
   pickLayer,
+  pickPathAnchor,
   type Handle,
   type HandleId,
 } from '@/lib/image-editor/hit'
@@ -716,6 +717,28 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
             handleId: handle.id,
             original: sel,
             preview: sel,
+          })
+          return
+        }
+      }
+    }
+
+    // Direct Selection: when the arrowPath tool is active, prefer grabbing
+    // a path anchor under the cursor — even if the path layer isn't
+    // currently selected. Avoids the "select first, then click anchor"
+    // two-step.
+    if (tool === 'arrowPath') {
+      const hit = pickPathAnchor(state.layers, p)
+      if (hit) {
+        const layer = findLayerById(state.layers, hit.layerId)
+        if (layer) {
+          onSelect(hit.layerId)
+          setInteraction({
+            kind: 'resizing',
+            layerId: hit.layerId,
+            handleId: hit.handleId,
+            original: layer,
+            preview: layer,
           })
           return
         }

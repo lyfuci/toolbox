@@ -317,7 +317,18 @@ export function scaleLayer(layer: Layer, sx: number, sy: number): Layer {
     clip.clipPath = layer.clipPath.map((p) => ({ x: p.x * sx, y: p.y * sy }))
   }
   if (layer.kind === 'mask') {
-    return { ...layer, ...clip, rects: layer.rects.map((r) => scaleRect(r, sx, sy)) }
+    // Scale rects + raster dims. The dataUrl bitmap itself isn't
+    // re-encoded — the renderer stretches it to fit the canvas, which
+    // (after Image Size scales both image AND layers by the same ratio)
+    // keeps it aligned. The w/h fields are updated for downstream
+    // helpers that need natural mask dims (e.g., Canvas Size realign).
+    return {
+      ...layer,
+      ...clip,
+      rects: layer.rects.map((r) => scaleRect(r, sx, sy)),
+      w: layer.w ? Math.max(1, Math.round(layer.w * sx)) : layer.w,
+      h: layer.h ? Math.max(1, Math.round(layer.h * sy)) : layer.h,
+    }
   }
   if (layer.kind === 'adjustment' || layer.kind === 'filter') {
     return { ...layer, ...clip }

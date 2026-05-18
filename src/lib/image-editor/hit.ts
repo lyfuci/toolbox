@@ -158,6 +158,34 @@ export function pointInBBox(p: Point, b: Rect): boolean {
  *
  * Skips hidden layers (and hidden groups, recursively).
  */
+/**
+ * Direct-selection-style hit-test: walks the tree topmost-first looking
+ * for a path-anchor handle within `HANDLE_HIT_RADIUS` of `p`. Returns the
+ * (layerId, handleId) of the first match. Used by the arrowPath tool so
+ * the user can grab an anchor on a path layer that isn't currently
+ * selected — without this, the first click selects the layer and the
+ * user has to click again to grab the anchor.
+ */
+export function pickPathAnchor(
+  layers: Layer[],
+  p: Point,
+): { layerId: string; handleId: HandleId } | null {
+  for (let i = layers.length - 1; i >= 0; i--) {
+    const layer = layers[i]
+    if (!layer.visible) continue
+    if (layer.kind === 'group') {
+      const inner = pickPathAnchor(layer.children, p)
+      if (inner) return inner
+      continue
+    }
+    if (layer.kind === 'annotation' && layer.shape.kind === 'path') {
+      const handle = pickHandle(getHandles(layer), p)
+      if (handle) return { layerId: layer.id, handleId: handle.id }
+    }
+  }
+  return null
+}
+
 export function pickLayer(layers: Layer[], p: Point): string | null {
   for (let i = layers.length - 1; i >= 0; i--) {
     const layer = layers[i]

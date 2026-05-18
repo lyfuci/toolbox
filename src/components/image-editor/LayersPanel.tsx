@@ -393,6 +393,16 @@ function LayerRow({
           {groupExpanded ? <FolderOpen className="h-3.5 w-3.5" /> : <Folder className="h-3.5 w-3.5" />}
         </span>
       )}
+      {layer.kind === 'mask' && layer.dataUrl && (
+        // Raster mask thumbnail — small img element sourced from the
+        // mask's dataUrl. Cheap to render; browser caches the dataUrl.
+        <img
+          src={layer.dataUrl}
+          alt=""
+          className="h-3.5 w-5 rounded border border-input object-cover"
+          style={{ background: '#000' }}
+        />
+      )}
       <span className="flex-1 truncate">{t(labelKey, labelArgs)}</span>
       {showFx && (
         <button

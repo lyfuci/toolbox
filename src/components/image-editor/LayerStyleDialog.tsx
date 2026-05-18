@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { fileToDataUrl } from '@/lib/image-editor/image-cache'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -323,9 +324,57 @@ function EffectPanel({
       )}
       {effect.kind === 'patternOverlay' && (
         <>
-          <div className="text-xs text-muted-foreground">
-            {t('pages.imageEditor.layerStyle.patternHint')}
+          <div className="flex items-center gap-2">
+            <Label className="w-16 text-xs text-muted-foreground">
+              {t('pages.imageEditor.layerStyle.pattern')}
+            </Label>
+            <button
+              onClick={async () => {
+                const file = await pickPatternFile()
+                if (!file) return
+                const dataUrl = await fileToDataUrl(file)
+                // Preload into the browser image cache so the first render
+                // after onChange has the pattern available synchronously —
+                // otherwise the render-then-load-then-render cycle shows
+                // a blank pattern for one paint frame.
+                await new Promise<void>((resolve) => {
+                  const probe = new Image()
+                  probe.onload = () => resolve()
+                  probe.onerror = () => resolve()
+                  probe.src = dataUrl
+                })
+                onChange({ ...effect, patternDataUrl: dataUrl } as PatternOverlayEffect)
+              }}
+              className="rounded border border-input bg-background px-2 py-0.5 text-[11px] hover:bg-accent/40"
+            >
+              {effect.patternDataUrl
+                ? t('pages.imageEditor.layerStyle.replacePattern')
+                : t('pages.imageEditor.layerStyle.choosePattern')}
+            </button>
+            {effect.patternDataUrl && (
+              <>
+                <img
+                  src={effect.patternDataUrl}
+                  alt=""
+                  className="h-8 w-8 rounded border border-input object-cover"
+                />
+                <button
+                  onClick={() =>
+                    onChange({ ...effect, patternDataUrl: '' } as PatternOverlayEffect)
+                  }
+                  className="text-xs text-muted-foreground hover:text-destructive"
+                  title={t('pages.imageEditor.layerStyle.clearPattern')}
+                >
+                  ×
+                </button>
+              </>
+            )}
           </div>
+          {!effect.patternDataUrl && (
+            <div className="text-[11px] italic text-muted-foreground">
+              {t('pages.imageEditor.layerStyle.patternHint')}
+            </div>
+          )}
           <Slider
             label={t('pages.imageEditor.layerStyle.scale')}
             value={effect.scale}
@@ -564,6 +613,19 @@ function ShadowControls({
       />
     </>
   )
+}
+
+/** One-shot file picker for Pattern Overlay's image source. Mirrors the
+ *  helper in ImageEditor.tsx but kept local so this dialog doesn't pull a
+ *  top-level dependency. */
+function pickPatternFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.onchange = () => resolve(input.files?.[0] ?? null)
+    input.click()
+  })
 }
 
 /** Best-effort: pull a #rrggbb out of rgba()/hex/etc for the color input.
