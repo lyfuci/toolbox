@@ -442,9 +442,8 @@ function EffectPanel({
             >
               {(['innerBevel', 'outerBevel', 'emboss', 'pillowEmboss'] as const).map(
                 (s) => (
-                  <option key={s} value={s} disabled={s !== 'innerBevel'}>
+                  <option key={s} value={s}>
                     {t(`pages.imageEditor.layerStyle.bevelStyle.${s}`)}
-                    {s !== 'innerBevel' ? ' (v2)' : ''}
                   </option>
                 ),
               )}

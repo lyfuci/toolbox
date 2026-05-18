@@ -671,6 +671,12 @@
         "released": "Clipping mask released",
         "unsupportedKind": "Clipping mask only applies to shape, Smart Object, and group layers."
       },
+      "quickMask": {
+        "entered": "Quick Mask mode — paint with brush (black removes from selection, white adds). Press Q to exit.",
+        "exited": "Quick Mask exited — selection updated to mask bbox",
+        "exitedNoSel": "Quick Mask exited — mask wasn't loaded, selection unchanged",
+        "exitedEmpty": "Quick Mask exited — no selected pixels"
+      },
       "maskRaster": {
         "defaultName": "Raster Mask",
         "created": "Raster mask layer added — paint with the brush (black hides, white reveals)",

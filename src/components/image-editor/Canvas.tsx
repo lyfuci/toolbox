@@ -147,6 +147,11 @@ type Props = {
   showGrid?: boolean
   /** Grid spacing in preview-canvas pixels. Default 50. */
   gridStep?: number
+  /** Quick Mask overlay — when present, render red rubylith over the
+   *  canvas where the mask alpha is low. Resolved via imageCache. */
+  quickMaskDataUrl?: string
+  /** Called on Quick Mask brush stroke commit with the new dataUrl. */
+  onUpdateQuickMaskDataUrl?: (dataUrl: string) => void
 }
 
 type Interaction =
@@ -239,7 +244,13 @@ type Interaction =
    * to dataUrl and patch the layer. FG color luminance drives the
    * stamp colour (black hides, white reveals — PS convention).
    */
-  | { kind: 'mask-painting'; layerId: string; offscreen: HTMLCanvasElement; lastPoint: Point }
+  | {
+      kind: 'mask-painting'
+      /** Either a specific MaskLayer or the editor-wide Quick Mask buffer. */
+      target: { kind: 'layer'; layerId: string } | { kind: 'quickMask' }
+      offscreen: HTMLCanvasElement
+      lastPoint: Point
+    }
 
 export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
   {
@@ -270,6 +281,8 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     extraPreviewLayer,
     showGrid,
     gridStep = 50,
+    quickMaskDataUrl,
+    onUpdateQuickMaskDataUrl,
   },
   ref,
 ) {
@@ -384,6 +397,13 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     if (showGrid) {
       drawGridOverlay(canvasRef.current, gridStep)
     }
+    // Quick Mask rubylith — render BEFORE in-progress paint preview so a
+    // brush stroke on the mask is reflected in the next render after
+    // the dataUrl updates.
+    if (quickMaskDataUrl && imageCache) {
+      const qmImg = imageCache.get(quickMaskDataUrl)
+      if (qmImg) drawQuickMaskOverlay(canvasRef.current, qmImg)
+    }
     // Mask-paint: no live preview in v1 — `multiply` ghost hid white-
     // reveal strokes and source-over would obscure the underlying art.
     // Stroke commits on mouseup via onCommitLayerUpdate, which triggers
@@ -402,6 +422,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     extraPreviewLayer,
     showGrid,
     gridStep,
+    quickMaskDataUrl,
   ])
 
   useImperativeHandle(
@@ -680,6 +701,33 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     // exists end-to-end, treat it identically to the no-tool selection arrow.
     // Drawing tools take priority over selection.
     if (tool !== 'none' && tool !== 'arrowPath') {
+      // Quick Mask paint: when in Quick Mask mode, brush / eraser paints
+      // into the global quickMask dataUrl. Takes priority over the per-
+      // layer raster-mask paint mode below.
+      if (
+        (tool === 'brush' || tool === 'eraser') &&
+        state.quickMask &&
+        imageCache
+      ) {
+        const cached = imageCache.get(state.quickMask.dataUrl)
+        if (cached) {
+          const off = document.createElement('canvas')
+          off.width = state.quickMask.w
+          off.height = state.quickMask.h
+          const octx = off.getContext('2d')
+          if (octx) {
+            octx.drawImage(cached, 0, 0)
+            stampMaskBrush(octx, p, p, toolStrokeWidth, brushOptions, tool === 'eraser' ? '#000000' : toolColor)
+            setInteraction({
+              kind: 'mask-painting',
+              target: { kind: 'quickMask' },
+              offscreen: off,
+              lastPoint: p,
+            })
+            return
+          }
+        }
+      }
       // Raster Layer Mask paint mode: brush / eraser on a selected mask with
       // dataUrl writes into the mask, not into a new brush layer.
       if ((tool === 'brush' || tool === 'eraser') && selectedId && selectedId !== 'image') {
@@ -687,7 +735,6 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
         if (sel && sel.kind === 'mask' && sel.dataUrl && sel.w && sel.h && imageCache) {
           const cached = imageCache.get(sel.dataUrl)
           if (cached) {
-            // Seed offscreen with the existing mask, then stamp the first dot.
             const off = document.createElement('canvas')
             off.width = sel.w
             off.height = sel.h
@@ -695,7 +742,12 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
             if (octx) {
               octx.drawImage(cached, 0, 0, sel.w, sel.h)
               stampMaskBrush(octx, p, p, toolStrokeWidth, brushOptions, tool === 'eraser' ? '#000000' : toolColor)
-              setInteraction({ kind: 'mask-painting', layerId: sel.id, offscreen: off, lastPoint: p })
+              setInteraction({
+                kind: 'mask-painting',
+                target: { kind: 'layer', layerId: sel.id },
+                offscreen: off,
+                lastPoint: p,
+              })
               return
             }
           }
@@ -913,13 +965,17 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     } else if (interaction.kind === 'sample-stroke') {
       finishSampleStroke()
     } else if (interaction.kind === 'mask-painting') {
-      // Export the painted offscreen as a new dataUrl and patch the mask
-      // layer. Single history step per stroke (mousedown→mouseup).
+      // Export the painted offscreen and patch the target. Single history
+      // step per stroke (mousedown→mouseup).
       try {
         const dataUrl = interaction.offscreen.toDataURL('image/png')
-        const orig = findLayerById(state.layers, interaction.layerId)
-        if (orig && orig.kind === 'mask') {
-          onCommitLayerUpdate(interaction.layerId, { ...orig, dataUrl })
+        if (interaction.target.kind === 'quickMask') {
+          onUpdateQuickMaskDataUrl?.(dataUrl)
+        } else {
+          const orig = findLayerById(state.layers, interaction.target.layerId)
+          if (orig && orig.kind === 'mask') {
+            onCommitLayerUpdate(interaction.target.layerId, { ...orig, dataUrl })
+          }
         }
       } catch {
         // Quota / encoding failure — drop the stroke silently. The
@@ -1952,6 +2008,44 @@ function drawCloneSourceMarker(canvas: HTMLCanvasElement | null, p: Point) {
  * the renderer drew last (selection marquee + chrome). Never bakes into
  * export — Canvas only renders this on the live canvas.
  */
+/**
+ * Quick Mask "rubylith" overlay. Renders a red 50%-opacity tint over the
+ * canvas wherever the quickMask alpha is low (= unselected), letting the
+ * user see the current selection as PS does. The mask is stored in the
+ * dataUrl's RGB channels (white=selected, black=unselected); we composite
+ * a red layer and use `destination-out` against the mask to cut the
+ * selected area out of the red.
+ */
+function drawQuickMaskOverlay(
+  canvas: HTMLCanvasElement | null,
+  maskImg: HTMLImageElement | HTMLCanvasElement,
+) {
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  // Build the red overlay on a sibling canvas so we can punch the
+  // selected region out of it via destination-out without affecting the
+  // main canvas's pixels.
+  const overlay = document.createElement('canvas')
+  overlay.width = canvas.width
+  overlay.height = canvas.height
+  const octx = overlay.getContext('2d')
+  if (!octx) return
+  octx.fillStyle = 'rgba(255, 0, 0, 0.5)'
+  octx.fillRect(0, 0, overlay.width, overlay.height)
+  // Mask is white-where-selected; multiply with mask, then keep where
+  // mask is BLACK (= unselected). Simpler: use destination-out with the
+  // mask drawn at its natural channels — that erases red where the mask
+  // is white (additive selection), leaving red on unselected areas.
+  octx.globalCompositeOperation = 'destination-out'
+  octx.drawImage(maskImg, 0, 0, overlay.width, overlay.height)
+  // Now blit the overlay onto the main canvas. source-over by default.
+  ctx.drawImage(overlay, 0, 0)
+  ctx.restore()
+}
+
 function drawGridOverlay(canvas: HTMLCanvasElement | null, stepPx: number) {
   if (!canvas || stepPx < 4) return
   const ctx = canvas.getContext('2d')

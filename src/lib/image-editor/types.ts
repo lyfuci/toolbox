@@ -996,6 +996,22 @@ export type EditorState = {
    * save / load and undo / redo.
    */
   layerComps?: LayerComp[]
+  /**
+   * Quick Mask mode (PS: Q). When non-null, the editor is in pixel-paint
+   * selection mode: `dataUrl` holds the in-progress mask (white = selected,
+   * black = unselected); the renderer overlays it on the canvas as a red
+   * "rubylith" so the user sees what's selected. Brush strokes paint into
+   * it (black = remove from selection, white = add). On exit (Q again),
+   * we rasterize the dataUrl back to a selection — bbox of non-black
+   * pixels for v1; pixel-perfect roundtrip via marching-squares is a v2
+   * follow-up.
+   *
+   * `(w, h)` is the preview-pixel canvas size at entry. quickMask is UI
+   * state — included in EditorState so undo / redo round-trip strokes,
+   * but cleared by Flatten Image and not part of saved projects (it's a
+   * transient editing mode).
+   */
+  quickMask?: { dataUrl: string; w: number; h: number }
 }
 
 /** One saved layer composite — a named restore point for the layer stack. */

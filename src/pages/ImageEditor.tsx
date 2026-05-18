@@ -178,7 +178,10 @@ export function ImageEditorPage() {
         }
       }
     }
-  }, [state.layers, ensureImage])
+    if (state.quickMask) {
+      ensureImage(state.quickMask.dataUrl).catch(() => {})
+    }
+  }, [state.layers, state.quickMask, ensureImage])
 
   const duplicateRef = useRef<() => void>(() => {})
   const moveLayerRef = useRef<(d: 'forward' | 'backward' | 'front' | 'back') => void>(() => {})
@@ -199,6 +202,7 @@ export function ImageEditorPage() {
   const stampVisibleRef = useRef<() => void>(() => {})
   const clippingMaskRef = useRef<() => void>(() => {})
   const saveProjectRef = useRef<() => void>(() => {})
+  const quickMaskToggleRef = useRef<() => void>(() => {})
 
   // View menu toggles (UI-only, not part of EditorState or project save).
   // Grid + snap travel together: snap is a no-op when the grid is hidden.
@@ -448,6 +452,14 @@ export function ImageEditorPage() {
       if (e.key === 'r' || e.key === 'R') {
         e.preventDefault()
         setViewRotation((r) => ((r + 90) % 360) as 0 | 90 | 180 | 270)
+        return
+      }
+      // Quick Mask (PS: Q) — toggle pixel-paint selection mode. On enter
+      // we rasterize the current selection into a dataUrl mask; on exit
+      // we threshold it back to a bbox selection.
+      if (e.key === 'q' || e.key === 'Q') {
+        e.preventDefault()
+        quickMaskToggleRef.current()
         return
       }
       if (e.key === 'Enter' && canvasRef.current?.hasPendingCrop()) {
@@ -1221,6 +1233,105 @@ export function ImageEditorPage() {
     toast.success(t('pages.imageEditor.maskRaster.converted'))
   }, [image, selectedLayerId, state, ensureImage, patchLayer, t])
 
+  // ── Quick Mask (Q) ─────────────────────────────────────────────────────
+  const handleToggleQuickMask = useCallback(async () => {
+    if (!image) return
+    if (state.quickMask) {
+      // Exit Quick Mask: threshold the mask back to a bbox selection.
+      // Pixel-perfect roundtrip via marching-squares is v2; for v1 we
+      // extract the bbox of all "selected" (white) pixels.
+      const cached = imageCache.get(state.quickMask.dataUrl)
+      if (!cached) {
+        history.set({ ...state, quickMask: undefined })
+        toast.message(t('pages.imageEditor.quickMask.exitedNoSel'))
+        return
+      }
+      const c = document.createElement('canvas')
+      c.width = state.quickMask.w
+      c.height = state.quickMask.h
+      const ctx = c.getContext('2d')
+      if (!ctx) return
+      ctx.drawImage(cached, 0, 0)
+      let data: ImageData
+      try {
+        data = ctx.getImageData(0, 0, c.width, c.height)
+      } catch {
+        history.set({ ...state, quickMask: undefined })
+        return
+      }
+      // Find bbox of pixels brighter than mid-grey (= "selected").
+      let minX = c.width, minY = c.height, maxX = -1, maxY = -1
+      for (let y = 0; y < c.height; y++) {
+        for (let x = 0; x < c.width; x++) {
+          const i = (y * c.width + x) * 4
+          // Luminance estimate (R+G+B) / 3 > 127 → selected
+          const lum = (data.data[i] + data.data[i + 1] + data.data[i + 2]) / 3
+          if (lum > 127) {
+            if (x < minX) minX = x
+            if (y < minY) minY = y
+            if (x > maxX) maxX = x
+            if (y > maxY) maxY = y
+          }
+        }
+      }
+      if (maxX < 0) {
+        history.set({
+          ...state,
+          quickMask: undefined,
+          selection: undefined,
+          selectionPath: undefined,
+        })
+        toast.message(t('pages.imageEditor.quickMask.exitedEmpty'))
+        return
+      }
+      history.set({
+        ...state,
+        quickMask: undefined,
+        selection: { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 },
+        selectionPath: undefined,
+        selectionInverse: false,
+      })
+      toast.success(t('pages.imageEditor.quickMask.exited'))
+    } else {
+      // Enter Quick Mask: rasterize the current selection (rect / path)
+      // into a fresh dataUrl. No selection → fully unselected mask
+      // (all black) — user paints selection in.
+      const { w, h } = previewDimsOf(image, state)
+      const c = document.createElement('canvas')
+      c.width = w
+      c.height = h
+      const ctx = c.getContext('2d')
+      if (!ctx) return
+      ctx.fillStyle = '#000000'
+      ctx.fillRect(0, 0, w, h)
+      ctx.fillStyle = '#ffffff'
+      if (state.selectionPath && state.selectionPath.length >= 3) {
+        ctx.beginPath()
+        const p0 = state.selectionPath[0]
+        ctx.moveTo(p0.x, p0.y)
+        for (let i = 1; i < state.selectionPath.length; i++) {
+          const p = state.selectionPath[i]
+          ctx.lineTo(p.x, p.y)
+        }
+        ctx.closePath()
+        ctx.fill()
+      } else if (state.selection) {
+        const r = state.selection
+        const nx = r.w >= 0 ? r.x : r.x + r.w
+        const ny = r.h >= 0 ? r.y : r.y + r.h
+        ctx.fillRect(nx, ny, Math.abs(r.w), Math.abs(r.h))
+      }
+      const dataUrl = c.toDataURL('image/png')
+      try {
+        await ensureImage(dataUrl)
+      } catch {
+        /* fallthrough — paint won't preview but mode is still entered */
+      }
+      history.set({ ...state, quickMask: { dataUrl, w, h } })
+      toast.success(t('pages.imageEditor.quickMask.entered'))
+    }
+  }, [image, state, imageCache, ensureImage, history, t])
+
   /** Toggle PS clipping mask on the selected layer. */
   const handleToggleClippingMask = useCallback(() => {
     if (!selectedLayerId || selectedLayerId === 'image') return
@@ -1559,6 +1670,7 @@ export function ImageEditorPage() {
     mergeVisibleRef.current = handleMergeVisible
     stampVisibleRef.current = handleStampVisible
     clippingMaskRef.current = handleToggleClippingMask
+    quickMaskToggleRef.current = handleToggleQuickMask
   })
 
   // ── Crop ─────────────────────────────────────────────────────────────────
@@ -2459,6 +2571,23 @@ export function ImageEditorPage() {
               extraPreviewLayer={adjustmentDraft ?? filterDraft ?? undefined}
               showGrid={showGrid}
               gridStep={gridStep}
+              quickMaskDataUrl={state.quickMask?.dataUrl}
+              onUpdateQuickMaskDataUrl={async (dataUrl) => {
+                if (!state.quickMask) return
+                // Await load so the renderer's next pass sees the new
+                // mask synchronously — without this, the overlay flashes
+                // back to the pre-stroke state for one frame before
+                // ensureImage's async resolve catches up.
+                try {
+                  await ensureImage(dataUrl)
+                } catch {
+                  /* keep mask anyway, render falls back */
+                }
+                history.set({
+                  ...state,
+                  quickMask: { ...state.quickMask, dataUrl },
+                })
+              }}
             />
           </Workspace>
         </div>
