@@ -5,6 +5,11 @@ export type HandleId =
   | 'ne'
   | 'se'
   | 'sw' // rect-like corner handles
+  | 'n'
+  | 'e'
+  | 's'
+  | 'w' // side midpoint handles (Free Transform)
+  | 'rotate' // rotation handle floating above the bbox
   | 'start'
   | 'end' // arrow endpoint handles
 
@@ -52,6 +57,12 @@ export function getLayerBBox(layer: Layer): Rect | null {
     }
     if (!any) return null
     return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+  }
+  if (layer.kind === 'smartObject') {
+    // Pre-rotation footprint stored directly on the transform — no state
+    // access required. (Free Transform's handle UI uses the rotated quad.)
+    const t = layer.transform
+    return normalizeRect({ x: t.x, y: t.y, w: t.w, h: t.h })
   }
   return getShapeBBox(layer.shape)
 }
@@ -155,6 +166,21 @@ export function pickLayer(layers: Layer[], p: Point): string | null {
       if (inner !== null) return layer.expanded ? inner : layer.id
       continue
     }
+    if (layer.kind === 'smartObject' && layer.transform.rotation !== 0) {
+      // Rotated SO: inverse-rotate the click point around the bbox centre,
+      // then check against the pre-rotation bbox. Without this, hit-test on a
+      // 45°-rotated SO would fail to pick the visible (rotated) content.
+      const t = layer.transform
+      const cx = t.x + t.w / 2
+      const cy = t.y + t.h / 2
+      const r = (-t.rotation * Math.PI) / 180
+      const lx = Math.cos(r) * (p.x - cx) - Math.sin(r) * (p.y - cy) + cx
+      const ly = Math.sin(r) * (p.x - cx) + Math.cos(r) * (p.y - cy) + cy
+      if (pointInBBox({ x: lx, y: ly }, { x: t.x, y: t.y, w: t.w, h: t.h })) {
+        return layer.id
+      }
+      continue
+    }
     const bbox = getLayerBBox(layer)
     if (bbox && pointInBBox(p, bbox)) return layer.id
   }
@@ -175,6 +201,19 @@ export function getHandles(layer: Layer): Handle[] {
     // resize through the layers panel instead if ever needed. Groups: the
     // user resizes group contents by selecting individual children.
     return []
+  }
+  if (layer.kind === 'smartObject') {
+    // Smart Objects ship the full 8-handle + rotation set so the selection
+    // chrome doubles as Free Transform. Coordinates honour the layer's
+    // existing transform.x/y/w/h; rotation handle floats 24 preview-px
+    // above the bbox centre-top (pre-rotation; renderer applies the
+    // current rotation at draw time).
+    return rectEightHandlesWithRotate({
+      x: layer.transform.x,
+      y: layer.transform.y,
+      w: layer.transform.w,
+      h: layer.transform.h,
+    })
   }
   switch (layer.shape.kind) {
     case 'rect':
@@ -214,6 +253,23 @@ function rectCornerHandles(r: Rect): Handle[] {
     { id: 'ne', x: r.x + r.w, y: r.y },
     { id: 'se', x: r.x + r.w, y: r.y + r.h },
     { id: 'sw', x: r.x, y: r.y + r.h },
+  ]
+}
+
+/** 4 corners + 4 mid-sides + 1 rotation handle. Used by Smart Object's
+ *  Free-Transform-style selection chrome. The rotation handle sits 24
+ *  preview-px above the top edge centre. */
+function rectEightHandlesWithRotate(r: Rect): Handle[] {
+  return [
+    { id: 'nw', x: r.x, y: r.y },
+    { id: 'n', x: r.x + r.w / 2, y: r.y },
+    { id: 'ne', x: r.x + r.w, y: r.y },
+    { id: 'e', x: r.x + r.w, y: r.y + r.h / 2 },
+    { id: 'se', x: r.x + r.w, y: r.y + r.h },
+    { id: 's', x: r.x + r.w / 2, y: r.y + r.h },
+    { id: 'sw', x: r.x, y: r.y + r.h },
+    { id: 'w', x: r.x, y: r.y + r.h / 2 },
+    { id: 'rotate', x: r.x + r.w / 2, y: r.y - 24 },
   ]
 }
 

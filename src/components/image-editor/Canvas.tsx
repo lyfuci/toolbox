@@ -1334,6 +1334,14 @@ function cursorForHandleId(id: HandleId): string {
     case 'ne':
     case 'sw':
       return 'nesw-resize'
+    case 'n':
+    case 's':
+      return 'ns-resize'
+    case 'e':
+    case 'w':
+      return 'ew-resize'
+    case 'rotate':
+      return 'grab'
     case 'start':
     case 'end':
       return 'crosshair'

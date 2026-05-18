@@ -22,6 +22,10 @@ type Props = {
   zoom: number
   /** Open the Layer Style dialog for the given layer id. */
   onOpenStyle: (id: string) => void
+  /** Smart Object > Replace Contents for currently selected SO layer. */
+  onReplaceSmartObjectContents: () => void
+  /** Right-click on a layer row — parent opens the ContextMenu. */
+  onLayerContextMenu?: (id: string, x: number, y: number) => void
 }
 
 /**
@@ -44,6 +48,8 @@ export function RightSidebar({
   setAdjust,
   zoom,
   onOpenStyle,
+  onReplaceSmartObjectContents,
+  onLayerContextMenu,
 }: Props) {
   const { t } = useTranslation()
   const [g1, setG1] = useState<'layers' | 'channels' | 'paths'>('layers')
@@ -109,6 +115,7 @@ export function RightSidebar({
               patchImageLayer={patchImageLayer}
               deleteLayer={deleteLayer}
               onOpenStyle={onOpenStyle}
+              onLayerContextMenu={onLayerContextMenu}
             />
           </div>
         )}
@@ -138,6 +145,7 @@ export function RightSidebar({
               patchLayer={patchLayer}
               patchImageLayer={patchImageLayer}
               onOpenStyle={onOpenStyle}
+              onReplaceSmartObjectContents={onReplaceSmartObjectContents}
             />
           </div>
         )}

@@ -25,6 +25,21 @@ export function translateLayer(layer: Layer, dx: number, dy: number): Layer {
       children: layer.children.map((c) => translateLayer(c, dx, dy)),
     }
   }
+  if (layer.kind === 'smartObject') {
+    // Smart object: translate its non-destructive transform (which carries
+    // both the bbox origin and the rotation pivot).
+    return {
+      ...layer,
+      ...clip,
+      transform: {
+        ...layer.transform,
+        x: layer.transform.x + dx,
+        y: layer.transform.y + dy,
+        anchorX: layer.transform.anchorX + dx,
+        anchorY: layer.transform.anchorY + dy,
+      },
+    }
+  }
   return { ...layer, ...clip, shape: translateShape(layer.shape, dx, dy) }
 }
 
@@ -143,11 +158,15 @@ export function resizeLayer(
       ],
     }
   }
-  if (layer.kind === 'adjustment' || layer.kind === 'filter' || layer.kind === 'group') {
-    // Adjustment + filter + group layers have no resizable geometry of their
-    // own; getHandles returns [] for them so this branch shouldn't be
-    // reached, but keep it as a no-op for safety.
+  if (
+    layer.kind === 'adjustment' ||
+    layer.kind === 'filter' ||
+    layer.kind === 'group'
+  ) {
     return layer
+  }
+  if (layer.kind === 'smartObject') {
+    return resizeSmartObject(layer, handleId, newPoint)
   }
   const s = layer.shape
   switch (s.kind) {
@@ -201,8 +220,67 @@ function resizeRect(r: Rect, handleId: HandleId, p: Point): Rect {
   } else if (handleId === 'sw') {
     nx1 = p.x
     ny2 = p.y
+  } else if (handleId === 'n') {
+    ny1 = p.y
+  } else if (handleId === 's') {
+    ny2 = p.y
+  } else if (handleId === 'e') {
+    nx2 = p.x
+  } else if (handleId === 'w') {
+    nx1 = p.x
   }
   return { x: nx1, y: ny1, w: nx2 - nx1, h: ny2 - ny1 }
+}
+
+/**
+ * Smart Object resize / rotate. Handles dragged in preview-pixel space
+ * (`newPoint`) update the layer's non-destructive transform — bbox for
+ * corner / side handles, rotation for the 'rotate' handle. Anchor follows
+ * the bbox centre so resize / rotation stay centred without surprising
+ * jumps in the next operation.
+ */
+function resizeSmartObject(
+  layer: import('./types').SmartObjectLayer,
+  handleId: HandleId,
+  newPoint: Point,
+): Layer {
+  const t = layer.transform
+  if (handleId === 'rotate') {
+    // Rotation around the bbox centre. Compute the angle from centre to
+    // the new pointer position relative to the centre→top axis.
+    const cx = t.x + t.w / 2
+    const cy = t.y + t.h / 2
+    const dx = newPoint.x - cx
+    const dy = newPoint.y - cy
+    // Angle 0 = pointer directly above (PS convention). atan2(dy, dx) returns
+    // counter-clockwise from +x; we offset and flip sign so dragging clockwise
+    // increases the rotation field.
+    const deg = (Math.atan2(dy, dx) * 180) / Math.PI + 90
+    // Normalize to [-180, 180].
+    const normalized = ((deg + 540) % 360) - 180
+    return { ...layer, transform: { ...t, rotation: normalized } }
+  }
+  // Pre-rotation: apply the inverse rotation to the pointer so the bbox
+  // edit math stays in the SO's local frame. Centre is the rotation pivot.
+  const cx = t.x + t.w / 2
+  const cy = t.y + t.h / 2
+  const r = (-t.rotation * Math.PI) / 180
+  const lx = Math.cos(r) * (newPoint.x - cx) - Math.sin(r) * (newPoint.y - cy) + cx
+  const ly = Math.sin(r) * (newPoint.x - cx) + Math.cos(r) * (newPoint.y - cy) + cy
+  const next = resizeRect({ x: t.x, y: t.y, w: t.w, h: t.h }, handleId, { x: lx, y: ly })
+  return {
+    ...layer,
+    transform: {
+      ...t,
+      x: next.x,
+      y: next.y,
+      w: next.w,
+      h: next.h,
+      // Keep anchor centred — Free Transform's natural feel.
+      anchorX: next.x + next.w / 2,
+      anchorY: next.y + next.h / 2,
+    },
+  }
 }
 
 /** Did the layer actually change? Used to skip no-op history pushes. */

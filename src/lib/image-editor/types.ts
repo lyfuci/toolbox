@@ -352,6 +352,82 @@ export type ColorOverlayEffect = {
   blend: BlendMode
 }
 
+/** Linear gradient overlay across the layer's alpha. */
+export type GradientOverlayEffect = {
+  kind: 'gradientOverlay'
+  enabled: boolean
+  /** Start colour at gradient position 0. */
+  color: string
+  /** End colour at gradient position 1. */
+  endColor: string
+  opacity: number
+  blend: BlendMode
+  /** Gradient sweep angle, degrees. 0 = left→right. */
+  angle: number
+  /** Visual scale of the gradient as a percentage of the layer's diagonal.
+   *  100 = the gradient spans corner-to-corner; lower values squeeze it. */
+  scale: number
+}
+
+/** Pattern fill across the layer's alpha. v1 uses a built-in checker
+ *  pattern when `patternDataUrl` is empty; future revisions will add a
+ *  pattern picker / file import. */
+export type PatternOverlayEffect = {
+  kind: 'patternOverlay'
+  enabled: boolean
+  /** Optional embedded pattern image as a dataUrl. Empty string = built-in
+   *  checker tile. */
+  patternDataUrl: string
+  opacity: number
+  blend: BlendMode
+  /** Tile scale, percent. 100 = pattern at its natural pixel size. */
+  scale: number
+}
+
+/** Satin — a shaped, interior soft-edged contour driven by the layer's
+ *  alpha self-intersection at the given angle / distance. PS-style. */
+export type SatinEffect = {
+  kind: 'satin'
+  enabled: boolean
+  color: string
+  opacity: number
+  blend: BlendMode
+  angle: number
+  distance: number
+  size: number
+  /** Invert flips the satin contour (highlights become shadows). */
+  invert: boolean
+}
+
+/** Bevel & Emboss — paired highlight + shadow shifted along a light angle,
+ *  giving the layer a chiselled / embossed look. Highlight and shadow each
+ *  carry their own blend + opacity for fine-grained control. */
+export type BevelEmbossEffect = {
+  kind: 'bevelEmboss'
+  enabled: boolean
+  /** Overall blend + opacity wrapping the combined highlight/shadow output.
+   *  Each sub-element also has its own opacity/blend that compose first. */
+  blend: BlendMode
+  opacity: number
+  /** Where the bevel sits relative to the layer's alpha edge. */
+  style: 'innerBevel' | 'outerBevel' | 'emboss' | 'pillowEmboss'
+  /** Light direction (where the light comes FROM), degrees. */
+  angle: number
+  /** Light altitude — vertical angle of the light. Larger = light from
+   *  more directly above → softer highlights. Degrees (0..90). */
+  altitude: number
+  /** Apparent height / depth (1..100). Drives the offset magnitude. */
+  depth: number
+  /** Falloff blur radius for both highlight + shadow, in preview px. */
+  size: number
+  highlightColor: string
+  highlightOpacity: number
+  highlightBlend: BlendMode
+  shadowColor: string
+  shadowOpacity: number
+  shadowBlend: BlendMode
+}
+
 export type LayerEffect =
   | DropShadowEffect
   | InnerShadowEffect
@@ -359,6 +435,10 @@ export type LayerEffect =
   | InnerGlowEffect
   | StrokeEffect
   | ColorOverlayEffect
+  | GradientOverlayEffect
+  | PatternOverlayEffect
+  | SatinEffect
+  | BevelEmbossEffect
 
 export type LayerEffectKind = LayerEffect['kind']
 
@@ -416,6 +496,52 @@ export const DEFAULT_EFFECTS: { [K in LayerEffectKind]: Extract<LayerEffect, { k
     color: '#ff0000',
     opacity: 100,
     blend: 'normal',
+  },
+  gradientOverlay: {
+    kind: 'gradientOverlay',
+    enabled: true,
+    color: '#000000',
+    endColor: '#ffffff',
+    opacity: 100,
+    blend: 'normal',
+    angle: 90,
+    scale: 100,
+  },
+  patternOverlay: {
+    kind: 'patternOverlay',
+    enabled: true,
+    patternDataUrl: '',
+    opacity: 100,
+    blend: 'normal',
+    scale: 100,
+  },
+  satin: {
+    kind: 'satin',
+    enabled: true,
+    color: '#000000',
+    opacity: 50,
+    blend: 'multiply',
+    angle: 19,
+    distance: 11,
+    size: 14,
+    invert: false,
+  },
+  bevelEmboss: {
+    kind: 'bevelEmboss',
+    enabled: true,
+    blend: 'normal',
+    opacity: 100,
+    style: 'innerBevel',
+    angle: 120,
+    altitude: 30,
+    depth: 100,
+    size: 5,
+    highlightColor: '#ffffff',
+    highlightOpacity: 75,
+    highlightBlend: 'screen',
+    shadowColor: '#000000',
+    shadowOpacity: 75,
+    shadowBlend: 'multiply',
   },
 }
 
@@ -665,6 +791,63 @@ export type GroupLayer = LayerCommon & {
   expanded: boolean
 }
 
+// ── Smart Object ─────────────────────────────────────────────────────────
+//
+// A Smart Object embeds an external source (currently always a raster image
+// stored as dataUrl) and renders it non-destructively under an affine
+// transform. The source itself lives in `EditorState.smartSources` keyed by
+// id; a SmartObjectLayer holds only a `sourceRef`. Multiple SO layers can
+// share the same source — editing the source (Replace Contents) updates
+// every instance at once, matching PS's "linked smart object" semantics.
+//
+// Transform fields are in **preview-canvas pixels** (same convention as
+// shape coords), so the renderer multiplies spatial offsets by annoScale.
+// The transform pivots around `(anchorX, anchorY)` so callers can scale /
+// rotate around the source centre (default) without it walking off screen.
+//
+// On scale-down then scale-up, the source raster is preserved — the layer
+// merely re-samples at the new effective dimension. That non-destructive
+// quality preservation is the headline reason to use a Smart Object.
+
+/** One embedded source. Multiple SO layers can reference the same id. */
+export type SmartSource = {
+  /** Original-resolution PNG data URL of the embedded source. */
+  dataUrl: string
+  /** Source pixel dimensions — kept so SO layers can scale to source-aware
+   *  defaults (e.g. "place at original size") without sniffing the dataUrl. */
+  w: number
+  h: number
+  /** Human-readable name (file basename, "From Layer", etc.) shown in UI. */
+  name: string
+}
+
+/** Affine transform applied to the SO's source pixels at render time.
+ *
+ *  `(x, y, w, h)` is the layer's pre-rotation bbox in preview-pixel space —
+ *  the source is sampled (with smoothing) onto this rect; non-uniform w/h
+ *  produces stretch. We store the bbox directly rather than scaleX/scaleY
+ *  multipliers so `getLayerBBox()` doesn't need access to the source pool
+ *  (the dimension is denormalized on the transform).
+ *
+ *  Rotation is in degrees, clockwise, pivoting around (anchorX, anchorY)
+ *  in absolute preview-pixel canvas space. Default anchor is (x + w/2,
+ *  y + h/2) — set by the Convert / Place flows. */
+export type SmartObjectTransform = {
+  x: number
+  y: number
+  w: number
+  h: number
+  rotation: number
+  anchorX: number
+  anchorY: number
+}
+
+export type SmartObjectLayer = LayerCommon & {
+  kind: 'smartObject'
+  sourceRef: string
+  transform: SmartObjectTransform
+}
+
 // User-addable overlay layer types (the image is special, see EditorState).
 export type Layer =
   | AnnotationLayer
@@ -672,6 +855,7 @@ export type Layer =
   | AdjustmentLayer
   | FilterLayer
   | GroupLayer
+  | SmartObjectLayer
 
 // The full editing state. The HTMLImageElement (pixels) is held outside this
 // state so it doesn't enter the history stack; here we only track the image
@@ -715,6 +899,13 @@ export type EditorState = {
    * Set/cleared via the Crop tool; history-tracked → undo restores.
    */
   cropRect?: Rect
+  /**
+   * Smart Object source pool, keyed by id. SmartObjectLayer.sourceRef
+   * indexes into this map. Sources persist across layer delete (matching
+   * PS — orphaned sources stay until you Purge) and are reused on layer
+   * duplicate. Cleared by Flatten Image (everything bakes to pixels).
+   */
+  smartSources?: { [id: string]: SmartSource }
 }
 
 // Persisted project format (JSON sidecar).

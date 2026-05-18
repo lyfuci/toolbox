@@ -18,6 +18,9 @@ type Props = {
   /** Open the Layer Style dialog for the currently selected layer.
    *  Hidden when the image background is selected (no fx support there). */
   onOpenStyle: (id: string) => void
+  /** Open the Smart Object > Replace Contents file picker for the selected
+   *  SO layer. Only shown when the selected layer is a SmartObjectLayer. */
+  onReplaceSmartObjectContents: () => void
 }
 
 /**
@@ -31,6 +34,7 @@ export function PropertiesPanel({
   patchLayer,
   patchImageLayer,
   onOpenStyle,
+  onReplaceSmartObjectContents,
 }: Props) {
   const { t } = useTranslation()
   const selected: Layer | EditorState['imageLayer'] | null =
@@ -107,6 +111,99 @@ export function PropertiesPanel({
           </button>
         </div>
       )}
+
+      {layerForFx && layerForFx.kind === 'smartObject' && (
+        <SmartObjectSection
+          state={state}
+          layer={layerForFx}
+          patchLayer={patchLayer}
+          onReplace={onReplaceSmartObjectContents}
+        />
+      )}
+    </div>
+  )
+}
+
+/** Smart Object panel: source info + non-destructive transform sliders
+ *  (x / y / w / h / rotation) + Replace Contents button. Full Free Transform
+ *  on-canvas handles live elsewhere; sliders cover the no-handle case. */
+function SmartObjectSection({
+  state,
+  layer,
+  patchLayer,
+  onReplace,
+}: {
+  state: EditorState
+  layer: Layer & { kind: 'smartObject' }
+  patchLayer: (id: string, patch: Partial<Layer>) => void
+  onReplace: () => void
+}) {
+  const { t } = useTranslation()
+  const source = state.smartSources?.[layer.sourceRef]
+  const t0 = layer.transform
+  const patchTransform = (patch: Partial<typeof t0>) =>
+    patchLayer(layer.id, { transform: { ...t0, ...patch } })
+  return (
+    <div className="space-y-2 border-t border-border pt-3">
+      <div className="text-xs text-muted-foreground">
+        {t('pages.imageEditor.smartObject.title')}
+      </div>
+      <div className="rounded-md bg-muted/30 px-2 py-1.5 text-[11px] text-muted-foreground">
+        <div className="truncate font-medium text-foreground">
+          {source?.name ?? '—'}
+        </div>
+        {source && (
+          <div className="font-mono">
+            {source.w} × {source.h}px
+          </div>
+        )}
+      </div>
+      <Slider
+        label="X"
+        value={Math.round(t0.x)}
+        min={-2000}
+        max={2000}
+        unit="px"
+        onChange={(v) => patchTransform({ x: v, anchorX: v + t0.w / 2 })}
+      />
+      <Slider
+        label="Y"
+        value={Math.round(t0.y)}
+        min={-2000}
+        max={2000}
+        unit="px"
+        onChange={(v) => patchTransform({ y: v, anchorY: v + t0.h / 2 })}
+      />
+      <Slider
+        label={t('pages.imageEditor.smartObject.width')}
+        value={Math.round(t0.w)}
+        min={1}
+        max={4000}
+        unit="px"
+        onChange={(v) => patchTransform({ w: v, anchorX: t0.x + v / 2 })}
+      />
+      <Slider
+        label={t('pages.imageEditor.smartObject.height')}
+        value={Math.round(t0.h)}
+        min={1}
+        max={4000}
+        unit="px"
+        onChange={(v) => patchTransform({ h: v, anchorY: t0.y + v / 2 })}
+      />
+      <Slider
+        label={t('pages.imageEditor.smartObject.rotation')}
+        value={Math.round(t0.rotation)}
+        min={-180}
+        max={180}
+        unit="°"
+        onChange={(v) => patchTransform({ rotation: v })}
+      />
+      <button
+        onClick={onReplace}
+        className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs text-foreground hover:bg-accent/40"
+      >
+        {t('pages.imageEditor.smartObject.replaceBtn')}
+      </button>
     </div>
   )
 }

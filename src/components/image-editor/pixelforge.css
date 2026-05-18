@@ -462,3 +462,57 @@
   inset: 0;
   z-index: 40;
 }
+
+/* Right-click contextual menus (LayersPanel rows, canvas). */
+.pf-context-menu {
+  min-width: 220px;
+  max-width: 320px;
+  background: var(--pf-bg-2);
+  border: 1px solid var(--pf-line);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  padding: 4px 0;
+  font-size: var(--pf-font-sm);
+  color: var(--pf-fg);
+  user-select: none;
+}
+.pf-context-menu-header {
+  padding: 4px 12px 6px;
+  color: var(--pf-fg-mid);
+  font-size: 11px;
+  border-bottom: 1px solid var(--pf-line);
+  margin-bottom: 4px;
+}
+.pf-context-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 4px 12px;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pf-context-menu-item:hover:not(:disabled) {
+  background: var(--pf-bg-3);
+}
+.pf-context-menu-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.pf-context-menu-shortcut {
+  color: var(--pf-fg-dim);
+  font-size: 11px;
+  margin-left: 16px;
+}
+.pf-context-menu-sep {
+  height: 1px;
+  background: var(--pf-line);
+  margin: 4px 0;
+}
+.pf-context-menu-danger {
+  color: #f87171;
+}
