@@ -46,6 +46,7 @@ import { fillSelection, strokeSelection, type StrokePosition } from '@/lib/image
 import { floodFillMask, maskToDataUrl } from '@/lib/image-editor/flood-fill'
 import { useHistoryState } from '@/lib/image-editor/history'
 import { fileToDataUrl, useImageCache } from '@/lib/image-editor/image-cache'
+import type { ImageCache } from '@/lib/image-editor/drawing'
 import {
   deepCloneLayerWithNewIds,
   findLayerById,
@@ -162,13 +163,19 @@ export function ImageEditorPage() {
 
   const { cache: imageCache, ensure: ensureImage } = useImageCache()
 
-  // Ensure raster Layer Mask dataUrls are loaded into the imageCache so
-  // the renderer's destination-in pass resolves them. ensureImage dedupes
-  // via an inflight map so seen dataUrls don't re-fetch.
+  // Ensure embedded dataUrls (raster Layer Masks + Pattern Overlay
+  // patterns) are loaded into the imageCache so the renderer can resolve
+  // them synchronously. ensureImage dedupes via an inflight map so seen
+  // dataUrls don't re-fetch.
   useEffect(() => {
     for (const l of walkLayers(state.layers)) {
       if (l.kind === 'mask' && l.dataUrl) {
         ensureImage(l.dataUrl).catch(() => {})
+      }
+      for (const fx of l.effects ?? []) {
+        if (fx.kind === 'patternOverlay' && fx.patternDataUrl) {
+          ensureImage(fx.patternDataUrl).catch(() => {})
+        }
       }
     }
   }, [state.layers, ensureImage])
@@ -1379,9 +1386,27 @@ export function ImageEditorPage() {
       try {
         const img = await loadImageFromUrl(tmp.toDataURL('image/png'))
         setImage(img)
+        // New preview-pixel canvas dims after resize. Mask raster dataUrls
+        // are at the OLD preview dims; re-rasterize each onto a fresh
+        // canvas of the new dims with the old content offset by
+        // (dxPreview, dyPreview) so they stay aligned with the (also
+        // translated) layer geometry.
+        const newCanvasPreviewW = newW * newPreviewScale
+        const newCanvasPreviewH = newH * newPreviewScale
+        const relignedLayers = state.layers
+          .map((l) => translateLayer(l, dxPreview, dyPreview))
+          .map((l) => realignMaskOnCanvasResize(
+            l,
+            imageCache,
+            newCanvasPreviewW,
+            newCanvasPreviewH,
+            dxPreview,
+            dyPreview,
+            ensureImage,
+          ))
         history.set({
           ...state,
-          layers: state.layers.map((l) => translateLayer(l, dxPreview, dyPreview)),
+          layers: relignedLayers,
           // Cleared crop / selection — the canvas resize invalidates them.
           cropRect: undefined,
           selection: undefined,
@@ -1392,7 +1417,7 @@ export function ImageEditorPage() {
         toast.error(t('pages.imageEditor.errLoadFailed'))
       }
     },
-    [image, state, history, t],
+    [image, state, imageCache, ensureImage, history, t],
   )
 
   // ── Image > Trim ───────────────────────────────────────────────────────
@@ -2600,6 +2625,61 @@ function pickFile(accept: string): Promise<File | null> {
     input.onchange = () => resolve(input.files?.[0] ?? null)
     input.click()
   })
+}
+
+/**
+ * If `layer` is a mask with a raster dataUrl, re-rasterize it onto a fresh
+ * canvas of the new preview-pixel dims with the old content offset by
+ * (dx, dy). Used after Canvas Size so masks align with the now-translated
+ * layer geometry instead of stretching to fit. Other layer kinds pass
+ * through unchanged.
+ *
+ * Reads from the existing imageCache (synchronous get); if the mask's
+ * dataUrl hasn't loaded yet we leave it alone and trigger ensureImage
+ * so the next render picks it up — caller should expect a brief beat
+ * of misalignment in that edge case.
+ */
+function realignMaskOnCanvasResize(
+  layer: Layer,
+  imageCache: ImageCache | undefined,
+  newW: number,
+  newH: number,
+  dx: number,
+  dy: number,
+  ensureImage: (dataUrl: string) => Promise<HTMLImageElement>,
+): Layer {
+  if (layer.kind === 'group') {
+    return {
+      ...layer,
+      children: layer.children.map((c) =>
+        realignMaskOnCanvasResize(c, imageCache, newW, newH, dx, dy, ensureImage),
+      ),
+    }
+  }
+  if (layer.kind !== 'mask' || !layer.dataUrl || !layer.w || !layer.h) return layer
+  const cached = imageCache?.get(layer.dataUrl)
+  if (!cached) {
+    // Touch the cache so a future render gets it — but we can't rasterize
+    // synchronously here, so the mask falls back to its stretched (wrong-
+    // but-visible) state until a paint stroke replaces the dataUrl.
+    ensureImage(layer.dataUrl).catch(() => {})
+    return layer
+  }
+  const c = document.createElement('canvas')
+  c.width = Math.max(1, Math.round(newW))
+  c.height = Math.max(1, Math.round(newH))
+  const ctx = c.getContext('2d')
+  if (!ctx) return layer
+  ctx.fillStyle = '#ffffff' // extended areas are visible by default
+  ctx.fillRect(0, 0, c.width, c.height)
+  ctx.drawImage(cached, dx, dy, layer.w, layer.h)
+  try {
+    const dataUrl = c.toDataURL('image/png')
+    ensureImage(dataUrl).catch(() => {})
+    return { ...layer, dataUrl, w: c.width, h: c.height }
+  } catch {
+    return layer
+  }
 }
 
 /**

@@ -904,7 +904,11 @@
         "style": "样式",
         "invert": "反相",
         "colorOverlayHint": "用所选颜色按指定不透明度与混合模式填充图层的不透明区域。",
-        "patternHint": "v1 内置棋盘格图案；自定义图案将在后续版本支持。",
+        "patternHint": "未选择图案 — 使用内置棋盘格作为回退。",
+        "pattern": "图案",
+        "choosePattern": "选择图像…",
+        "replacePattern": "替换…",
+        "clearPattern": "清除图案",
         "strokePos": {
           "outside": "外部",
           "center": "居中",

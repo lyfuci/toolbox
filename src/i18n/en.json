@@ -904,7 +904,11 @@
         "style": "Style",
         "invert": "Invert",
         "colorOverlayHint": "Fills the layer's alpha with the chosen colour at the given opacity / blend.",
-        "patternHint": "v1 ships a built-in checker pattern; custom patterns coming in a follow-up.",
+        "patternHint": "No pattern selected — falls back to a built-in checker tile.",
+        "pattern": "Pattern",
+        "choosePattern": "Choose image…",
+        "replacePattern": "Replace…",
+        "clearPattern": "Clear pattern",
         "strokePos": {
           "outside": "Outside",
           "center": "Center",
