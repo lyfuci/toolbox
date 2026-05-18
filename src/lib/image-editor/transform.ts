@@ -188,6 +188,19 @@ export function resizeLayer(
         return { ...layer, shape: { ...s, x2: newPoint.x, y2: newPoint.y } }
       }
       return layer
+    case 'path': {
+      // Direct selection: move a single anchor. Handle id format is
+      // `path-anchor-<n>`; extract n and rewrite the anchor at that index.
+      // Bezier handles (hin / hout) stay relative to the anchor, so they
+      // translate naturally.
+      const m = /^path-anchor-(\d+)$/.exec(handleId)
+      if (!m) return layer
+      const idx = Number(m[1])
+      if (!Number.isFinite(idx) || idx < 0 || idx >= s.anchors.length) return layer
+      const next = [...s.anchors]
+      next[idx] = { ...s.anchors[idx], x: newPoint.x, y: newPoint.y }
+      return { ...layer, shape: { ...s, anchors: next } }
+    }
     default:
       return layer
   }

@@ -36,6 +36,11 @@ import {
   regionFromSelection,
   renderEditorToCanvas,
 } from '@/lib/image-editor/composite-ops'
+import {
+  loadCustomBrushPresets,
+  saveCustomBrushPresets,
+  type BrushPreset,
+} from '@/lib/image-editor/brush-presets'
 import { DEFAULT_BRUSH_OPTIONS, DEFAULT_TEXT_OPTIONS, initialState, PREVIEW_MAX } from '@/lib/image-editor/defaults'
 import { fillSelection, strokeSelection, type StrokePosition } from '@/lib/image-editor/edit-ops'
 import { floodFillMask, maskToDataUrl } from '@/lib/image-editor/flood-fill'
@@ -136,6 +141,9 @@ export function ImageEditorPage() {
   const [strokeWidth, setStrokeWidth] = useState(4)
   const [brushOptions, setBrushOptions] = useState<BrushOptions>(DEFAULT_BRUSH_OPTIONS)
   const [textOptions, setTextOptions] = useState<TextOptions>(DEFAULT_TEXT_OPTIONS)
+  const [customBrushPresets, setCustomBrushPresets] = useState<BrushPreset[]>(() =>
+    loadCustomBrushPresets(),
+  )
   const [bucketTolerance, setBucketTolerance] = useState(32)
   const [wandTolerance, setWandTolerance] = useState(32)
   // Clone Stamp source point — set by Alt+click while the Stamp tool is
@@ -1605,7 +1613,11 @@ export function ImageEditorPage() {
     (params: AdjustmentParams) => {
       commitLayer({
         id: crypto.randomUUID(),
-        name: t(`pages.imageEditor.adjustments.${params.kind}`),
+        name: t(
+          params.kind === 'channelMixer'
+            ? 'pages.imageEditor.adjustments.channelMixer.title'
+            : `pages.imageEditor.adjustments.${params.kind}`,
+        ),
         visible: true,
         opacity: 100,
         blend: 'normal',
@@ -2345,9 +2357,26 @@ export function ImageEditorPage() {
           onApplyLayerComp={handleApplyLayerComp}
           onDeleteLayerComp={handleDeleteLayerComp}
           currentBrush={{ strokeWidth, options: brushOptions }}
+          customBrushPresets={customBrushPresets}
           onPickBrushPreset={(p) => {
             setStrokeWidth(p.strokeWidth)
             setBrushOptions(p.options)
+          }}
+          onSaveCurrentBrush={(name) => {
+            const preset: BrushPreset = {
+              id: crypto.randomUUID(),
+              name,
+              strokeWidth,
+              options: { ...brushOptions },
+            }
+            const next = [...customBrushPresets, preset]
+            setCustomBrushPresets(next)
+            saveCustomBrushPresets(next)
+          }}
+          onDeleteCustomBrush={(id) => {
+            const next = customBrushPresets.filter((p) => p.id !== id)
+            setCustomBrushPresets(next)
+            saveCustomBrushPresets(next)
           }}
         />
 

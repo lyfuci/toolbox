@@ -2,14 +2,54 @@ import type { BrushOptions } from './types'
 
 /**
  * Built-in brush presets. Each preset overwrites the editor's brushOptions
- * + strokeWidth when picked from the Brushes panel. Custom user presets
- * (a localStorage round-trip + "save current" button) are deferred to v2.
+ * + strokeWidth when picked from the Brushes panel. User-created custom
+ * presets are stored separately via `loadCustomBrushPresets` /
+ * `saveCustomBrushPresets` (localStorage round-trip) and merged onto the
+ * built-in list at render time.
  */
 export type BrushPreset = {
   id: string
   name: string
   strokeWidth: number
   options: BrushOptions
+}
+
+const CUSTOM_KEY = 'pf-custom-brushes'
+
+/** Read custom presets from localStorage. Returns [] on any parse failure. */
+export function loadCustomBrushPresets(): BrushPreset[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(isValidPreset)
+  } catch {
+    return []
+  }
+}
+
+/** Persist custom presets. Overwrites the previous list. */
+export function saveCustomBrushPresets(list: BrushPreset[]): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(CUSTOM_KEY, JSON.stringify(list))
+  } catch {
+    // Quota / serialization error — silent. The user's session keeps the
+    // list in memory; only persistence fails.
+  }
+}
+
+function isValidPreset(v: unknown): v is BrushPreset {
+  const p = v as Partial<BrushPreset> | null
+  return !!p &&
+    typeof p.id === 'string' &&
+    typeof p.name === 'string' &&
+    typeof p.strokeWidth === 'number' &&
+    typeof p.options === 'object' &&
+    p.options !== null &&
+    typeof (p.options as BrushOptions).hardness === 'number'
 }
 
 export const BUILTIN_BRUSH_PRESETS: BrushPreset[] = [

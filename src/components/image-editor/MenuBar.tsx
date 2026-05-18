@@ -310,6 +310,11 @@ export function MenuBar({ handlers }: Props) {
             label: t('pages.imageEditor.adjustments.threshold') + '…',
             onClick: () => handlers.openAdjustment?.('threshold'),
           },
+          {
+            id: 'adj-channelMixer',
+            label: t('pages.imageEditor.adjustments.channelMixer.title') + '…',
+            onClick: () => handlers.openAdjustment?.('channelMixer'),
+          },
         ],
       ],
     },

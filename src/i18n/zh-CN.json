@@ -455,6 +455,13 @@
         "invert": "反相",
         "vibrance": "自然饱和度",
         "exposure": "曝光度",
+        "channelMixer": {
+          "title": "通道混合器",
+          "outR": "输出：红",
+          "outG": "输出：绿",
+          "outB": "输出：蓝",
+          "constant": "常数"
+        },
         "inputBlack": "输入黑场",
         "inputWhite": "输入白场",
         "outputBlack": "输出黑场",
@@ -733,7 +740,13 @@
         "applied": "已应用复合 \"{{name}}\""
       },
       "brushes": {
-        "customHint": "内置预设。自定义画笔预设为 v2 功能。"
+        "customHint": "内置预设。自定义画笔预设为 v2 功能。",
+        "builtIn": "内置",
+        "custom": "自定义",
+        "saveCurrent": "保存",
+        "defaultName": "画笔 {{n}}",
+        "emptyCustom": "把当前画笔设置保存为预设。",
+        "deleteCustom": "删除预设"
       },
       "moveToolHint": "移动 (V)：拖动图层；Cmd/Ctrl+J 复制；Delete 删除。",
       "zoomToolHint": "缩放 (Z)：单击放大 2×，Alt 单击缩小。Cmd/Ctrl+滚轮在光标位置缩放。",
@@ -913,6 +926,7 @@
       "projectLoaded": "项目已加载",
       "projectInvalid": "不是有效的项目文件",
       "textPrompt": "标注文字",
+      "textInlinePrompt": "输入文字 — ⌘Enter 确认，Esc 取消",
       "errNotImage": "不是图片文件",
       "errLoadFailed": "图片加载失败",
       "errExport": "导出失败",
