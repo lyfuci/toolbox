@@ -1,9 +1,16 @@
 import { useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AdjustPanel } from './AdjustPanel'
+import { BrushesPanel } from './BrushesPanel'
+import type { BrushPreset } from '@/lib/image-editor/brush-presets'
+import { ChannelsPanel } from './ChannelsPanel'
+import { HistoryPanel } from './HistoryPanel'
+import { LayerCompsPanel } from './LayerCompsPanel'
 import { LayersPanel } from './LayersPanel'
+import { PathsPanel } from './PathsPanel'
 import { PropertiesPanel } from './PropertiesPanel'
-import type { Adjustments, EditorState, Layer, Transforms } from '@/lib/image-editor/types'
+import type { ImageCache } from '@/lib/image-editor/drawing'
+import type { Adjustments, BrushOptions, EditorState, Layer, LayerComp, Transforms } from '@/lib/image-editor/types'
 
 const LAYERS_HEIGHT_KEY = 'pf-layers-h'
 const LAYERS_HEIGHT_DEFAULT = 320
@@ -26,6 +33,22 @@ type Props = {
   onReplaceSmartObjectContents: () => void
   /** Right-click on a layer row — parent opens the ContextMenu. */
   onLayerContextMenu?: (id: string, x: number, y: number) => void
+  /** Channels panel needs the rendered composite source. */
+  image: HTMLImageElement | null
+  imageCache?: ImageCache
+  /** History panel — passed through from the parent's useHistoryState. */
+  history: {
+    totalLength: number
+    currentIndex: number
+    jumpTo: (index: number) => void
+  }
+  /** Layer Comps panel — save + apply. */
+  onSaveLayerComp: (name: string) => void
+  onApplyLayerComp: (comp: LayerComp) => void
+  onDeleteLayerComp: (id: string) => void
+  /** Brushes panel — pick a preset. */
+  currentBrush: { strokeWidth: number; options: BrushOptions }
+  onPickBrushPreset: (preset: BrushPreset) => void
 }
 
 /**
@@ -50,11 +73,19 @@ export function RightSidebar({
   onOpenStyle,
   onReplaceSmartObjectContents,
   onLayerContextMenu,
+  image,
+  imageCache,
+  history,
+  onSaveLayerComp,
+  onApplyLayerComp,
+  onDeleteLayerComp,
+  currentBrush,
+  onPickBrushPreset,
 }: Props) {
   const { t } = useTranslation()
   const [g1, setG1] = useState<'layers' | 'channels' | 'paths'>('layers')
-  const [g2, setG2] = useState<'properties' | 'info'>('properties')
-  const [g3, setG3] = useState<'adjustments' | 'navigator'>('adjustments')
+  const [g2, setG2] = useState<'properties' | 'info' | 'history'>('properties')
+  const [g3, setG3] = useState<'adjustments' | 'navigator' | 'comps' | 'brushes'>('adjustments')
 
   // Layers section height — fixed by default, drag-resizable via the handle
   // below the panel. Persisted in localStorage so layout sticks across reloads.
@@ -119,8 +150,12 @@ export function RightSidebar({
             />
           </div>
         )}
-        {g1 === 'channels' && <StubPanel msg={t('pages.imageEditor.panelStubChannels')} />}
-        {g1 === 'paths' && <StubPanel msg={t('pages.imageEditor.panelStubPaths')} />}
+        {g1 === 'channels' && (
+          <ChannelsPanel image={image} state={state} imageCache={imageCache} />
+        )}
+        {g1 === 'paths' && (
+          <PathsPanel state={state} selectedId={selectedId} onSelect={onSelect} />
+        )}
       </PanelGroup>
       <div
         className="pf-resize-handle"
@@ -133,6 +168,7 @@ export function RightSidebar({
         tabs={[
           { id: 'properties', label: t('pages.imageEditor.panelProperties') },
           { id: 'info', label: t('pages.imageEditor.panelInfo') },
+          { id: 'history', label: t('pages.imageEditor.panelHistory') },
         ]}
         active={g2}
         setActive={(id) => setG2(id as typeof g2)}
@@ -150,12 +186,21 @@ export function RightSidebar({
           </div>
         )}
         {g2 === 'info' && <StubPanel msg={t('pages.imageEditor.panelStubInfo')} />}
+        {g2 === 'history' && (
+          <HistoryPanel
+            totalLength={history.totalLength}
+            currentIndex={history.currentIndex}
+            onJumpTo={history.jumpTo}
+          />
+        )}
       </PanelGroup>
 
       <PanelGroup
         tabs={[
           { id: 'adjustments', label: t('pages.imageEditor.panelAdjust') },
           { id: 'navigator', label: t('pages.imageEditor.panelNavigator') },
+          { id: 'comps', label: t('pages.imageEditor.panelComps') },
+          { id: 'brushes', label: t('pages.imageEditor.panelBrushes') },
         ]}
         active={g3}
         setActive={(id) => setG3(id as typeof g3)}
@@ -171,6 +216,17 @@ export function RightSidebar({
           </div>
         )}
         {g3 === 'navigator' && <NavigatorStub zoom={zoom} />}
+        {g3 === 'comps' && (
+          <LayerCompsPanel
+            state={state}
+            onSaveComp={onSaveLayerComp}
+            onApplyComp={onApplyLayerComp}
+            onDeleteComp={onDeleteLayerComp}
+          />
+        )}
+        {g3 === 'brushes' && (
+          <BrushesPanel current={currentBrush} onPick={onPickBrushPreset} />
+        )}
       </PanelGroup>
     </aside>
   )

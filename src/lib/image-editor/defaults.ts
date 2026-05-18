@@ -30,6 +30,7 @@ export const initialState = (): EditorState => ({
   transforms: { ...DEFAULT_TRANSFORMS },
   adjust: { ...DEFAULT_ADJUST },
   smartSources: {},
+  layerComps: [],
 })
 
 // Live-preview canvas dimension cap, for snappy filter slider editing.

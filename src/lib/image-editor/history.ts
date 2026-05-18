@@ -51,6 +51,27 @@ export function useHistoryState<T>(initial: T) {
     setPresent(next)
   }, [])
 
+  /**
+   * Jump to an arbitrary index in the chronological [past..present..future]
+   * stack. Index 0 = oldest past entry; index `past.length` = present.
+   * Out-of-range indices clamp. Used by the History panel.
+   */
+  const jumpTo = useCallback(
+    (index: number) => {
+      const all = [...past, present, ...future.slice().reverse()]
+      const clamped = Math.max(0, Math.min(all.length - 1, index))
+      const newPast = all.slice(0, clamped)
+      const newPresent = all[clamped]
+      // Future is everything AFTER the new present, in reverse chronological
+      // order (so pop() picks the most-recently-undone entry first).
+      const newFuture = all.slice(clamped + 1).reverse()
+      setPast(newPast)
+      setPresent(newPresent)
+      setFuture(newFuture)
+    },
+    [past, present, future],
+  )
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey
@@ -77,6 +98,11 @@ export function useHistoryState<T>(initial: T) {
     undo,
     redo,
     reset,
+    jumpTo,
+    /** Past-entries-then-present-then-undone-redoable count. */
+    totalLength: past.length + 1 + future.length,
+    /** Position of `present` in the [past..present..future] timeline. */
+    currentIndex: past.length,
     canUndo: past.length > 0,
     canRedo: future.length > 0,
   }

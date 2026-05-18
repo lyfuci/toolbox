@@ -943,6 +943,24 @@ export type EditorState = {
    * duplicate. Cleared by Flatten Image (everything bakes to pixels).
    */
   smartSources?: { [id: string]: SmartSource }
+  /**
+   * Saved layer composites (PS "Layer Comps"). Each comp is a named
+   * snapshot of the layer tree + image-layer display state. Applying a
+   * comp replaces those fields without touching selection / crop /
+   * transforms. Stored on EditorState so they round-trip through project
+   * save / load and undo / redo.
+   */
+  layerComps?: LayerComp[]
+}
+
+/** One saved layer composite — a named restore point for the layer stack. */
+export type LayerComp = {
+  id: string
+  name: string
+  /** ISO-8601 timestamp captured at save time. Display-only. */
+  createdAt: string
+  layers: Layer[]
+  imageLayer: ImageLayerProps
 }
 
 // Persisted project format (JSON sidecar).

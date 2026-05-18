@@ -667,6 +667,10 @@
         "added": "已添加滤镜到智能对象（非破坏性）",
         "remove": "移除此智能滤镜"
       },
+      "freeTransform": {
+        "useSOHandles": "拖动智能对象上的角点 / 旋转手柄进行变换。",
+        "onlySO": "自由变换当前仅支持智能对象 —— 请先转换该图层。"
+      },
       "imageMenu": {
         "trimmed": "已裁修图像",
         "trimNothing": "没有可裁修的区域 —— 图像没有透明边缘。",
@@ -695,9 +699,42 @@
       "panelInfo": "信息",
       "panelAdjust": "调整",
       "panelNavigator": "导航器",
+      "panelHistory": "历史记录",
+      "panelComps": "图层复合",
+      "panelBrushes": "画笔",
       "panelStubChannels": "通道面板 — 即将推出（按 R/G/B/A 通道分别查看）。",
       "panelStubPaths": "路径面板 — 即将推出（钢笔工具的矢量路径）。",
       "panelStubInfo": "信息面板 — 即将推出（实时光标颜色 / 坐标）。",
+      "channels": {
+        "R": "红",
+        "G": "绿",
+        "B": "蓝",
+        "A": "Alpha",
+        "noImage": "未载入图像。",
+        "readOnlyHint": "只读预览。Alpha 通道在完全不透明的图像上呈白色（属正常）。按通道编辑为 v2 功能。"
+      },
+      "paths": {
+        "empty": "暂无矢量路径。使用钢笔工具开始绘制。"
+      },
+      "history": {
+        "empty": "暂无历史记录 —— 进行编辑后开始记录步骤。",
+        "initial": "初始状态",
+        "step": "步骤 {{n}}"
+      },
+      "layerComps": {
+        "title": "图层复合",
+        "newBtn": "新建",
+        "defaultName": "复合 {{n}}",
+        "empty": "暂无复合。可以捕捉当前图层状态为复合。",
+        "applyHint": "恢复到该复合的图层 + 图像",
+        "delete": "删除复合",
+        "layersCount": "图层",
+        "saved": "已保存图层复合",
+        "applied": "已应用复合 \"{{name}}\""
+      },
+      "brushes": {
+        "customHint": "内置预设。自定义画笔预设为 v2 功能。"
+      },
       "moveToolHint": "移动 (V)：拖动图层；Cmd/Ctrl+J 复制；Delete 删除。",
       "zoomToolHint": "缩放 (Z)：单击放大 2×，Alt 单击缩小。Cmd/Ctrl+滚轮在光标位置缩放。",
       "eyedropperHint": "吸管 (I)：在画布上单击以拾取前景色。",

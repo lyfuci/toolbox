@@ -667,6 +667,10 @@
         "added": "Filter added to Smart Object (non-destructive)",
         "remove": "Remove this Smart Filter"
       },
+      "freeTransform": {
+        "useSOHandles": "Use the corner / rotation handles on this Smart Object to transform.",
+        "onlySO": "Free Transform currently applies to Smart Objects — convert this layer first."
+      },
       "imageMenu": {
         "trimmed": "Image trimmed",
         "trimNothing": "Nothing to trim — image has no transparent border.",
@@ -695,9 +699,42 @@
       "panelInfo": "Info",
       "panelAdjust": "Adjust",
       "panelNavigator": "Navigator",
+      "panelHistory": "History",
+      "panelComps": "Comps",
+      "panelBrushes": "Brushes",
       "panelStubChannels": "Channels panel — coming soon (per-channel R/G/B/A view).",
       "panelStubPaths": "Paths panel — coming soon (vector paths from the Pen tool).",
       "panelStubInfo": "Info panel — coming soon (live cursor color/coords).",
+      "channels": {
+        "R": "Red",
+        "G": "Green",
+        "B": "Blue",
+        "A": "Alpha",
+        "noImage": "No image loaded.",
+        "readOnlyHint": "Read-only preview. Alpha = white on fully opaque images (not a bug). Per-channel editing is a v2 feature."
+      },
+      "paths": {
+        "empty": "No vector paths yet. Use the Pen tool to draw one."
+      },
+      "history": {
+        "empty": "No history yet — make an edit to start recording steps.",
+        "initial": "Initial state",
+        "step": "Step {{n}}"
+      },
+      "layerComps": {
+        "title": "Layer Comps",
+        "newBtn": "New",
+        "defaultName": "Comp {{n}}",
+        "empty": "No comps saved. Capture the current layer state as a comp.",
+        "applyHint": "Restore layers + image to this comp",
+        "delete": "Delete comp",
+        "layersCount": "layers",
+        "saved": "Layer comp saved",
+        "applied": "Applied comp \"{{name}}\""
+      },
+      "brushes": {
+        "customHint": "Built-in presets. Custom brush presets are v2."
+      },
       "moveToolHint": "Move (V): drag layers; Cmd/Ctrl+J duplicate; Delete remove.",
       "zoomToolHint": "Zoom (Z): click to zoom in 2×, Alt-click to zoom out. Cmd/Ctrl+wheel zooms at cursor.",
       "eyedropperHint": "Eyedropper (I): click anywhere on the canvas to set the foreground color.",

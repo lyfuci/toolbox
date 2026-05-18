@@ -51,6 +51,7 @@ export function parseProject(text: string): Project {
       selection: obj.state.selection,
       selectionPath: obj.state.selectionPath,
       smartSources: obj.state.smartSources ?? {},
+      layerComps: obj.state.layerComps ?? [],
     },
   }
 }
