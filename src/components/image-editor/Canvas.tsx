@@ -139,6 +139,11 @@ type Props = {
    * without committing it to history.
    */
   extraPreviewLayer?: Layer
+  /** View > Show Grid — draws light gridlines on top of the rendered canvas
+   *  at `gridStep` preview-pixel intervals. UI-only; never bakes into export. */
+  showGrid?: boolean
+  /** Grid spacing in preview-canvas pixels. Default 50. */
+  gridStep?: number
 }
 
 type Interaction =
@@ -241,6 +246,8 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     cloneSource,
     onCloneNeedSource,
     extraPreviewLayer,
+    showGrid,
+    gridStep = 50,
   },
   ref,
 ) {
@@ -347,6 +354,14 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     if (tool === 'stamp' && cloneSource) {
       drawCloneSourceMarker(canvasRef.current, cloneSource)
     }
+    // View > Show Grid — drawn last so it overlays everything except the
+    // selection chrome (which the renderer already put on top via renderTo).
+    // Grid step is in preview pixels — the live canvas renders at
+    // scale=previewScale so preview-pixel = target-pixel here, no further
+    // scaling needed.
+    if (showGrid) {
+      drawGridOverlay(canvasRef.current, gridStep)
+    }
   }, [
     image,
     effectiveState,
@@ -359,6 +374,8 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     tool,
     cloneSource,
     extraPreviewLayer,
+    showGrid,
+    gridStep,
   ])
 
   useImperativeHandle(
@@ -1683,6 +1700,35 @@ function drawCloneSourceMarker(canvas: HTMLCanvasElement | null, p: Point) {
   ctx.strokeStyle = '#000'
   ctx.lineWidth = 1
   ctx.stroke()
+  ctx.restore()
+}
+
+/**
+ * View > Show Grid. Draw thin grey lines at `stepPx` target-pixel intervals
+ * across the entire canvas. Stays on top of all layers but below the chrome
+ * the renderer drew last (selection marquee + chrome). Never bakes into
+ * export — Canvas only renders this on the live canvas.
+ */
+function drawGridOverlay(canvas: HTMLCanvasElement | null, stepPx: number) {
+  if (!canvas || stepPx < 4) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)'
+  ctx.lineWidth = 1
+  for (let x = stepPx; x < canvas.width; x += stepPx) {
+    ctx.beginPath()
+    ctx.moveTo(x + 0.5, 0)
+    ctx.lineTo(x + 0.5, canvas.height)
+    ctx.stroke()
+  }
+  for (let y = stepPx; y < canvas.height; y += stepPx) {
+    ctx.beginPath()
+    ctx.moveTo(0, y + 0.5)
+    ctx.lineTo(canvas.width, y + 0.5)
+    ctx.stroke()
+  }
   ctx.restore()
 }
 

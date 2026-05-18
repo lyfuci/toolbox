@@ -287,3 +287,100 @@ function resizeSmartObject(
 export function layerEquals(a: Layer, b: Layer): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
 }
+
+/**
+ * Scale a layer's geometry by (sx, sy) — used by Image Size after the
+ * underlying image is resampled, so layer shapes stay anchored to the same
+ * pixels. Operates uniformly across all shape kinds + group children + SO
+ * transforms + masks + clips. Does NOT touch rotation, opacity, blend, or
+ * other non-geometric fields.
+ */
+export function scaleLayer(layer: Layer, sx: number, sy: number): Layer {
+  const clip: { clipRect?: Rect; clipPath?: Point[] } = {}
+  if (layer.clipRect) {
+    clip.clipRect = scaleRect(layer.clipRect, sx, sy)
+  }
+  if (layer.clipPath) {
+    clip.clipPath = layer.clipPath.map((p) => ({ x: p.x * sx, y: p.y * sy }))
+  }
+  if (layer.kind === 'mask') {
+    return { ...layer, ...clip, rects: layer.rects.map((r) => scaleRect(r, sx, sy)) }
+  }
+  if (layer.kind === 'adjustment' || layer.kind === 'filter') {
+    return { ...layer, ...clip }
+  }
+  if (layer.kind === 'group') {
+    return {
+      ...layer,
+      ...clip,
+      children: layer.children.map((c) => scaleLayer(c, sx, sy)),
+    }
+  }
+  if (layer.kind === 'smartObject') {
+    const t = layer.transform
+    return {
+      ...layer,
+      ...clip,
+      transform: {
+        ...t,
+        x: t.x * sx,
+        y: t.y * sy,
+        w: t.w * sx,
+        h: t.h * sy,
+        anchorX: t.anchorX * sx,
+        anchorY: t.anchorY * sy,
+      },
+    }
+  }
+  return { ...layer, ...clip, shape: scaleShape(layer.shape, sx, sy) }
+}
+
+function scaleRect(r: Rect, sx: number, sy: number): Rect {
+  return { x: r.x * sx, y: r.y * sy, w: r.w * sx, h: r.h * sy }
+}
+
+function scaleShape(shape: Shape, sx: number, sy: number): Shape {
+  // Use the average for thickness/font fields where one number must cover both axes.
+  const sAvg = (sx + sy) / 2
+  switch (shape.kind) {
+    case 'rect':
+    case 'mosaic':
+    case 'image':
+    case 'ellipse':
+    case 'blur':
+    case 'frame':
+      return { ...shape, x: shape.x * sx, y: shape.y * sy, w: shape.w * sx, h: shape.h * sy }
+    case 'arrow':
+    case 'line':
+      return {
+        ...shape,
+        x1: shape.x1 * sx,
+        y1: shape.y1 * sy,
+        x2: shape.x2 * sx,
+        y2: shape.y2 * sy,
+        strokeWidth: shape.strokeWidth * sAvg,
+      }
+    case 'text':
+      return { ...shape, x: shape.x * sx, y: shape.y * sy, fontSize: shape.fontSize * sAvg }
+    case 'brush':
+      return {
+        ...shape,
+        points: shape.points.map((p) => ({ x: p.x * sx, y: p.y * sy })),
+        strokeWidth: shape.strokeWidth * sAvg,
+      }
+    case 'note':
+      return { ...shape, x: shape.x * sx, y: shape.y * sy }
+    case 'path':
+      return {
+        ...shape,
+        anchors: shape.anchors.map((a) => ({
+          ...a,
+          x: a.x * sx,
+          y: a.y * sy,
+          hin: a.hin ? { x: a.hin.x * sx, y: a.hin.y * sy } : undefined,
+          hout: a.hout ? { x: a.hout.x * sx, y: a.hout.y * sy } : undefined,
+        })),
+        strokeWidth: shape.strokeWidth * sAvg,
+      }
+  }
+}
