@@ -303,7 +303,7 @@ function renderLayer(
     return
   }
   if (layer.kind === 'mask') {
-    applyMask(ctx, layer, rc.annoScale, canvas.width, canvas.height)
+    applyMask(ctx, layer, rc.annoScale, canvas.width, canvas.height, rc.imageCache)
     return
   }
   if (layer.kind === 'adjustment') {
@@ -740,13 +740,29 @@ function applyMask(
   scale: number,
   w: number,
   h: number,
+  imageCache: ImageCache | undefined,
 ) {
+  // Raster path: when a dataUrl is set and resolved, use its alpha as the
+  // mask via destination-in. The dataUrl is stored at preview-pixel
+  // resolution; drawImage handles the scale to target pixels.
+  if (layer.dataUrl && imageCache) {
+    const cached = imageCache.get(layer.dataUrl)
+    if (cached) {
+      ctx.save()
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.globalCompositeOperation = 'destination-in'
+      ctx.globalAlpha = layer.opacity / 100
+      ctx.drawImage(cached, 0, 0, w, h)
+      ctx.restore()
+      return
+    }
+    // Raster present but not yet loaded — fall through to rect-based so
+    // we don't render an unmasked canvas while waiting.
+  }
   if (layer.rects.length === 0) return
   ctx.save()
   ctx.globalCompositeOperation = 'destination-in'
   ctx.fillStyle = '#000'
-  // Apply mask layer opacity by alpha-fading the mask geometry so partial
-  // opacity erodes the underlying alpha proportionally.
   ctx.globalAlpha = layer.opacity / 100
   ctx.beginPath()
   for (const r of normalizeRects(layer.rects, scale)) {
