@@ -246,8 +246,12 @@ type Interaction =
    */
   | {
       kind: 'mask-painting'
-      /** Either a specific MaskLayer or the editor-wide Quick Mask buffer. */
-      target: { kind: 'layer'; layerId: string } | { kind: 'quickMask' }
+      /** Either a specific layer's mask field or the editor-wide Quick Mask.
+       *  `field` selects which dataUrl on the layer to patch: 'dataUrl' for
+       *  MaskLayer, 'maskDataUrl' for adjustment / filter per-layer masks. */
+      target:
+        | { kind: 'layer'; layerId: string; field: 'dataUrl' | 'maskDataUrl' }
+        | { kind: 'quickMask' }
       offscreen: HTMLCanvasElement
       lastPoint: Point
     }
@@ -728,23 +732,26 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
           }
         }
       }
-      // Raster Layer Mask paint mode: brush / eraser on a selected mask with
-      // dataUrl writes into the mask, not into a new brush layer.
+      // Raster Layer Mask paint mode: brush / eraser on a selected mask
+      // layer (with dataUrl) OR on a selected adjustment/filter layer
+      // (with maskDataUrl) writes into that mask instead of creating a
+      // brush layer. The two cases share the same offscreen pipeline.
       if ((tool === 'brush' || tool === 'eraser') && selectedId && selectedId !== 'image') {
         const sel = findLayerById(state.layers, selectedId)
-        if (sel && sel.kind === 'mask' && sel.dataUrl && sel.w && sel.h && imageCache) {
-          const cached = imageCache.get(sel.dataUrl)
+        const mask = resolveMaskTarget(sel)
+        if (mask && imageCache) {
+          const cached = imageCache.get(mask.dataUrl)
           if (cached) {
             const off = document.createElement('canvas')
-            off.width = sel.w
-            off.height = sel.h
+            off.width = mask.w
+            off.height = mask.h
             const octx = off.getContext('2d')
             if (octx) {
-              octx.drawImage(cached, 0, 0, sel.w, sel.h)
+              octx.drawImage(cached, 0, 0, mask.w, mask.h)
               stampMaskBrush(octx, p, p, toolStrokeWidth, brushOptions, tool === 'eraser' ? '#000000' : toolColor)
               setInteraction({
                 kind: 'mask-painting',
-                target: { kind: 'layer', layerId: sel.id },
+                target: { kind: 'layer', layerId: sel!.id, field: mask.field },
                 offscreen: off,
                 lastPoint: p,
               })
@@ -973,8 +980,21 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
           onUpdateQuickMaskDataUrl?.(dataUrl)
         } else {
           const orig = findLayerById(state.layers, interaction.target.layerId)
-          if (orig && orig.kind === 'mask') {
-            onCommitLayerUpdate(interaction.target.layerId, { ...orig, dataUrl })
+          if (orig) {
+            // MaskLayer.dataUrl vs AdjustmentLayer.maskDataUrl: select the
+            // right field. Other kinds shouldn't appear here (the
+            // mousedown intercept gated on resolveMaskTarget).
+            if (interaction.target.field === 'dataUrl' && orig.kind === 'mask') {
+              onCommitLayerUpdate(interaction.target.layerId, { ...orig, dataUrl })
+            } else if (
+              interaction.target.field === 'maskDataUrl' &&
+              (orig.kind === 'adjustment' || orig.kind === 'filter')
+            ) {
+              onCommitLayerUpdate(interaction.target.layerId, {
+                ...orig,
+                maskDataUrl: dataUrl,
+              })
+            }
           }
         }
       } catch {
@@ -1577,6 +1597,36 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
 
 function cursorForHandle(h: Handle): string {
   return cursorForHandleId(h.id)
+}
+
+/**
+ * Resolve a selected layer to a paintable mask target. Returns the
+ * dataUrl + dims + which field on the layer to patch, or null if the
+ * layer kind doesn't carry a mask the brush can paint.
+ *   - MaskLayer → patches `dataUrl`
+ *   - AdjustmentLayer / FilterLayer with maskDataUrl → patches `maskDataUrl`
+ */
+function resolveMaskTarget(
+  layer: Layer | null,
+): { dataUrl: string; w: number; h: number; field: 'dataUrl' | 'maskDataUrl' } | null {
+  if (!layer) return null
+  if (layer.kind === 'mask' && layer.dataUrl && layer.w && layer.h) {
+    return { dataUrl: layer.dataUrl, w: layer.w, h: layer.h, field: 'dataUrl' }
+  }
+  if (
+    (layer.kind === 'adjustment' || layer.kind === 'filter') &&
+    layer.maskDataUrl &&
+    layer.maskW &&
+    layer.maskH
+  ) {
+    return {
+      dataUrl: layer.maskDataUrl,
+      w: layer.maskW,
+      h: layer.maskH,
+      field: 'maskDataUrl',
+    }
+  }
+  return null
 }
 
 /** Tiny hex → [r, g, b] tuple parser. Used by mask-paint soft stamps. */

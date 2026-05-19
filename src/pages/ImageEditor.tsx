@@ -13,6 +13,7 @@ import { ImageSizeDialog } from '@/components/image-editor/ImageSizeDialog'
 import { LayerStyleDialog } from '@/components/image-editor/LayerStyleDialog'
 import { MenuBar } from '@/components/image-editor/MenuBar'
 import { RotateArbitraryDialog } from '@/components/image-editor/RotateArbitraryDialog'
+import { SaveForWebDialog } from '@/components/image-editor/SaveForWebDialog'
 import { OptionsBar } from '@/components/image-editor/OptionsBar'
 import { RightSidebar } from '@/components/image-editor/RightSidebar'
 import {
@@ -155,7 +156,7 @@ export function ImageEditorPage() {
   const [selectedLayerId, setSelectedLayerId] = useState<string>('image')
 
   const [outFormat, setOutFormat] = useState<OutputFormat>('png')
-  const outQuality = 92
+  const [outQuality, setOutQuality] = useState<number>(92)
 
   const [focused, setFocused] = useState(false)
   const canvasRef = useRef<CanvasHandle | null>(null)
@@ -171,6 +172,12 @@ export function ImageEditorPage() {
     for (const l of walkLayers(state.layers)) {
       if (l.kind === 'mask' && l.dataUrl) {
         ensureImage(l.dataUrl).catch(() => {})
+      }
+      if (
+        (l.kind === 'adjustment' || l.kind === 'filter') &&
+        l.maskDataUrl
+      ) {
+        ensureImage(l.maskDataUrl).catch(() => {})
       }
       for (const fx of l.effects ?? []) {
         if (fx.kind === 'patternOverlay' && fx.patternDataUrl) {
@@ -1191,6 +1198,41 @@ export function ImageEditorPage() {
     setSelectedLayerId(layer.id)
     toast.success(t('pages.imageEditor.maskRaster.created'))
   }, [image, state, ensureImage, history, t])
+
+  /**
+   * Add a per-adjustment / per-filter raster mask to the currently
+   * selected adjustment / filter layer. Initializes the mask to fully
+   * white (entire adjustment passes through). User then paints with the
+   * brush to gate where the adjustment applies.
+   */
+  const handleAddAdjustmentMask = useCallback(async () => {
+    if (!image || !selectedLayerId || selectedLayerId === 'image') return
+    const target = findLayerById(state.layers, selectedLayerId)
+    if (!target || (target.kind !== 'adjustment' && target.kind !== 'filter')) {
+      toast.message(t('pages.imageEditor.adjMask.unsupportedKind'))
+      return
+    }
+    if (target.maskDataUrl) {
+      toast.message(t('pages.imageEditor.adjMask.alreadyHas'))
+      return
+    }
+    const { w, h } = previewDimsOf(image, state)
+    const c = document.createElement('canvas')
+    c.width = w
+    c.height = h
+    const ctx = c.getContext('2d')
+    if (!ctx) return
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, w, h)
+    const dataUrl = c.toDataURL('image/png')
+    try {
+      await ensureImage(dataUrl)
+    } catch {
+      /* still usable */
+    }
+    patchLayer(target.id, { maskDataUrl: dataUrl, maskW: w, maskH: h })
+    toast.success(t('pages.imageEditor.adjMask.added'))
+  }, [image, selectedLayerId, state, ensureImage, patchLayer, t])
 
   /**
    * Convert a rect-based MaskLayer into a raster mask. Rasterizes the
@@ -2315,6 +2357,28 @@ export function ImageEditorPage() {
   )
   const handleDownload = useCallback(() => exportImage(), [exportImage])
 
+  const [saveForWebOpen, setSaveForWebOpen] = useState(false)
+  // Increment-on-open counter that re-keys the SaveForWeb dialog so its
+  // internal full-resolution canvas is freshly painted from current
+  // editor state every time it opens. Without this the dialog cached
+  // the canvas from first open and showed stale previews on reopen.
+  const [saveForWebOpenSeq, setSaveForWebOpenSeq] = useState(0)
+  const renderExportTo = useCallback(
+    (c: HTMLCanvasElement) => canvasRef.current?.exportTo(c),
+    [],
+  )
+  const handleSaveForWebSave = useCallback(
+    (args: { format: OutputFormat; quality: number; blob: Blob }) => {
+      setOutFormat(args.format)
+      setOutQuality(args.quality)
+      const ext = args.format === 'jpeg' ? 'jpg' : args.format
+      triggerDownload(args.blob, `${filename}_edited.${ext}`)
+      toast.success(t('pages.imageEditor.downloaded', { format: args.format.toUpperCase() }))
+      setSaveForWebOpen(false)
+    },
+    [filename, t],
+  )
+
   const handleSaveProject = useCallback(() => {
     if (!image) return
     const blob = serializeProject({ image, filename, state })
@@ -2381,6 +2445,10 @@ export function ImageEditorPage() {
             exportPng: () => exportImage('png'),
             exportJpeg: () => exportImage('jpeg'),
             exportWebp: () => exportImage('webp'),
+            saveForWeb: () => {
+              setSaveForWebOpenSeq((n) => n + 1)
+              setSaveForWebOpen(true)
+            },
             undo: history.undo,
             redo: history.redo,
             canUndo: history.canUndo,
@@ -2444,6 +2512,12 @@ export function ImageEditorPage() {
               if (!selectedLayerId || selectedLayerId === 'image') return false
               const l = findLayerById(state.layers, selectedLayerId)
               return !!l && l.kind === 'mask' && !l.dataUrl
+            })(),
+            addAdjustmentMask: handleAddAdjustmentMask,
+            isAdjustmentOrFilterSelected: (() => {
+              if (!selectedLayerId || selectedLayerId === 'image') return false
+              const l = findLayerById(state.layers, selectedLayerId)
+              return !!l && (l.kind === 'adjustment' || l.kind === 'filter') && !l.maskDataUrl
             })(),
             openLayerStyle: handleOpenLayerStyle,
             zoomIn,
@@ -2712,6 +2786,17 @@ export function ImageEditorPage() {
         onApply={handleRotateArbitraryApply}
         onCancel={() => setRotateOpen(false)}
       />
+      {image && (
+        <SaveForWebDialog
+          key={`sfw-${saveForWebOpenSeq}`}
+          open={saveForWebOpen}
+          initialFormat={outFormat}
+          initialQuality={outQuality}
+          renderToCanvas={renderExportTo}
+          onSave={handleSaveForWebSave}
+          onCancel={() => setSaveForWebOpen(false)}
+        />
+      )}
       <ColorPickerDialog
         open={colorPicker !== null}
         initial={colorPicker === 'bg' ? colors.bg : colors.fg}

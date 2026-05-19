@@ -554,6 +554,7 @@
         "exportPng": "导出为 PNG",
         "exportJpeg": "导出为 JPEG",
         "exportWebp": "导出为 WebP",
+        "saveForWeb": "存储为 Web 所用格式",
         "undo": "撤销",
         "redo": "重做",
         "rotate90": "旋转 90°",
@@ -574,6 +575,7 @@
         "releaseClippingMask": "释放剪贴蒙版",
         "newRasterMask": "新建栅格蒙版图层",
         "convertMaskToRaster": "蒙版转换为栅格",
+        "addAdjustmentMask": "为调整图层添加蒙版",
         "imageSize": "图像大小",
         "canvasSize": "画布大小",
         "rotateArbitrary": "任意角度旋转",
@@ -664,7 +666,8 @@
         "applied": "图像已旋转"
       },
       "colorPicker": {
-        "title": "拾色器"
+        "title": "拾色器",
+        "eyedropper": "从屏幕取色（仅 Chromium 内核）"
       },
       "clippingMask": {
         "created": "已创建剪贴蒙版 —— 图层被下方图层蒙版剪贴",
@@ -676,6 +679,19 @@
         "exited": "已退出快速蒙版 —— 选区已更新为蒙版包围盒",
         "exitedNoSel": "已退出快速蒙版 —— 蒙版未加载，选区未变",
         "exitedEmpty": "已退出快速蒙版 —— 没有选中的像素"
+      },
+      "saveForWeb": {
+        "title": "存储为 Web 格式",
+        "format": "格式",
+        "quality": "品质",
+        "size": "估计大小：{{kb}} KB",
+        "computing": "计算中…",
+        "save": "保存"
+      },
+      "adjMask": {
+        "added": "已为图层添加蒙版 —— 用画笔涂抹以控制效果作用范围",
+        "alreadyHas": "该图层已有调整蒙版。",
+        "unsupportedKind": "调整蒙版仅适用于调整 / 滤镜图层。"
       },
       "maskRaster": {
         "defaultName": "栅格蒙版",

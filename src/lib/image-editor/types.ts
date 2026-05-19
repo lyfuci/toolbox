@@ -752,6 +752,16 @@ export type AdjustmentKind = AdjustmentParams['kind']
 export type AdjustmentLayer = LayerCommon & {
   kind: 'adjustment'
   params: AdjustmentParams
+  /**
+   * Per-adjustment raster mask. When set, the adjustment's effect is
+   * gated by this mask's alpha — white areas get the full adjustment,
+   * black areas pass through unmodified, grey areas blend. Same dataUrl
+   * format as a Layer Mask layer; resolved via the same imageCache.
+   * `maskW / maskH` are preview-pixel dims for the raster.
+   */
+  maskDataUrl?: string
+  maskW?: number
+  maskH?: number
 }
 
 // ── Filter layer ─────────────────────────────────────────────────────────
@@ -847,6 +857,10 @@ export type FilterKind = FilterParams['kind']
 export type FilterLayer = LayerCommon & {
   kind: 'filter'
   params: FilterParams
+  /** Per-filter raster mask — same semantics as AdjustmentLayer.maskDataUrl. */
+  maskDataUrl?: string
+  maskW?: number
+  maskH?: number
 }
 
 /**

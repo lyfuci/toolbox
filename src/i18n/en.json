@@ -554,6 +554,7 @@
         "exportPng": "Export as PNG",
         "exportJpeg": "Export as JPEG",
         "exportWebp": "Export as WebP",
+        "saveForWeb": "Save for Web",
         "undo": "Undo",
         "redo": "Redo",
         "rotate90": "Rotate 90° CW",
@@ -574,6 +575,7 @@
         "releaseClippingMask": "Release Clipping Mask",
         "newRasterMask": "New Raster Mask Layer",
         "convertMaskToRaster": "Convert Mask to Raster",
+        "addAdjustmentMask": "Add Mask to Adjustment",
         "imageSize": "Image Size",
         "canvasSize": "Canvas Size",
         "rotateArbitrary": "Arbitrary Rotation",
@@ -664,7 +666,8 @@
         "applied": "Image rotated"
       },
       "colorPicker": {
-        "title": "Color Picker"
+        "title": "Color Picker",
+        "eyedropper": "Pick from screen (Chromium-only)"
       },
       "clippingMask": {
         "created": "Clipping mask created — layer masked to layer below",
@@ -676,6 +679,19 @@
         "exited": "Quick Mask exited — selection updated to mask bbox",
         "exitedNoSel": "Quick Mask exited — mask wasn't loaded, selection unchanged",
         "exitedEmpty": "Quick Mask exited — no selected pixels"
+      },
+      "saveForWeb": {
+        "title": "Save for Web",
+        "format": "Format",
+        "quality": "Quality",
+        "size": "Estimated size: {{kb}} KB",
+        "computing": "Estimating size…",
+        "save": "Save"
+      },
+      "adjMask": {
+        "added": "Mask added to layer — paint with the brush to gate where the effect applies",
+        "alreadyHas": "This layer already has an adjustment mask.",
+        "unsupportedKind": "Adjustment masks apply only to adjustment / filter layers."
       },
       "maskRaster": {
         "defaultName": "Raster Mask",
