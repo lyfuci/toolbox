@@ -13,8 +13,10 @@ import { ImageSizeDialog } from '@/components/image-editor/ImageSizeDialog'
 import { LayerStyleDialog } from '@/components/image-editor/LayerStyleDialog'
 import { MenuBar } from '@/components/image-editor/MenuBar'
 import { RotateArbitraryDialog } from '@/components/image-editor/RotateArbitraryDialog'
+import { NewDocumentDialog } from '@/components/image-editor/NewDocumentDialog'
 import { SaveForWebDialog } from '@/components/image-editor/SaveForWebDialog'
 import { OptionsBar } from '@/components/image-editor/OptionsBar'
+import { CROP_ASPECTS } from '@/lib/image-editor/crop-presets'
 import { RightSidebar } from '@/components/image-editor/RightSidebar'
 import {
   SelectModifyDialog,
@@ -147,6 +149,10 @@ export function ImageEditorPage() {
   const [customBrushPresets, setCustomBrushPresets] = useState<BrushPreset[]>(() =>
     loadCustomBrushPresets(),
   )
+  const [cropAspectId, setCropAspectId] = useState<string>('free')
+  // Hoisted up so the Ctrl+N keyboard handler (declared above its handler
+  // function below) compiles without a "used before declared" lint flag.
+  const [newDocOpen, setNewDocOpen] = useState(false)
   const [bucketTolerance, setBucketTolerance] = useState(32)
   const [wandTolerance, setWandTolerance] = useState(32)
   // Clone Stamp source point — set by Alt+click while the Stamp tool is
@@ -349,6 +355,11 @@ export function ImageEditorPage() {
         if (e.key === 's' || e.key === 'S') {
           e.preventDefault()
           saveProjectRef.current()
+          return
+        }
+        if (e.key === 'n' || e.key === 'N') {
+          e.preventDefault()
+          setNewDocOpen(true)
           return
         }
         if (e.key === 'o' || e.key === 'O') {
@@ -1235,6 +1246,37 @@ export function ImageEditorPage() {
   }, [image, selectedLayerId, state, ensureImage, patchLayer, t])
 
   /**
+   * Remove Mask — clears the mask on the selected layer.
+   *   - MaskLayer: deletes the layer entirely (it IS the mask).
+   *   - Adjustment / Filter with maskDataUrl: clears the mask fields,
+   *     leaving the adjustment to apply everywhere again.
+   */
+  const handleRemoveMask = useCallback(() => {
+    if (!selectedLayerId || selectedLayerId === 'image') return
+    const target = findLayerById(state.layers, selectedLayerId)
+    if (!target) return
+    if (target.kind === 'mask') {
+      deleteLayer(target.id)
+      toast.success(t('pages.imageEditor.maskActions.removedMaskLayer'))
+      return
+    }
+    if (target.kind === 'adjustment' || target.kind === 'filter') {
+      if (!target.maskDataUrl) {
+        toast.message(t('pages.imageEditor.maskActions.noMaskToRemove'))
+        return
+      }
+      patchLayer(target.id, {
+        maskDataUrl: undefined,
+        maskW: undefined,
+        maskH: undefined,
+      })
+      toast.success(t('pages.imageEditor.maskActions.removedAdjMask'))
+      return
+    }
+    toast.message(t('pages.imageEditor.maskActions.noMaskToRemove'))
+  }, [selectedLayerId, state.layers, patchLayer, deleteLayer, t])
+
+  /**
    * Convert a rect-based MaskLayer into a raster mask. Rasterizes the
    * existing rects (white inside, black outside) onto a fresh canvas at
    * preview-pixel resolution and replaces `rects` with `dataUrl`.
@@ -1301,19 +1343,33 @@ export function ImageEditorPage() {
         history.set({ ...state, quickMask: undefined })
         return
       }
-      // Find bbox of pixels brighter than mid-grey (= "selected").
+      // Scan-line polygon contour. For each row, record leftmost +
+      // rightmost "selected" (lum > 127) pixel. Build the polygon
+      // outline as the left side top→bottom + right side bottom→top.
+      // Convex-ish shapes get a good approximation; concave / disjoint
+      // shapes degrade to the union's outer envelope. Bbox is also
+      // computed as a fallback.
+      const leftCol: Array<{ y: number; x: number }> = []
+      const rightCol: Array<{ y: number; x: number }> = []
       let minX = c.width, minY = c.height, maxX = -1, maxY = -1
       for (let y = 0; y < c.height; y++) {
+        let xL = -1
+        let xR = -1
         for (let x = 0; x < c.width; x++) {
           const i = (y * c.width + x) * 4
-          // Luminance estimate (R+G+B) / 3 > 127 → selected
           const lum = (data.data[i] + data.data[i + 1] + data.data[i + 2]) / 3
           if (lum > 127) {
+            if (xL < 0) xL = x
+            xR = x
             if (x < minX) minX = x
-            if (y < minY) minY = y
             if (x > maxX) maxX = x
-            if (y > maxY) maxY = y
           }
+        }
+        if (xL >= 0) {
+          leftCol.push({ y, x: xL })
+          rightCol.push({ y, x: xR })
+          if (y < minY) minY = y
+          if (y > maxY) maxY = y
         }
       }
       if (maxX < 0) {
@@ -1326,11 +1382,20 @@ export function ImageEditorPage() {
         toast.message(t('pages.imageEditor.quickMask.exitedEmpty'))
         return
       }
+      // Sample every Kth row to keep the polygon point count under a
+      // few hundred even for tall masks. K is chosen so we land around
+      // 200 polygon points total (L + R).
+      const stride = Math.max(1, Math.floor(leftCol.length / 100))
+      const path: Array<{ x: number; y: number }> = []
+      for (let i = 0; i < leftCol.length; i += stride) path.push(leftCol[i])
+      if (leftCol.length > 0) path.push(leftCol[leftCol.length - 1])
+      for (let i = rightCol.length - 1; i >= 0; i -= stride) path.push(rightCol[i])
+      if (rightCol.length > 0) path.push(rightCol[0])
       history.set({
         ...state,
         quickMask: undefined,
         selection: { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 },
-        selectionPath: undefined,
+        selectionPath: path.length >= 3 ? path : undefined,
         selectionInverse: false,
       })
       toast.success(t('pages.imageEditor.quickMask.exited'))
@@ -2357,6 +2422,30 @@ export function ImageEditorPage() {
   )
   const handleDownload = useCallback(() => exportImage(), [exportImage])
 
+  const handleNewDocument = useCallback(
+    async (args: { w: number; h: number; bgColor: string }) => {
+      const c = document.createElement('canvas')
+      c.width = args.w
+      c.height = args.h
+      const ctx = c.getContext('2d')
+      if (!ctx) return
+      ctx.fillStyle = args.bgColor
+      ctx.fillRect(0, 0, args.w, args.h)
+      try {
+        const img = await loadImageFromUrl(c.toDataURL('image/png'))
+        setImage(img)
+        setFilename('untitled')
+        history.reset(initialState())
+        setSelectedLayerId('image')
+        setNewDocOpen(false)
+        toast.success(t('pages.imageEditor.newDoc.created'))
+      } catch {
+        toast.error(t('pages.imageEditor.errLoadFailed'))
+      }
+    },
+    [history, t],
+  )
+
   const [saveForWebOpen, setSaveForWebOpen] = useState(false)
   // Increment-on-open counter that re-keys the SaveForWeb dialog so its
   // internal full-resolution canvas is freshly painted from current
@@ -2440,6 +2529,7 @@ export function ImageEditorPage() {
         <MenuBar
           handlers={{
             open: () => replaceInputRef.current?.click(),
+            newDocument: () => setNewDocOpen(true),
             save: handleSaveProject,
             download: handleDownload,
             exportPng: () => exportImage('png'),
@@ -2519,6 +2609,15 @@ export function ImageEditorPage() {
               const l = findLayerById(state.layers, selectedLayerId)
               return !!l && (l.kind === 'adjustment' || l.kind === 'filter') && !l.maskDataUrl
             })(),
+            removeMask: handleRemoveMask,
+            canRemoveMask: (() => {
+              if (!selectedLayerId || selectedLayerId === 'image') return false
+              const l = findLayerById(state.layers, selectedLayerId)
+              if (!l) return false
+              if (l.kind === 'mask') return true
+              if ((l.kind === 'adjustment' || l.kind === 'filter') && l.maskDataUrl) return true
+              return false
+            })(),
             openLayerStyle: handleOpenLayerStyle,
             zoomIn,
             zoomOut,
@@ -2552,6 +2651,8 @@ export function ImageEditorPage() {
           isStubTool={STUB_TOOLS.has(tool)}
           hasActiveCrop={!!state.cropRect}
           onClearCrop={handleClearCrop}
+          cropAspectId={cropAspectId}
+          setCropAspectId={setCropAspectId}
           hasSelection={!!state.selection}
           onClearSelection={() =>
             history.set({ ...state, selection: undefined, selectionPath: undefined })
@@ -2646,6 +2747,7 @@ export function ImageEditorPage() {
               showGrid={showGrid}
               gridStep={gridStep}
               quickMaskDataUrl={state.quickMask?.dataUrl}
+              cropAspect={CROP_ASPECTS.find((a) => a.id === cropAspectId)?.ratio ?? undefined}
               onUpdateQuickMaskDataUrl={async (dataUrl) => {
                 if (!state.quickMask) return
                 // Await load so the renderer's next pass sees the new
@@ -2785,6 +2887,11 @@ export function ImageEditorPage() {
         open={rotateOpen}
         onApply={handleRotateArbitraryApply}
         onCancel={() => setRotateOpen(false)}
+      />
+      <NewDocumentDialog
+        open={newDocOpen}
+        onCreate={handleNewDocument}
+        onCancel={() => setNewDocOpen(false)}
       />
       {image && (
         <SaveForWebDialog

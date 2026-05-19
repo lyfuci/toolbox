@@ -726,6 +726,31 @@ export type ChannelMixerParams = {
   bOutB: number
   bConstant: number
 }
+/**
+ * Gradient Map — map each pixel's luminance to a 2-stop gradient. White
+ * pixels get `endColor`, black pixels get `color`, mid-tones interpolate.
+ * Classic PS "Image > Adjustments > Gradient Map" for stylized colour
+ * grading or duotone-style effects.
+ */
+export type GradientMapParams = {
+  kind: 'gradientMap'
+  color: string // start (luminance = 0)
+  endColor: string // end (luminance = 255)
+}
+
+/**
+ * Photo Filter — tinted overlay simulating warming / cooling filters
+ * placed over the camera lens. `density` controls how much of the tint
+ * blends in (0..100%). `preserveLuminosity` keeps the original brightness
+ * — without it, dark scenes lose contrast under heavy filters.
+ */
+export type PhotoFilterParams = {
+  kind: 'photoFilter'
+  color: string
+  density: number // 0..100
+  preserveLuminosity: boolean
+}
+
 export type AdjustmentParams =
   | LevelsParams
   | CurvesParams
@@ -738,6 +763,8 @@ export type AdjustmentParams =
   | VibranceParams
   | ExposureParams
   | ChannelMixerParams
+  | GradientMapParams
+  | PhotoFilterParams
 
 export type AdjustmentKind = AdjustmentParams['kind']
 

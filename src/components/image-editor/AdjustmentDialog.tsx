@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 import { Slider } from './Slider'
 import { CurvesEditor } from './CurvesEditor'
 import { DEFAULT_FOR_KIND } from '@/lib/image-editor/adjustments'
@@ -19,6 +20,8 @@ import type {
   CurvesParams,
   ChannelMixerParams,
   ExposureParams,
+  GradientMapParams,
+  PhotoFilterParams,
   HueSaturationParams,
   LevelsParams,
   PosterizeParams,
@@ -140,6 +143,12 @@ function AdjustmentDialogInner({
         )}
         {draft.kind === 'channelMixer' && (
           <ChannelMixerForm value={draft} onChange={update} />
+        )}
+        {draft.kind === 'gradientMap' && (
+          <GradientMapForm value={draft} onChange={update} />
+        )}
+        {draft.kind === 'photoFilter' && (
+          <PhotoFilterForm value={draft} onChange={update} />
         )}
       </div>
       <DialogFooter>
@@ -514,6 +523,129 @@ function ChannelMixerForm({
           </div>
         )
       })}
+    </>
+  )
+}
+
+/**
+ * Gradient Map form. Two colour pickers (black → end of luminance ramp).
+ * No other knobs in v1 — Photoshop's gradient editor with multi-stop
+ * gradients is bigger than this dialog should be.
+ */
+function GradientMapForm({
+  value,
+  onChange,
+}: {
+  value: GradientMapParams
+  onChange: (patch: Partial<GradientMapParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <Label className="w-24 text-xs text-muted-foreground">
+          {t('pages.imageEditor.adjustments.gradientMapStops.dark')}
+        </Label>
+        <input
+          type="color"
+          value={value.color}
+          onChange={(e) => onChange({ color: e.target.value })}
+          className="h-7 w-12 cursor-pointer rounded border border-input bg-transparent"
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <Label className="w-24 text-xs text-muted-foreground">
+          {t('pages.imageEditor.adjustments.gradientMapStops.light')}
+        </Label>
+        <input
+          type="color"
+          value={value.endColor}
+          onChange={(e) => onChange({ endColor: e.target.value })}
+          className="h-7 w-12 cursor-pointer rounded border border-input bg-transparent"
+        />
+      </div>
+    </>
+  )
+}
+
+/**
+ * Photo Filter form. Preset chooser + custom color + density slider +
+ * preserve-luminosity toggle. The presets match Photoshop's: 85 warming,
+ * 80 cooling, sepia, etc.
+ */
+const PHOTO_FILTER_PRESETS: Array<{ label: string; color: string }> = [
+  { label: 'warming85', color: '#ec8a00' },
+  { label: 'warming81', color: '#ebb113' },
+  { label: 'cooling80', color: '#006dff' },
+  { label: 'cooling82', color: '#00b5ff' },
+  { label: 'sepia', color: '#ac7a33' },
+  { label: 'red', color: '#ea1d22' },
+  { label: 'green', color: '#00a651' },
+  { label: 'blue', color: '#0072bc' },
+]
+function PhotoFilterForm({
+  value,
+  onChange,
+}: {
+  value: PhotoFilterParams
+  onChange: (patch: Partial<PhotoFilterParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <Label className="w-24 text-xs text-muted-foreground">
+          {t('pages.imageEditor.adjustments.photoFilterPreset')}
+        </Label>
+        <select
+          value={
+            PHOTO_FILTER_PRESETS.find((p) => p.color === value.color)?.label ??
+            'custom'
+          }
+          onChange={(e) => {
+            const found = PHOTO_FILTER_PRESETS.find((p) => p.label === e.target.value)
+            if (found) onChange({ color: found.color })
+          }}
+          className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+        >
+          {PHOTO_FILTER_PRESETS.map((p) => (
+            <option key={p.label} value={p.label}>
+              {t(`pages.imageEditor.adjustments.photoFilterPresets.${p.label}`)}
+            </option>
+          ))}
+          <option value="custom">
+            {t('pages.imageEditor.adjustments.photoFilterPresets.custom')}
+          </option>
+        </select>
+      </div>
+      <div className="flex items-center gap-2">
+        <Label className="w-24 text-xs text-muted-foreground">
+          {t('pages.imageEditor.adjustments.photoFilterColor')}
+        </Label>
+        <input
+          type="color"
+          value={value.color}
+          onChange={(e) => onChange({ color: e.target.value })}
+          className="h-7 w-12 cursor-pointer rounded border border-input bg-transparent"
+        />
+      </div>
+      <Slider
+        label={t('pages.imageEditor.adjustments.photoFilterDensity')}
+        value={value.density}
+        min={0}
+        max={100}
+        unit="%"
+        onChange={(v) => onChange({ density: v })}
+      />
+      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={value.preserveLuminosity}
+          onChange={(e) => onChange({ preserveLuminosity: e.target.checked })}
+          className="h-3.5 w-3.5 accent-primary"
+        />
+        {t('pages.imageEditor.adjustments.photoFilterPreserveLum')}
+      </label>
     </>
   )
 }

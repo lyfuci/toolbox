@@ -150,6 +150,9 @@ type Props = {
   /** Quick Mask overlay — when present, render red rubylith over the
    *  canvas where the mask alpha is low. Resolved via imageCache. */
   quickMaskDataUrl?: string
+  /** Crop tool aspect-ratio constraint as width/height (e.g. 1.0 = 1:1,
+   *  16/9 ≈ 1.78). Undefined / 0 = free crop. */
+  cropAspect?: number
   /** Called on Quick Mask brush stroke commit with the new dataUrl. */
   onUpdateQuickMaskDataUrl?: (dataUrl: string) => void
 }
@@ -287,6 +290,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     gridStep = 50,
     quickMaskDataUrl,
     onUpdateQuickMaskDataUrl,
+    cropAspect,
   },
   ref,
 ) {
@@ -401,10 +405,15 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     if (showGrid) {
       drawGridOverlay(canvasRef.current, gridStep)
     }
-    // Quick Mask rubylith — render BEFORE in-progress paint preview so a
-    // brush stroke on the mask is reflected in the next render after
-    // the dataUrl updates.
-    if (quickMaskDataUrl && imageCache) {
+    // Quick Mask rubylith — show the in-progress offscreen during a stroke
+    // (live preview for both add-to-selection and subtract-from-selection),
+    // otherwise the committed dataUrl from the cache.
+    if (
+      interaction.kind === 'mask-painting' &&
+      interaction.target.kind === 'quickMask'
+    ) {
+      drawQuickMaskOverlay(canvasRef.current, interaction.offscreen)
+    } else if (quickMaskDataUrl && imageCache) {
       const qmImg = imageCache.get(quickMaskDataUrl)
       if (qmImg) drawQuickMaskOverlay(canvasRef.current, qmImg)
     }
@@ -828,9 +837,17 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
 
     if (interaction.kind === 'crop-drawing') {
       const r = interaction.rect
+      const dw = p.x - r.x
+      let dh = p.y - r.y
+      // Aspect-ratio constraint (PS Crop tool preset). Keep w sign;
+      // derive h from |w| × ratio, preserving the user's drag direction.
+      if (cropAspect && cropAspect > 0) {
+        const sigH = dh < 0 ? -1 : 1
+        dh = sigH * Math.abs(dw) / cropAspect
+      }
       setInteraction({
         kind: 'crop-drawing',
-        rect: { x: r.x, y: r.y, w: p.x - r.x, h: p.y - r.y },
+        rect: { x: r.x, y: r.y, w: dw, h: dh },
       })
       return
     }

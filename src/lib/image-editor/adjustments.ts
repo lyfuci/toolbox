@@ -5,9 +5,11 @@ import type {
   ColorBalanceParams,
   CurvesParams,
   ExposureParams,
+  GradientMapParams,
   HueSaturationParams,
   InvertParams,
   LevelsParams,
+  PhotoFilterParams,
   PosterizeParams,
   ThresholdParams,
   VibranceParams,
@@ -86,6 +88,18 @@ export const DEFAULT_CHANNEL_MIXER: ChannelMixerParams = {
   gOutR: 0, gOutG: 100, gOutB: 0, gConstant: 0,
   bOutR: 0, bOutG: 0, bOutB: 100, bConstant: 0,
 }
+export const DEFAULT_GRADIENT_MAP: GradientMapParams = {
+  kind: 'gradientMap',
+  color: '#000000',
+  endColor: '#ffffff',
+}
+export const DEFAULT_PHOTO_FILTER: PhotoFilterParams = {
+  kind: 'photoFilter',
+  // Warming Filter (85) — PS preset value
+  color: '#ec8a00',
+  density: 25,
+  preserveLuminosity: true,
+}
 
 export const DEFAULT_FOR_KIND: Record<
   AdjustmentParams['kind'],
@@ -102,6 +116,8 @@ export const DEFAULT_FOR_KIND: Record<
   vibrance: DEFAULT_VIBRANCE,
   exposure: DEFAULT_EXPOSURE,
   channelMixer: DEFAULT_CHANNEL_MIXER,
+  gradientMap: DEFAULT_GRADIENT_MAP,
+  photoFilter: DEFAULT_PHOTO_FILTER,
 }
 
 export function applyAdjustment(
@@ -142,7 +158,80 @@ export function applyAdjustment(
     case 'channelMixer':
       applyChannelMixer(data, params)
       return
+    case 'gradientMap':
+      applyGradientMap(data, params)
+      return
+    case 'photoFilter':
+      applyPhotoFilter(data, params)
+      return
   }
+}
+
+/**
+ * Gradient Map — for each pixel, compute luminance (Rec. 601), interpolate
+ * `color` → `endColor` at that t, write back. Precompute a 256-entry LUT
+ * for the three output channels so the hot loop is just three array
+ * lookups per pixel.
+ */
+function applyGradientMap(data: Uint8ClampedArray, p: GradientMapParams): void {
+  const [r0, g0, b0] = parseHex(p.color)
+  const [r1, g1, b1] = parseHex(p.endColor)
+  const lutR = new Uint8ClampedArray(256)
+  const lutG = new Uint8ClampedArray(256)
+  const lutB = new Uint8ClampedArray(256)
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255
+    lutR[i] = clamp255(r0 + (r1 - r0) * t)
+    lutG[i] = clamp255(g0 + (g1 - g0) * t)
+    lutB[i] = clamp255(b0 + (b1 - b0) * t)
+  }
+  for (let i = 0; i < data.length; i += 4) {
+    // Rec. 601 luminance — fast and close to human-perceived brightness.
+    const lum = (data[i] * 299 + data[i + 1] * 587 + data[i + 2] * 114) / 1000
+    const l = lum | 0
+    data[i] = lutR[l]
+    data[i + 1] = lutG[l]
+    data[i + 2] = lutB[l]
+  }
+}
+
+/**
+ * Photo Filter — blend the chosen tint into each pixel by `density`
+ * percent. When `preserveLuminosity` is true, the result's luminance is
+ * adjusted back to the source's so heavy filters don't darken the scene.
+ */
+function applyPhotoFilter(data: Uint8ClampedArray, p: PhotoFilterParams): void {
+  const [tR, tG, tB] = parseHex(p.color)
+  const d = p.density / 100
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i]
+    const g = data[i + 1]
+    const b = data[i + 2]
+    let nr = r * (1 - d) + tR * d
+    let ng = g * (1 - d) + tG * d
+    let nb = b * (1 - d) + tB * d
+    if (p.preserveLuminosity) {
+      const srcLum = (r * 299 + g * 587 + b * 114) / 1000
+      const newLum = (nr * 299 + ng * 587 + nb * 114) / 1000
+      if (newLum > 0) {
+        const k = srcLum / newLum
+        nr *= k
+        ng *= k
+        nb *= k
+      }
+    }
+    data[i] = clamp255(nr)
+    data[i + 1] = clamp255(ng)
+    data[i + 2] = clamp255(nb)
+  }
+}
+
+function parseHex(hex: string): [number, number, number] {
+  let s = hex.trim().replace('#', '')
+  if (s.length === 3) s = s.split('').map((c) => c + c).join('')
+  if (s.length !== 6) return [0, 0, 0]
+  const n = parseInt(s, 16)
+  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
 }
 
 /**
