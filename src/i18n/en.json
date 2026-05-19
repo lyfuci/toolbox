@@ -483,6 +483,23 @@
           "outB": "Output: Blue",
           "constant": "Constant"
         },
+        "cameraRaw": {
+          "title": "Camera Raw",
+          "wb": "White Balance",
+          "tone": "Tone",
+          "presence": "Presence",
+          "temperature": "Temperature",
+          "tint": "Tint",
+          "exposure": "Exposure",
+          "highlights": "Highlights",
+          "shadows": "Shadows",
+          "whites": "Whites",
+          "blacks": "Blacks",
+          "clarity": "Clarity",
+          "dehaze": "Dehaze",
+          "vibrance": "Vibrance",
+          "saturation": "Saturation"
+        },
         "inputBlack": "Input black",
         "inputWhite": "Input white",
         "outputBlack": "Output black",
@@ -599,6 +616,7 @@
         "convertMaskToRaster": "Convert Mask to Raster",
         "addAdjustmentMask": "Add Mask to Adjustment",
         "removeMask": "Remove Mask",
+        "applyMask": "Apply Mask",
         "imageSize": "Image Size",
         "canvasSize": "Canvas Size",
         "rotateArbitrary": "Arbitrary Rotation",
@@ -734,7 +752,12 @@
       "maskActions": {
         "removedMaskLayer": "Mask layer removed",
         "removedAdjMask": "Adjustment mask removed",
-        "noMaskToRemove": "No mask on the selected layer."
+        "noMaskToRemove": "No mask on the selected layer.",
+        "applied": "Mask applied — baked into the layer below",
+        "applyOnlyMask": "Apply Mask works on a Mask layer.",
+        "applyEmptyMask": "Mask is empty — nothing to apply.",
+        "applyNoTarget": "No layer beneath this mask to apply it to.",
+        "applyTargetUnsupported": "Apply Mask needs an image / shape / Smart Object below — adjustment, filter, and mask layers can't be baked."
       },
       "adjMask": {
         "added": "Mask added to layer — paint with the brush to gate where the effect applies",
@@ -789,6 +812,7 @@
       "panelHistory": "History",
       "panelComps": "Comps",
       "panelBrushes": "Brushes",
+      "panelActions": "Actions",
       "panelStubChannels": "Channels panel — coming soon (per-channel R/G/B/A view).",
       "panelStubPaths": "Paths panel — coming soon (vector paths from the Pen tool).",
       "panelStubInfo": "Info panel — coming soon (live cursor color/coords).",
@@ -819,6 +843,23 @@
         "saved": "Layer comp saved",
         "applied": "Applied comp \"{{name}}\""
       },
+      "actions": {
+        "saveSnapshot": "Snapshot",
+        "record": "Record",
+        "stop": "Stop",
+        "play": "Play action",
+        "delete": "Delete action",
+        "defaultSnapshot": "Snapshot {{n}}",
+        "defaultRecording": "Recording {{n}}",
+        "recording": "Recording \"{{name}}\" — {{n}} step(s)",
+        "recordStarted": "Recording started — every edit becomes a step",
+        "recordSaved": "Action saved ({{n}} steps)",
+        "recordEmpty": "Recording ended with no edits — nothing to save",
+        "recordCancelled": "Recording cancelled",
+        "snapshotSaved": "Snapshot saved",
+        "played": "Played \"{{name}}\"",
+        "empty": "No actions yet. Save a snapshot or start a recording."
+      },
       "brushes": {
         "customHint": "Built-in presets. Custom brush presets are v2.",
         "builtIn": "Built-in",
@@ -826,7 +867,10 @@
         "saveCurrent": "Save",
         "defaultName": "Brush {{n}}",
         "emptyCustom": "Save the current brush settings as a preset.",
-        "deleteCustom": "Delete preset"
+        "deleteCustom": "Delete preset",
+        "importTip": "Import tip",
+        "importTipHint": "Import an image file as a brush tip stamp (PNG with transparency works best).",
+        "importTipDone": "Brush tip imported: {{name}}"
       },
       "moveToolHint": "Move (V): drag layers; Cmd/Ctrl+J duplicate; Delete remove.",
       "zoomToolHint": "Zoom (Z): click to zoom in 2×, Alt-click to zoom out. Cmd/Ctrl+wheel zooms at cursor.",

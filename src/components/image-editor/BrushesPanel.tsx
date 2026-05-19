@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   BUILTIN_BRUSH_PRESETS,
@@ -19,6 +19,9 @@ type Props = {
   onPick: (preset: BrushPreset) => void
   onSaveCurrent: (name: string) => void
   onDeleteCustom: (id: string) => void
+  /** Import an image file (PNG / JPG) as a brush tip. The parent builds the
+   *  dataUrl, generates a small thumbnail, and saves it as a custom preset. */
+  onImportTipFile?: (file: File) => void
 }
 
 export function BrushesPanel({
@@ -27,16 +30,19 @@ export function BrushesPanel({
   onPick,
   onSaveCurrent,
   onDeleteCustom,
+  onImportTipFile,
 }: Props) {
   const { t } = useTranslation()
   const [drafting, setDrafting] = useState(false)
   const [draftName, setDraftName] = useState('')
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const isActive = (p: BrushPreset) =>
     p.strokeWidth === current.strokeWidth &&
     p.options.hardness === current.options.hardness &&
     p.options.spacing === current.options.spacing &&
     p.options.flow === current.options.flow &&
-    p.options.opacity === current.options.opacity
+    p.options.opacity === current.options.opacity &&
+    p.options.tipDataUrl === current.options.tipDataUrl
   return (
     <div className="pf-panel-body" style={{ padding: 8 }}>
       <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -63,15 +69,39 @@ export function BrushesPanel({
         <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           {t('pages.imageEditor.brushes.custom')}
         </span>
-        <button
-          onClick={() => {
-            setDraftName(t('pages.imageEditor.brushes.defaultName', { n: customPresets.length + 1 }))
-            setDrafting(true)
-          }}
-          className="rounded border border-input bg-background px-2 py-0.5 text-[10px] hover:bg-accent/40"
-        >
-          + {t('pages.imageEditor.brushes.saveCurrent')}
-        </button>
+        <div className="flex items-center gap-1">
+          {onImportTipFile && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f && onImportTipFile) onImportTipFile(f)
+                  e.target.value = ''
+                }}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded border border-input bg-background px-2 py-0.5 text-[10px] hover:bg-accent/40"
+                title={t('pages.imageEditor.brushes.importTipHint')}
+              >
+                ⤴ {t('pages.imageEditor.brushes.importTip')}
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => {
+              setDraftName(t('pages.imageEditor.brushes.defaultName', { n: customPresets.length + 1 }))
+              setDrafting(true)
+            }}
+            className="rounded border border-input bg-background px-2 py-0.5 text-[10px] hover:bg-accent/40"
+          >
+            + {t('pages.imageEditor.brushes.saveCurrent')}
+          </button>
+        </div>
       </div>
       {drafting && (
         <div className="mt-1 flex items-center gap-1">
@@ -140,12 +170,25 @@ export function BrushesPanel({
   )
 }
 
-/** Render a tiny preview of the brush tip — a single circular stamp
- *  approximating the hardness falloff via a radial gradient. */
+/** Render a tiny preview of the brush tip. Custom-tip presets render the
+ *  imported image's alpha; soft / hard round presets fall back to an SVG
+ *  radial gradient approximating the hardness falloff. */
 function BrushPreview({ preset }: { preset: BrushPreset }) {
   const size = 32
+  const thumb = preset.thumbnailDataUrl ?? preset.options.tipDataUrl
+  if (thumb) {
+    return (
+      <img
+        src={thumb}
+        alt=""
+        width={size}
+        height={size}
+        className="rounded"
+        style={{ objectFit: 'contain' }}
+      />
+    )
+  }
   const r = Math.min(size / 2 - 2, Math.max(4, preset.strokeWidth / 2))
-  // SVG radial gradient: solid centre out to soft fringe based on hardness.
   const stops = [
     { offset: 0, opacity: preset.options.opacity },
     { offset: preset.options.hardness, opacity: preset.options.opacity },

@@ -178,6 +178,26 @@ type Interaction =
   | { kind: 'crop-drawing'; rect: { x: number; y: number; w: number; h: number } }
   /** Crop drag finished, awaiting commit/cancel from caller. */
   | { kind: 'crop-pending'; rect: { x: number; y: number; w: number; h: number } }
+  /**
+   * Resizing a pending crop via one of the 8 handles. `rect` is the *current*
+   * normalised rect; `original` is the pre-drag rect (so aspect-ratio
+   * derivations can re-base off it instead of drifting cumulatively). On
+   * mouseup we collapse back into `crop-pending` with the final rect.
+   */
+  | {
+      kind: 'crop-resizing'
+      handle: 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
+      startMouse: Point
+      original: { x: number; y: number; w: number; h: number }
+      rect: { x: number; y: number; w: number; h: number }
+    }
+  /** Translating the entire pending crop rect — drag from the interior. */
+  | {
+      kind: 'crop-moving'
+      startMouse: Point
+      original: { x: number; y: number; w: number; h: number }
+      rect: { x: number; y: number; w: number; h: number }
+    }
   /** Gradient drag in progress — start + current end point in canvas pixels. */
   | { kind: 'gradient-drawing'; start: Point; end: Point }
   /** Marquee selection drag — rect in canvas-pixel space. */
@@ -335,7 +355,12 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
   useEffect(() => {
     if (tool !== 'crop') {
       setInteraction((i) =>
-        i.kind === 'crop-drawing' || i.kind === 'crop-pending' ? { kind: 'idle' } : i,
+        i.kind === 'crop-drawing' ||
+        i.kind === 'crop-pending' ||
+        i.kind === 'crop-resizing' ||
+        i.kind === 'crop-moving'
+          ? { kind: 'idle' }
+          : i,
       )
     }
   }, [tool])
@@ -365,8 +390,17 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     // Crop preview overlay — drawn AFTER the image render so it sits on top.
     // Lives only on the live canvas; the export canvas (separate renderTo
     // call) never sees it.
-    if (interaction.kind === 'crop-drawing' || interaction.kind === 'crop-pending') {
-      drawCropOverlay(canvasRef.current, interaction.rect)
+    if (
+      interaction.kind === 'crop-drawing' ||
+      interaction.kind === 'crop-pending' ||
+      interaction.kind === 'crop-resizing' ||
+      interaction.kind === 'crop-moving'
+    ) {
+      // Show handles once the drag has settled to a definite rect (pending /
+      // resizing / moving). Drawing-mode skips them so the rubber-band rect
+      // doesn't flicker handles into view at sub-handle sizes.
+      const showHandles = interaction.kind !== 'crop-drawing'
+      drawCropOverlay(canvasRef.current, interaction.rect, showHandles)
     }
     // Gradient preview line — start dot, end dot, dashed line between.
     if (interaction.kind === 'gradient-drawing') {
@@ -453,7 +487,12 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
         })
       },
       commitPendingCrop: () => {
-        if (interaction.kind !== 'crop-pending' && interaction.kind !== 'crop-drawing') {
+        if (
+          interaction.kind !== 'crop-pending' &&
+          interaction.kind !== 'crop-drawing' &&
+          interaction.kind !== 'crop-resizing' &&
+          interaction.kind !== 'crop-moving'
+        ) {
           return
         }
         const r = interaction.rect
@@ -477,12 +516,20 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
         setInteraction({ kind: 'idle' })
       },
       cancelPendingCrop: () => {
-        if (interaction.kind === 'crop-pending' || interaction.kind === 'crop-drawing') {
+        if (
+          interaction.kind === 'crop-pending' ||
+          interaction.kind === 'crop-drawing' ||
+          interaction.kind === 'crop-resizing' ||
+          interaction.kind === 'crop-moving'
+        ) {
           setInteraction({ kind: 'idle' })
         }
       },
       hasPendingCrop: () =>
-        interaction.kind === 'crop-pending' || interaction.kind === 'crop-drawing',
+        interaction.kind === 'crop-pending' ||
+        interaction.kind === 'crop-drawing' ||
+        interaction.kind === 'crop-resizing' ||
+        interaction.kind === 'crop-moving',
       hasPendingPolyLasso: () => interaction.kind === 'polylasso-drawing',
       cancelPendingPolyLasso: () => {
         if (interaction.kind === 'polylasso-drawing') {
@@ -573,9 +620,41 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       return
     }
 
-    // Crop: drag to define a region within the current view. Replace any
-    // pending crop on a fresh drag.
+    // Crop: drag to define a region within the current view. If a pending
+    // crop already exists, drag from a handle (corner/edge) to resize or
+    // from the interior to move; outside the rect starts a fresh draw.
     if (tool === 'crop') {
+      if (interaction.kind === 'crop-pending') {
+        const r0 = interaction.rect
+        // Normalise so resize math always sees positive w/h regardless of
+        // which corner the user originally dragged from.
+        const norm = {
+          x: Math.min(r0.x, r0.x + r0.w),
+          y: Math.min(r0.y, r0.y + r0.h),
+          w: Math.abs(r0.w),
+          h: Math.abs(r0.h),
+        }
+        const handle = pickCropHandle(p, norm)
+        if (handle === 'move') {
+          setInteraction({
+            kind: 'crop-moving',
+            startMouse: p,
+            original: norm,
+            rect: norm,
+          })
+          return
+        }
+        if (handle) {
+          setInteraction({
+            kind: 'crop-resizing',
+            handle,
+            startMouse: p,
+            original: norm,
+            rect: norm,
+          })
+          return
+        }
+      }
       setInteraction({ kind: 'crop-drawing', rect: { x: p.x, y: p.y, w: 0, h: 0 } })
       return
     }
@@ -852,6 +931,31 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       return
     }
 
+    if (interaction.kind === 'crop-resizing') {
+      const dx = p.x - interaction.startMouse.x
+      const dy = p.y - interaction.startMouse.y
+      const next = applyCropHandleDrag(
+        interaction.handle,
+        interaction.original,
+        dx,
+        dy,
+        cropAspect,
+      )
+      setInteraction({ ...interaction, rect: next })
+      return
+    }
+
+    if (interaction.kind === 'crop-moving') {
+      const dx = p.x - interaction.startMouse.x
+      const dy = p.y - interaction.startMouse.y
+      const o = interaction.original
+      setInteraction({
+        ...interaction,
+        rect: { x: o.x + dx, y: o.y + dy, w: o.w, h: o.h },
+      })
+      return
+    }
+
     if (interaction.kind === 'gradient-drawing') {
       setInteraction({ kind: 'gradient-drawing', start: interaction.start, end: p })
       return
@@ -941,6 +1045,15 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
   const handleMouseUp = () => {
     if (interaction.kind === 'idle') return
     if (interaction.kind === 'crop-drawing') {
+      const r = interaction.rect
+      if (Math.abs(r.w) < 4 || Math.abs(r.h) < 4) {
+        setInteraction({ kind: 'idle' })
+      } else {
+        setInteraction({ kind: 'crop-pending', rect: r })
+      }
+      return
+    }
+    if (interaction.kind === 'crop-resizing' || interaction.kind === 'crop-moving') {
       const r = interaction.rect
       if (Math.abs(r.w) < 4 || Math.abs(r.h) < 4) {
         setInteraction({ kind: 'idle' })
@@ -1140,6 +1253,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
             hardness: brushOptions.hardness,
             spacing: brushOptions.spacing,
             flow: brushOptions.flow,
+            tipDataUrl: brushOptions.tipDataUrl,
           },
         } as AnnotationLayer,
       })
@@ -1428,6 +1542,22 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
   // Update cursor on idle hover so users can preview what a click will do.
   // Cheap (one state set per move while idle).
   const handleHover = (e: ReactMouseEvent<HTMLCanvasElement>) => {
+    // Special-case: when a pending crop exists the user is hovering AFTER
+    // an initial drag — show handle / move cursors over the rect even
+    // though interaction is no longer 'idle'.
+    if (tool === 'crop' && interaction.kind === 'crop-pending' && !panMode) {
+      const handle = pickCropHandle(eventToCanvasXY(e), interaction.rect)
+      if (handle === 'move') {
+        setHoverCursor('move')
+        return
+      }
+      if (handle) {
+        setHoverCursor(cursorForCropHandle(handle))
+        return
+      }
+      setHoverCursor('crosshair')
+      return
+    }
     if (interaction.kind !== 'idle') return
     if (panMode) {
       // Workspace owns the cursor in pan mode (grab/grabbing).
@@ -1766,6 +1896,7 @@ function shouldDiscardDrawing(layer: Layer): boolean {
 function drawCropOverlay(
   canvas: HTMLCanvasElement | null,
   rect: { x: number; y: number; w: number; h: number },
+  showHandles: boolean = false,
 ) {
   if (!canvas) return
   const ctx = canvas.getContext('2d')
@@ -1791,7 +1922,135 @@ function drawCropOverlay(
   ctx.setLineDash([6, 4])
   ctx.strokeRect(rx + 0.5, ry + 0.5, rw - 1, rh - 1)
   ctx.setLineDash([])
+  if (showHandles) {
+    const cx = rx + rw / 2
+    const cy = ry + rh / 2
+    const handles: Array<{ x: number; y: number }> = [
+      { x: rx, y: ry },
+      { x: cx, y: ry },
+      { x: rx + rw, y: ry },
+      { x: rx + rw, y: cy },
+      { x: rx + rw, y: ry + rh },
+      { x: cx, y: ry + rh },
+      { x: rx, y: ry + rh },
+      { x: rx, y: cy },
+    ]
+    const size = 8
+    ctx.fillStyle = '#ffffff'
+    ctx.strokeStyle = '#000000'
+    ctx.lineWidth = 1
+    for (const h of handles) {
+      ctx.fillRect(h.x - size / 2, h.y - size / 2, size, size)
+      ctx.strokeRect(h.x - size / 2 + 0.5, h.y - size / 2 + 0.5, size - 1, size - 1)
+    }
+    // PS rule-of-thirds grid lines inside the crop.
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)'
+    ctx.setLineDash([])
+    ctx.beginPath()
+    const v1 = rx + rw / 3
+    const v2 = rx + (rw * 2) / 3
+    const h1 = ry + rh / 3
+    const h2 = ry + (rh * 2) / 3
+    ctx.moveTo(v1 + 0.5, ry); ctx.lineTo(v1 + 0.5, ry + rh)
+    ctx.moveTo(v2 + 0.5, ry); ctx.lineTo(v2 + 0.5, ry + rh)
+    ctx.moveTo(rx, h1 + 0.5); ctx.lineTo(rx + rw, h1 + 0.5)
+    ctx.moveTo(rx, h2 + 0.5); ctx.lineTo(rx + rw, h2 + 0.5)
+    ctx.stroke()
+  }
   ctx.restore()
+}
+
+type CropHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
+
+function cursorForCropHandle(h: CropHandle): string {
+  switch (h) {
+    case 'nw': case 'se': return 'nwse-resize'
+    case 'ne': case 'sw': return 'nesw-resize'
+    case 'n': case 's': return 'ns-resize'
+    case 'e': case 'w': return 'ew-resize'
+  }
+}
+
+/**
+ * Hit-test a point against the 8 corner/edge handles + interior of a
+ * normalised crop rect. Returns the handle id, 'move' for an interior hit,
+ * or null when the point is outside the rect (and so should start a fresh
+ * crop-drawing).
+ */
+function pickCropHandle(
+  p: { x: number; y: number },
+  rect: { x: number; y: number; w: number; h: number },
+): CropHandle | 'move' | null {
+  const rx = Math.min(rect.x, rect.x + rect.w)
+  const ry = Math.min(rect.y, rect.y + rect.h)
+  const rw = Math.abs(rect.w)
+  const rh = Math.abs(rect.h)
+  const cx = rx + rw / 2
+  const cy = ry + rh / 2
+  const HIT = 10
+  const handles: Array<{ id: CropHandle; x: number; y: number }> = [
+    { id: 'nw', x: rx, y: ry },
+    { id: 'n', x: cx, y: ry },
+    { id: 'ne', x: rx + rw, y: ry },
+    { id: 'e', x: rx + rw, y: cy },
+    { id: 'se', x: rx + rw, y: ry + rh },
+    { id: 's', x: cx, y: ry + rh },
+    { id: 'sw', x: rx, y: ry + rh },
+    { id: 'w', x: rx, y: cy },
+  ]
+  for (const h of handles) {
+    if (Math.abs(p.x - h.x) <= HIT && Math.abs(p.y - h.y) <= HIT) return h.id
+  }
+  if (p.x >= rx && p.x <= rx + rw && p.y >= ry && p.y <= ry + rh) return 'move'
+  return null
+}
+
+/**
+ * Apply a handle drag (`dx`, `dy` from mousedown) to the original rect and
+ * return the resulting normalised rect. When `aspect` is set (a fixed
+ * w/h ratio from the crop aspect preset), corner handles drive both axes
+ * coherently and edge handles widen the opposite axis symmetrically around
+ * the rect's centre, so the aspect ratio survives the drag.
+ */
+function applyCropHandleDrag(
+  handle: CropHandle,
+  original: { x: number; y: number; w: number; h: number },
+  dx: number,
+  dy: number,
+  aspect: number | undefined,
+): { x: number; y: number; w: number; h: number } {
+  let x = original.x
+  let y = original.y
+  let w = original.w
+  let h = original.h
+  const N = handle.includes('n')
+  const S = handle.includes('s')
+  const W = handle.includes('w')
+  const E = handle.includes('e')
+  if (N) { y += dy; h -= dy }
+  if (S) { h += dy }
+  if (W) { x += dx; w -= dx }
+  if (E) { w += dx }
+  if (aspect && aspect > 0) {
+    const isCorner = (N || S) && (W || E)
+    if (isCorner) {
+      // Derive new height from new width, keeping the dragged corner fixed.
+      const newH = w / aspect
+      if (N) y = original.y + original.h - newH
+      h = newH
+    } else if (handle === 'e' || handle === 'w') {
+      // Horizontal-only drag: re-centre vertically.
+      const newH = w / aspect
+      y = original.y + (original.h - newH) / 2
+      h = newH
+    } else if (handle === 'n' || handle === 's') {
+      // Vertical-only drag: re-centre horizontally.
+      const newW = h * aspect
+      x = original.x + (original.w - newW) / 2
+      w = newW
+    }
+  }
+  return { x, y, w, h }
 }
 
 /**

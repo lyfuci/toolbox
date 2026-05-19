@@ -16,6 +16,7 @@ import type {
   AdjustmentKind,
   AdjustmentParams,
   BrightnessContrastParams,
+  CameraRawParams,
   ColorBalanceParams,
   CurvesParams,
   ChannelMixerParams,
@@ -102,8 +103,8 @@ function AdjustmentDialogInner({
   }
 
   const title = t(
-    kind === 'channelMixer'
-      ? 'pages.imageEditor.adjustments.channelMixer.title'
+    kind === 'channelMixer' || kind === 'cameraRaw'
+      ? `pages.imageEditor.adjustments.${kind}.title`
       : `pages.imageEditor.adjustments.${kind}`,
   )
 
@@ -149,6 +150,9 @@ function AdjustmentDialogInner({
         )}
         {draft.kind === 'photoFilter' && (
           <PhotoFilterForm value={draft} onChange={update} />
+        )}
+        {draft.kind === 'cameraRaw' && (
+          <CameraRawForm value={draft} onChange={update} />
         )}
       </div>
       <DialogFooter>
@@ -647,5 +651,113 @@ function PhotoFilterForm({
         {t('pages.imageEditor.adjustments.photoFilterPreserveLum')}
       </label>
     </>
+  )
+}
+
+/**
+ * Camera Raw form. Eleven sliders organised into three sections (white
+ * balance / tone / presence) mirroring Lightroom's basic panel. All
+ * adjustments compose into a single per-pixel pass; clarity / dehaze are
+ * approximated globally — see applyCameraRaw for the implementation note.
+ */
+function CameraRawForm({
+  value,
+  onChange,
+}: {
+  value: CameraRawParams
+  onChange: (patch: Partial<CameraRawParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+      <div className="text-xs font-medium text-muted-foreground">
+        {t('pages.imageEditor.adjustments.cameraRaw.wb')}
+      </div>
+      <Slider
+        label={t('pages.imageEditor.adjustments.cameraRaw.temperature')}
+        value={value.temperature}
+        min={-100}
+        max={100}
+        onChange={(v) => onChange({ temperature: v })}
+      />
+      <Slider
+        label={t('pages.imageEditor.adjustments.cameraRaw.tint')}
+        value={value.tint}
+        min={-100}
+        max={100}
+        onChange={(v) => onChange({ tint: v })}
+      />
+      <div className="text-xs font-medium text-muted-foreground pt-2">
+        {t('pages.imageEditor.adjustments.cameraRaw.tone')}
+      </div>
+      <Slider
+        label={t('pages.imageEditor.adjustments.cameraRaw.exposure')}
+        value={value.exposure}
+        min={-2}
+        max={2}
+        step={0.01}
+        unit="EV"
+        onChange={(v) => onChange({ exposure: v })}
+      />
+      <Slider
+        label={t('pages.imageEditor.adjustments.cameraRaw.highlights')}
+        value={value.highlights}
+        min={-100}
+        max={100}
+        onChange={(v) => onChange({ highlights: v })}
+      />
+      <Slider
+        label={t('pages.imageEditor.adjustments.cameraRaw.shadows')}
+        value={value.shadows}
+        min={-100}
+        max={100}
+        onChange={(v) => onChange({ shadows: v })}
+      />
+      <Slider
+        label={t('pages.imageEditor.adjustments.cameraRaw.whites')}
+        value={value.whites}
+        min={-100}
+        max={100}
+        onChange={(v) => onChange({ whites: v })}
+      />
+      <Slider
+        label={t('pages.imageEditor.adjustments.cameraRaw.blacks')}
+        value={value.blacks}
+        min={-100}
+        max={100}
+        onChange={(v) => onChange({ blacks: v })}
+      />
+      <div className="text-xs font-medium text-muted-foreground pt-2">
+        {t('pages.imageEditor.adjustments.cameraRaw.presence')}
+      </div>
+      <Slider
+        label={t('pages.imageEditor.adjustments.cameraRaw.clarity')}
+        value={value.clarity}
+        min={-100}
+        max={100}
+        onChange={(v) => onChange({ clarity: v })}
+      />
+      <Slider
+        label={t('pages.imageEditor.adjustments.cameraRaw.dehaze')}
+        value={value.dehaze}
+        min={-100}
+        max={100}
+        onChange={(v) => onChange({ dehaze: v })}
+      />
+      <Slider
+        label={t('pages.imageEditor.adjustments.cameraRaw.vibrance')}
+        value={value.vibrance}
+        min={-100}
+        max={100}
+        onChange={(v) => onChange({ vibrance: v })}
+      />
+      <Slider
+        label={t('pages.imageEditor.adjustments.cameraRaw.saturation')}
+        value={value.saturation}
+        min={-100}
+        max={100}
+        onChange={(v) => onChange({ saturation: v })}
+      />
+    </div>
   )
 }

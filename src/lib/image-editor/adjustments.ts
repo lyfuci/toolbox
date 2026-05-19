@@ -1,6 +1,7 @@
 import type {
   AdjustmentParams,
   BrightnessContrastParams,
+  CameraRawParams,
   ChannelMixerParams,
   ColorBalanceParams,
   CurvesParams,
@@ -100,6 +101,20 @@ export const DEFAULT_PHOTO_FILTER: PhotoFilterParams = {
   density: 25,
   preserveLuminosity: true,
 }
+export const DEFAULT_CAMERA_RAW: CameraRawParams = {
+  kind: 'cameraRaw',
+  temperature: 0,
+  tint: 0,
+  exposure: 0,
+  highlights: 0,
+  shadows: 0,
+  whites: 0,
+  blacks: 0,
+  clarity: 0,
+  vibrance: 0,
+  saturation: 0,
+  dehaze: 0,
+}
 
 export const DEFAULT_FOR_KIND: Record<
   AdjustmentParams['kind'],
@@ -118,6 +133,7 @@ export const DEFAULT_FOR_KIND: Record<
   channelMixer: DEFAULT_CHANNEL_MIXER,
   gradientMap: DEFAULT_GRADIENT_MAP,
   photoFilter: DEFAULT_PHOTO_FILTER,
+  cameraRaw: DEFAULT_CAMERA_RAW,
 }
 
 export function applyAdjustment(
@@ -163,6 +179,9 @@ export function applyAdjustment(
       return
     case 'photoFilter':
       applyPhotoFilter(data, params)
+      return
+    case 'cameraRaw':
+      applyCameraRaw(data, params)
       return
   }
 }
@@ -224,6 +243,97 @@ function applyPhotoFilter(data: Uint8ClampedArray, p: PhotoFilterParams): void {
     data[i + 1] = clamp255(ng)
     data[i + 2] = clamp255(nb)
   }
+}
+
+/**
+ * Camera Raw — per-pixel approximation of ACR / Lightroom's basic panel.
+ *
+ * Pipeline per pixel:
+ *   1. White-balance shift (temperature / tint as small additive R/G/B offsets)
+ *   2. Tone LUT (exposure + highlights / shadows / whites / blacks + clarity
+ *      + dehaze contrast), built once before the loop
+ *   3. HSL pass for vibrance + saturation + dehaze saturation boost
+ *
+ * Clarity/dehaze are *neighbourhood-dependent* in real ACR (USM-style local
+ * contrast). Per-pixel adjustment layers can't sample neighbours, so we
+ * substitute a midtone-contrast curve which captures the visual character
+ * of moderate slider values; reach for the Unsharp Mask filter layer when
+ * you need true local clarity.
+ */
+function applyCameraRaw(data: Uint8ClampedArray, p: CameraRawParams): void {
+  const lut = cameraRawToneLut(p)
+  const rOff = p.temperature * 0.3 + p.tint * 0.15
+  const gOff = -p.tint * 0.3
+  const bOff = -p.temperature * 0.3 + p.tint * 0.15
+  const v = p.vibrance / 100
+  const s = p.saturation / 100
+  const dh = p.dehaze / 100
+  const wantHsl = v !== 0 || s !== 0 || dh !== 0
+  const hsl = { h: 0, s: 0, l: 0 }
+  const rgb = { r: 0, g: 0, b: 0 }
+  for (let i = 0; i < data.length; i += 4) {
+    let r = clamp255(data[i] + rOff)
+    let g = clamp255(data[i + 1] + gOff)
+    let b = clamp255(data[i + 2] + bOff)
+    r = lut[r]
+    g = lut[g]
+    b = lut[b]
+    if (wantHsl) {
+      rgbToHsl(r, g, b, hsl)
+      const protection = 1 - hsl.s
+      let ns = hsl.s + v * protection
+      ns = s >= 0 ? ns + (1 - ns) * s : ns * (1 + s)
+      if (dh > 0) ns = ns + (1 - ns) * dh * 0.3
+      else if (dh < 0) ns = ns * (1 + dh * 0.3)
+      ns = clamp01(ns)
+      hslToRgb(hsl.h, ns, hsl.l, rgb)
+      r = rgb.r
+      g = rgb.g
+      b = rgb.b
+    }
+    data[i] = r
+    data[i + 1] = g
+    data[i + 2] = b
+  }
+}
+
+function cameraRawToneLut(p: CameraRawParams): Uint8ClampedArray {
+  const expGain = Math.pow(2, p.exposure)
+  const hi = p.highlights / 100
+  const sh = p.shadows / 100
+  const wh = p.whites / 100
+  const bl = p.blacks / 100
+  const cl = p.clarity / 100
+  const dh = p.dehaze / 100
+  const dhScale = 1 + dh * 0.5
+  const lut = new Uint8ClampedArray(256)
+  for (let i = 0; i < 256; i++) {
+    let v = i * expGain
+    // Whites: push the upper end up/down — strongest at white.
+    v = v + wh * 64 * (v / 255)
+    // Blacks: push the lower end up/down — strongest at black.
+    v = v + bl * 64 * (1 - Math.min(255, Math.max(0, v)) / 255)
+    // Highlights: positive = darker highlights (recover), negative = brighter.
+    const hiWeight = smoothBand(v, 128, 255)
+    v = v - hi * 50 * hiWeight
+    // Shadows: positive = brighter shadows (open), negative = darker.
+    const shWeight = smoothBand(v, 128, 0)
+    v = v + sh * 50 * shWeight
+    // Clarity: midtone S-curve — boost contrast around 128.
+    const claWeight = 1 - Math.abs(v / 127.5 - 1)
+    v = v + cl * 32 * (v < 128 ? -claWeight : claWeight)
+    // Dehaze contrast component (rest is saturation in the HSL pass).
+    v = (v - 128) * dhScale + 128
+    lut[i] = clamp255(v)
+  }
+  return lut
+}
+
+/** Smooth weight that ramps 0→1 across `[lo, hi]` (lo can be > hi to flip). */
+function smoothBand(v: number, lo: number, hi: number): number {
+  const t = (v - lo) / (hi - lo)
+  const clamped = t < 0 ? 0 : t > 1 ? 1 : t
+  return clamped * clamped * (3 - 2 * clamped)
 }
 
 function parseHex(hex: string): [number, number, number] {
