@@ -103,6 +103,9 @@ type Props = {
      *  adjustment/filter mask). */
     removeMask?: () => void
     canRemoveMask?: boolean
+    /** Apply Mask — bake selected MaskLayer into the layer below + remove mask. */
+    applyMask?: () => void
+    canApplyMask?: boolean
     zoomIn?: () => void
     zoomOut?: () => void
     zoomFit?: () => void
@@ -350,6 +353,11 @@ export function MenuBar({ handlers }: Props) {
             id: 'adj-photoFilter',
             label: t('pages.imageEditor.adjustments.photoFilter') + '…',
             onClick: () => handlers.openAdjustment?.('photoFilter'),
+          },
+          {
+            id: 'adj-cameraRaw',
+            label: t('pages.imageEditor.adjustments.cameraRaw.title') + '…',
+            onClick: () => handlers.openAdjustment?.('cameraRaw'),
           },
         ],
       ],
@@ -636,6 +644,12 @@ export function MenuBar({ handlers }: Props) {
             label: t('pages.imageEditor.menu.removeMask'),
             onClick: handlers.removeMask,
             disabled: !handlers.canRemoveMask,
+          },
+          {
+            id: 'applyMask',
+            label: t('pages.imageEditor.menu.applyMask'),
+            onClick: handlers.applyMask,
+            disabled: !handlers.canApplyMask,
           },
           {
             id: 'replaceSO',

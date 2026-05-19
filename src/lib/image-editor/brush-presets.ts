@@ -12,6 +12,11 @@ export type BrushPreset = {
   name: string
   strokeWidth: number
   options: BrushOptions
+  /** Optional thumbnail dataUrl for the panel (a small swatch of the tip
+   *  silhouette). Lets the user identify imported tips at a glance.
+   *  Identical to options.tipDataUrl in practice; stored separately so the
+   *  panel can show a thumbnail without re-rendering the tip every frame. */
+  thumbnailDataUrl?: string
 }
 
 const CUSTOM_KEY = 'pf-custom-brushes'

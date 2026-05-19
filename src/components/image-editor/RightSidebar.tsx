@@ -1,5 +1,6 @@
 import { useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ActionsPanel } from './ActionsPanel'
 import { AdjustPanel } from './AdjustPanel'
 import { BrushesPanel } from './BrushesPanel'
 import type { BrushPreset } from '@/lib/image-editor/brush-presets'
@@ -10,7 +11,7 @@ import { LayersPanel } from './LayersPanel'
 import { PathsPanel } from './PathsPanel'
 import { PropertiesPanel } from './PropertiesPanel'
 import type { ImageCache } from '@/lib/image-editor/drawing'
-import type { Adjustments, BrushOptions, EditorState, Layer, LayerComp, Transforms } from '@/lib/image-editor/types'
+import type { Action, Adjustments, BrushOptions, EditorState, Layer, LayerComp, Transforms } from '@/lib/image-editor/types'
 
 const LAYERS_HEIGHT_KEY = 'pf-layers-h'
 const LAYERS_HEIGHT_DEFAULT = 320
@@ -52,6 +53,18 @@ type Props = {
   onPickBrushPreset: (preset: BrushPreset) => void
   onSaveCurrentBrush: (name: string) => void
   onDeleteCustomBrush: (id: string) => void
+  onImportBrushTip?: (file: File) => void
+  /** Actions panel — save / record / play. */
+  actions: Action[]
+  isActionRecording: boolean
+  actionRecordingName?: string
+  actionRecordingStepCount: number
+  onSaveActionSnapshot: (name: string) => void
+  onStartActionRecording: (name: string) => void
+  onStopActionRecording: () => void
+  onCancelActionRecording: () => void
+  onPlayAction: (id: string) => void
+  onDeleteAction: (id: string) => void
 }
 
 /**
@@ -87,11 +100,22 @@ export function RightSidebar({
   onPickBrushPreset,
   onSaveCurrentBrush,
   onDeleteCustomBrush,
+  onImportBrushTip,
+  actions,
+  isActionRecording,
+  actionRecordingName,
+  actionRecordingStepCount,
+  onSaveActionSnapshot,
+  onStartActionRecording,
+  onStopActionRecording,
+  onCancelActionRecording,
+  onPlayAction,
+  onDeleteAction,
 }: Props) {
   const { t } = useTranslation()
   const [g1, setG1] = useState<'layers' | 'channels' | 'paths'>('layers')
   const [g2, setG2] = useState<'properties' | 'info' | 'history'>('properties')
-  const [g3, setG3] = useState<'adjustments' | 'navigator' | 'comps' | 'brushes'>('adjustments')
+  const [g3, setG3] = useState<'adjustments' | 'navigator' | 'comps' | 'brushes' | 'actions'>('adjustments')
 
   // Layers section height — fixed by default, drag-resizable via the handle
   // below the panel. Persisted in localStorage so layout sticks across reloads.
@@ -207,6 +231,7 @@ export function RightSidebar({
           { id: 'navigator', label: t('pages.imageEditor.panelNavigator') },
           { id: 'comps', label: t('pages.imageEditor.panelComps') },
           { id: 'brushes', label: t('pages.imageEditor.panelBrushes') },
+          { id: 'actions', label: t('pages.imageEditor.panelActions') },
         ]}
         active={g3}
         setActive={(id) => setG3(id as typeof g3)}
@@ -237,6 +262,21 @@ export function RightSidebar({
             onPick={onPickBrushPreset}
             onSaveCurrent={onSaveCurrentBrush}
             onDeleteCustom={onDeleteCustomBrush}
+            onImportTipFile={onImportBrushTip}
+          />
+        )}
+        {g3 === 'actions' && (
+          <ActionsPanel
+            actions={actions}
+            isRecording={isActionRecording}
+            recordingName={actionRecordingName}
+            recordingStepCount={actionRecordingStepCount}
+            onSaveSnapshot={onSaveActionSnapshot}
+            onStartRecording={onStartActionRecording}
+            onStopRecording={onStopActionRecording}
+            onCancelRecording={onCancelActionRecording}
+            onPlayAction={onPlayAction}
+            onDeleteAction={onDeleteAction}
           />
         )}
       </PanelGroup>

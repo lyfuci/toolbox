@@ -483,6 +483,23 @@
           "outB": "输出：蓝",
           "constant": "常数"
         },
+        "cameraRaw": {
+          "title": "Camera Raw",
+          "wb": "白平衡",
+          "tone": "色调",
+          "presence": "外观",
+          "temperature": "色温",
+          "tint": "色调（绿/品红）",
+          "exposure": "曝光",
+          "highlights": "高光",
+          "shadows": "阴影",
+          "whites": "白色",
+          "blacks": "黑色",
+          "clarity": "清晰度",
+          "dehaze": "去雾",
+          "vibrance": "自然饱和度",
+          "saturation": "饱和度"
+        },
         "inputBlack": "输入黑场",
         "inputWhite": "输入白场",
         "outputBlack": "输出黑场",
@@ -599,6 +616,7 @@
         "convertMaskToRaster": "蒙版转换为栅格",
         "addAdjustmentMask": "为调整图层添加蒙版",
         "removeMask": "移除蒙版",
+        "applyMask": "应用蒙版",
         "imageSize": "图像大小",
         "canvasSize": "画布大小",
         "rotateArbitrary": "任意角度旋转",
@@ -734,7 +752,12 @@
       "maskActions": {
         "removedMaskLayer": "已移除蒙版图层",
         "removedAdjMask": "已移除调整蒙版",
-        "noMaskToRemove": "所选图层没有蒙版。"
+        "noMaskToRemove": "所选图层没有蒙版。",
+        "applied": "已应用蒙版 —— 已烘焙到下方图层",
+        "applyOnlyMask": "应用蒙版仅适用于蒙版图层。",
+        "applyEmptyMask": "蒙版为空 —— 无可应用内容。",
+        "applyNoTarget": "蒙版下方没有图层可供应用。",
+        "applyTargetUnsupported": "应用蒙版需要下方为图像 / 形状 / 智能对象图层 —— 调整、滤镜、蒙版图层无法烘焙。"
       },
       "adjMask": {
         "added": "已为图层添加蒙版 —— 用画笔涂抹以控制效果作用范围",
@@ -789,6 +812,7 @@
       "panelHistory": "历史记录",
       "panelComps": "图层复合",
       "panelBrushes": "画笔",
+      "panelActions": "动作",
       "panelStubChannels": "通道面板 — 即将推出（按 R/G/B/A 通道分别查看）。",
       "panelStubPaths": "路径面板 — 即将推出（钢笔工具的矢量路径）。",
       "panelStubInfo": "信息面板 — 即将推出（实时光标颜色 / 坐标）。",
@@ -819,6 +843,23 @@
         "saved": "已保存图层复合",
         "applied": "已应用复合 \"{{name}}\""
       },
+      "actions": {
+        "saveSnapshot": "快照",
+        "record": "录制",
+        "stop": "停止",
+        "play": "播放动作",
+        "delete": "删除动作",
+        "defaultSnapshot": "快照 {{n}}",
+        "defaultRecording": "录制 {{n}}",
+        "recording": "录制中 \"{{name}}\" —— {{n}} 步",
+        "recordStarted": "录制已开始 —— 每次编辑都将作为一步",
+        "recordSaved": "动作已保存（{{n}} 步）",
+        "recordEmpty": "录制结束但无任何编辑 —— 没有可保存内容",
+        "recordCancelled": "已取消录制",
+        "snapshotSaved": "快照已保存",
+        "played": "已播放 \"{{name}}\"",
+        "empty": "暂无动作。保存一个快照或开始录制。"
+      },
       "brushes": {
         "customHint": "内置预设。自定义画笔预设为 v2 功能。",
         "builtIn": "内置",
@@ -826,7 +867,10 @@
         "saveCurrent": "保存",
         "defaultName": "画笔 {{n}}",
         "emptyCustom": "把当前画笔设置保存为预设。",
-        "deleteCustom": "删除预设"
+        "deleteCustom": "删除预设",
+        "importTip": "导入笔尖",
+        "importTipHint": "把图片文件作为笔尖印章导入（带透明通道的 PNG 效果最好）。",
+        "importTipDone": "已导入笔尖：{{name}}"
       },
       "moveToolHint": "移动 (V)：拖动图层；Cmd/Ctrl+J 复制；Delete 删除。",
       "zoomToolHint": "缩放 (Z)：单击放大 2×，Alt 单击缩小。Cmd/Ctrl+滚轮在光标位置缩放。",

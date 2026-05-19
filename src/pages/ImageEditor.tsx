@@ -48,6 +48,7 @@ import { DEFAULT_BRUSH_OPTIONS, DEFAULT_TEXT_OPTIONS, initialState, PREVIEW_MAX 
 import { fillSelection, strokeSelection, type StrokePosition } from '@/lib/image-editor/edit-ops'
 import { floodFillMask, maskToDataUrl } from '@/lib/image-editor/flood-fill'
 import { useHistoryState } from '@/lib/image-editor/history'
+import { extractMaskContour } from '@/lib/image-editor/mask-contour'
 import { fileToDataUrl, useImageCache } from '@/lib/image-editor/image-cache'
 import type { ImageCache } from '@/lib/image-editor/drawing'
 import {
@@ -79,6 +80,7 @@ import {
   serializeProject,
 } from '@/lib/image-editor/serialize'
 import type {
+  Action,
   AdjustmentKind,
   AdjustmentLayer,
   AdjustmentParams,
@@ -99,6 +101,18 @@ import type {
   Tool,
   Transforms,
 } from '@/lib/image-editor/types'
+
+/**
+ * Strip the `actions` field off a state snapshot before storing it inside
+ * an Action's steps. Stops actions from nesting recursively (an action that
+ * captures the current state should not also capture every prior action).
+ */
+function stripActions(s: EditorState): EditorState {
+  if (!s.actions) return s
+  const { actions: _omit, ...rest } = s
+  void _omit
+  return rest
+}
 
 /**
  * Image editor page (PixelForge shell).
@@ -185,6 +199,9 @@ export function ImageEditorPage() {
       ) {
         ensureImage(l.maskDataUrl).catch(() => {})
       }
+      if (l.kind === 'annotation' && l.shape.kind === 'brush' && l.shape.tipDataUrl) {
+        ensureImage(l.shape.tipDataUrl).catch(() => {})
+      }
       for (const fx of l.effects ?? []) {
         if (fx.kind === 'patternOverlay' && fx.patternDataUrl) {
           ensureImage(fx.patternDataUrl).catch(() => {})
@@ -195,6 +212,36 @@ export function ImageEditorPage() {
       ensureImage(state.quickMask.dataUrl).catch(() => {})
     }
   }, [state.layers, state.quickMask, ensureImage])
+
+  // Custom brush tip (set by BrushesPanel / persisted in localStorage). The
+  // tip lives on brushOptions, not in state.layers, so the layer-walker
+  // effect above won't pick it up — make sure it's in the cache before the
+  // first stroke commits.
+  const brushTipDataUrl = brushOptions.tipDataUrl
+  useEffect(() => {
+    if (brushTipDataUrl) ensureImage(brushTipDataUrl).catch(() => {})
+  }, [brushTipDataUrl, ensureImage])
+
+  // ── Actions panel state ────────────────────────────────────────────────
+  //
+  // Recording captures every state transition while active. We stash the
+  // mutable list on a ref so the state-change effect can push without
+  // triggering itself; the step count is mirrored to React state for the
+  // UI badge.
+  const actionRecordingRef = useRef<{ name: string; steps: EditorState[] } | null>(null)
+  const [actionRecordingName, setActionRecordingName] = useState<string | undefined>(undefined)
+  const [actionRecordingStepCount, setActionRecordingStepCount] = useState(0)
+  const lastRecordedRef = useRef<EditorState | null>(null)
+  useEffect(() => {
+    const rec = actionRecordingRef.current
+    if (!rec) return
+    // Avoid recording the same state twice in a row (defensive — guards
+    // against the effect firing for no-op renders).
+    if (lastRecordedRef.current === state) return
+    rec.steps.push(stripActions(state))
+    lastRecordedRef.current = state
+    setActionRecordingStepCount(rec.steps.length)
+  }, [state])
 
   const duplicateRef = useRef<() => void>(() => {})
   const moveLayerRef = useRef<(d: 'forward' | 'backward' | 'front' | 'back') => void>(() => {})
@@ -1277,6 +1324,76 @@ export function ImageEditorPage() {
   }, [selectedLayerId, state.layers, patchLayer, deleteLayer, t])
 
   /**
+   * Apply Mask — bake the selected MaskLayer's effect into the layer
+   * immediately below it (in the same parent), then remove the mask. The
+   * baked layer becomes a single image annotation with the masked pixels
+   * permanent — equivalent to PS "Layer > Layer Mask > Apply".
+   *
+   * Implementation: rasterize { mask, layerBelow } together via the existing
+   * mergeLayersToImageLayer pipeline (which honours the mask's destination-in
+   * pass), then replace both with the merged image layer.
+   */
+  const handleApplyMask = useCallback(() => {
+    if (!image) return
+    if (!selectedLayerId || selectedLayerId === 'image') return
+    const target = findLayerById(state.layers, selectedLayerId)
+    if (!target) return
+    if (target.kind !== 'mask') {
+      toast.message(t('pages.imageEditor.maskActions.applyOnlyMask'))
+      return
+    }
+    if (!target.dataUrl && target.rects.length === 0) {
+      toast.message(t('pages.imageEditor.maskActions.applyEmptyMask'))
+      return
+    }
+    const path = findLayerPath(state.layers, selectedLayerId)
+    if (!path) return
+    const parentPath = path.slice(0, -1)
+    const idx = path[path.length - 1]
+    if (idx === 0) {
+      toast.message(t('pages.imageEditor.maskActions.applyNoTarget'))
+      return
+    }
+    const siblings: Layer[] =
+      parentPath.length === 0
+        ? state.layers
+        : (() => {
+            const parent = getLayerAtPath(state.layers, parentPath)
+            return parent && isGroup(parent) ? parent.children : []
+          })()
+    const targetBelow = siblings[idx - 1]
+    if (!targetBelow) return
+    // Only pixel-emitting layer kinds make sense as bake targets. Adjustment
+    // / filter / nested-mask layers have no source pixels to mask into; the
+    // rasterizer would produce an empty image and silently destroy the
+    // sibling. Bail with a toast instead.
+    if (
+      targetBelow.kind === 'mask' ||
+      targetBelow.kind === 'adjustment' ||
+      targetBelow.kind === 'filter'
+    ) {
+      toast.message(t('pages.imageEditor.maskActions.applyTargetUnsupported'))
+      return
+    }
+    const ids = new Set<string>([target.id, targetBelow.id])
+    const merged = mergeLayersToImageLayer({
+      image,
+      state,
+      imageCache,
+      pred: (l) => ids.has(l.id),
+      name: targetBelow.name,
+    })
+    if (!merged) return
+    let layers = removeLayerById(state.layers, target.id)
+    layers = removeLayerById(layers, targetBelow.id)
+    const newPath = [...parentPath, idx - 1]
+    layers = insertAtPath(layers, newPath, merged)
+    history.set({ ...state, layers })
+    setSelectedLayerId(merged.id)
+    toast.success(t('pages.imageEditor.maskActions.applied'))
+  }, [image, selectedLayerId, state, imageCache, history, t])
+
+  /**
    * Convert a rect-based MaskLayer into a raster mask. Rasterizes the
    * existing rects (white inside, black outside) onto a fresh canvas at
    * preview-pixel resolution and replaces `rects` with `dataUrl`.
@@ -1317,6 +1434,178 @@ export function ImageEditorPage() {
     toast.success(t('pages.imageEditor.maskRaster.converted'))
   }, [image, selectedLayerId, state, ensureImage, patchLayer, t])
 
+  // ── Action / snapshot handlers ─────────────────────────────────────────
+  const handleSaveActionSnapshot = useCallback(
+    (name: string) => {
+      const action: Action = {
+        id: crypto.randomUUID(),
+        name,
+        createdAt: new Date().toISOString(),
+        steps: [stripActions(state)],
+      }
+      history.set({ ...state, actions: [...(state.actions ?? []), action] })
+      toast.success(t('pages.imageEditor.actions.snapshotSaved'))
+    },
+    [state, history, t],
+  )
+
+  const handleStartActionRecording = useCallback(
+    (name: string) => {
+      actionRecordingRef.current = { name, steps: [stripActions(state)] }
+      lastRecordedRef.current = state
+      setActionRecordingName(name)
+      setActionRecordingStepCount(1)
+      toast.message(t('pages.imageEditor.actions.recordStarted'))
+    },
+    [state, t],
+  )
+
+  const handleStopActionRecording = useCallback(() => {
+    const rec = actionRecordingRef.current
+    if (!rec) return
+    actionRecordingRef.current = null
+    setActionRecordingName(undefined)
+    setActionRecordingStepCount(0)
+    if (rec.steps.length < 2) {
+      toast.message(t('pages.imageEditor.actions.recordEmpty'))
+      return
+    }
+    const action: Action = {
+      id: crypto.randomUUID(),
+      name: rec.name,
+      createdAt: new Date().toISOString(),
+      steps: rec.steps,
+    }
+    history.set({ ...state, actions: [...(state.actions ?? []), action] })
+    toast.success(t('pages.imageEditor.actions.recordSaved', { n: rec.steps.length }))
+  }, [state, history, t])
+
+  const handleCancelActionRecording = useCallback(() => {
+    actionRecordingRef.current = null
+    setActionRecordingName(undefined)
+    setActionRecordingStepCount(0)
+    toast.message(t('pages.imageEditor.actions.recordCancelled'))
+  }, [t])
+
+  const handlePlayAction = useCallback(
+    (id: string) => {
+      const action = state.actions?.find((a) => a.id === id)
+      if (!action || action.steps.length === 0) return
+      // 1-step actions = instant snapshot restore.
+      if (action.steps.length === 1) {
+        history.set({ ...action.steps[0], actions: state.actions })
+        toast.success(t('pages.imageEditor.actions.played', { name: action.name }))
+        return
+      }
+      // Multi-step: replay each step with a short delay so the user can see
+      // the progression. Preserves the saved actions list across each step.
+      const steps = action.steps
+      const delay = 200
+      steps.forEach((step, i) => {
+        setTimeout(() => {
+          history.set({ ...step, actions: state.actions })
+        }, i * delay)
+      })
+      setTimeout(() => {
+        toast.success(t('pages.imageEditor.actions.played', { name: action.name }))
+      }, steps.length * delay)
+    },
+    [state, history, t],
+  )
+
+  const handleDeleteAction = useCallback(
+    (id: string) => {
+      const next = (state.actions ?? []).filter((a) => a.id !== id)
+      history.set({ ...state, actions: next })
+    },
+    [state, history],
+  )
+
+  /**
+   * Import a brush tip from a user-supplied image file (PNG / JPG / etc.).
+   * Resizes to a 128 px tip on a transparent square, derives the tip mask
+   * from the image's alpha (PNG) or luminance (no-alpha sources), and
+   * persists the result as a new custom brush preset that lights up the
+   * brush's stamped pipeline. Also flips the editor's active brush to the
+   * imported tip so the user can paint with it right away.
+   */
+  const handleImportBrushTip = useCallback(async (file: File) => {
+    try {
+      const dataUrl = await fileToDataUrl(file)
+      const img = await ensureImage(dataUrl)
+      const TIP = 128
+      const c = document.createElement('canvas')
+      c.width = TIP
+      c.height = TIP
+      const ctx = c.getContext('2d')
+      if (!ctx) return
+      // Centre-fit so non-square tips don't stretch; uses the largest dim
+      // as the fit edge.
+      const srcW = img.naturalWidth
+      const srcH = img.naturalHeight
+      const fit = Math.max(srcW, srcH, 1)
+      const dw = (srcW * TIP) / fit
+      const dh = (srcH * TIP) / fit
+      ctx.drawImage(img, (TIP - dw) / 2, (TIP - dh) / 2, dw, dh)
+      // If the source had no alpha (JPG), derive the tip silhouette from the
+      // luminance — bright pixels become opaque, dark pixels become
+      // transparent. Heuristic: check the four corner pixels; if all opaque,
+      // assume no usable alpha channel.
+      let needsLumKey = false
+      try {
+        const probe = ctx.getImageData(0, 0, TIP, TIP)
+        const a0 = probe.data[3]
+        const a1 = probe.data[(TIP - 1) * 4 + 3]
+        const a2 = probe.data[((TIP - 1) * TIP) * 4 + 3]
+        const a3 = probe.data[((TIP * TIP) - 1) * 4 + 3]
+        needsLumKey = a0 === 255 && a1 === 255 && a2 === 255 && a3 === 255
+        if (needsLumKey) {
+          for (let i = 0; i < probe.data.length; i += 4) {
+            const r = probe.data[i]
+            const g = probe.data[i + 1]
+            const b = probe.data[i + 2]
+            const lum = (r * 299 + g * 587 + b * 114) / 1000
+            // Invert: a black brush mark on white paper should be opaque.
+            probe.data[i + 3] = 255 - lum
+            // Force colour to white so the tint pass owns the appearance.
+            probe.data[i] = 255
+            probe.data[i + 1] = 255
+            probe.data[i + 2] = 255
+          }
+          ctx.putImageData(probe, 0, 0)
+        }
+      } catch {
+        // CORS-tainted (shouldn't happen for local file picks) — keep as-is.
+      }
+      const tipUrl = c.toDataURL('image/png')
+      await ensureImage(tipUrl).catch(() => {})
+      const name = (file.name || t('pages.imageEditor.brushes.defaultName', {
+        n: customBrushPresets.length + 1,
+      })).replace(/\.[^/.]+$/, '')
+      const preset: BrushPreset = {
+        id: crypto.randomUUID(),
+        name,
+        strokeWidth: 60,
+        options: {
+          hardness: 1,
+          spacing: 0.15,
+          flow: 1,
+          opacity: 1,
+          tipDataUrl: tipUrl,
+        },
+        thumbnailDataUrl: tipUrl,
+      }
+      const next = [...customBrushPresets, preset]
+      setCustomBrushPresets(next)
+      saveCustomBrushPresets(next)
+      setStrokeWidth(60)
+      setBrushOptions(preset.options)
+      toast.success(t('pages.imageEditor.brushes.importTipDone', { name }))
+    } catch {
+      toast.error(t('pages.imageEditor.errLoadFailed'))
+    }
+  }, [customBrushPresets, ensureImage, t])
+
   // ── Quick Mask (Q) ─────────────────────────────────────────────────────
   const handleToggleQuickMask = useCallback(async () => {
     if (!image) return
@@ -1343,36 +1632,14 @@ export function ImageEditorPage() {
         history.set({ ...state, quickMask: undefined })
         return
       }
-      // Scan-line polygon contour. For each row, record leftmost +
-      // rightmost "selected" (lum > 127) pixel. Build the polygon
-      // outline as the left side top→bottom + right side bottom→top.
-      // Convex-ish shapes get a good approximation; concave / disjoint
-      // shapes degrade to the union's outer envelope. Bbox is also
-      // computed as a fallback.
-      const leftCol: Array<{ y: number; x: number }> = []
-      const rightCol: Array<{ y: number; x: number }> = []
-      let minX = c.width, minY = c.height, maxX = -1, maxY = -1
-      for (let y = 0; y < c.height; y++) {
-        let xL = -1
-        let xR = -1
-        for (let x = 0; x < c.width; x++) {
-          const i = (y * c.width + x) * 4
-          const lum = (data.data[i] + data.data[i + 1] + data.data[i + 2]) / 3
-          if (lum > 127) {
-            if (xL < 0) xL = x
-            xR = x
-            if (x < minX) minX = x
-            if (x > maxX) maxX = x
-          }
-        }
-        if (xL >= 0) {
-          leftCol.push({ y, x: xL })
-          rightCol.push({ y, x: xR })
-          if (y < minY) minY = y
-          if (y > maxY) maxY = y
-        }
-      }
-      if (maxX < 0) {
+      // Marching-squares (Moore boundary) contour: walks the perimeter of
+      // the largest connected selected region. Concave shapes follow their
+      // true silhouette instead of degrading to a left/right envelope.
+      const path = extractMaskContour(data.data, c.width, c.height, {
+        threshold: 127,
+        maxPoints: 400,
+      })
+      if (path.length === 0) {
         history.set({
           ...state,
           quickMask: undefined,
@@ -1382,15 +1649,13 @@ export function ImageEditorPage() {
         toast.message(t('pages.imageEditor.quickMask.exitedEmpty'))
         return
       }
-      // Sample every Kth row to keep the polygon point count under a
-      // few hundred even for tall masks. K is chosen so we land around
-      // 200 polygon points total (L + R).
-      const stride = Math.max(1, Math.floor(leftCol.length / 100))
-      const path: Array<{ x: number; y: number }> = []
-      for (let i = 0; i < leftCol.length; i += stride) path.push(leftCol[i])
-      if (leftCol.length > 0) path.push(leftCol[leftCol.length - 1])
-      for (let i = rightCol.length - 1; i >= 0; i -= stride) path.push(rightCol[i])
-      if (rightCol.length > 0) path.push(rightCol[0])
+      let minX = c.width, minY = c.height, maxX = 0, maxY = 0
+      for (const p of path) {
+        if (p.x < minX) minX = p.x
+        if (p.x > maxX) maxX = p.x
+        if (p.y < minY) minY = p.y
+        if (p.y > maxY) maxY = p.y
+      }
       history.set({
         ...state,
         quickMask: undefined,
@@ -2618,6 +2883,12 @@ export function ImageEditorPage() {
               if ((l.kind === 'adjustment' || l.kind === 'filter') && l.maskDataUrl) return true
               return false
             })(),
+            applyMask: handleApplyMask,
+            canApplyMask: (() => {
+              if (!selectedLayerId || selectedLayerId === 'image') return false
+              const l = findLayerById(state.layers, selectedLayerId)
+              return !!l && l.kind === 'mask'
+            })(),
             openLayerStyle: handleOpenLayerStyle,
             zoomIn,
             zoomOut,
@@ -2817,6 +3088,17 @@ export function ImageEditorPage() {
             setCustomBrushPresets(next)
             saveCustomBrushPresets(next)
           }}
+          onImportBrushTip={handleImportBrushTip}
+          actions={state.actions ?? []}
+          isActionRecording={actionRecordingName !== undefined}
+          actionRecordingName={actionRecordingName}
+          actionRecordingStepCount={actionRecordingStepCount}
+          onSaveActionSnapshot={handleSaveActionSnapshot}
+          onStartActionRecording={handleStartActionRecording}
+          onStopActionRecording={handleStopActionRecording}
+          onCancelActionRecording={handleCancelActionRecording}
+          onPlayAction={handlePlayAction}
+          onDeleteAction={handleDeleteAction}
         />
 
         <StatusBar

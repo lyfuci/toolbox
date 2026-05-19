@@ -44,7 +44,7 @@ export function drawShape(
       drawMosaic(ctx, shape, scale, underlying)
       break
     case 'brush':
-      drawBrush(ctx, shape, scale)
+      drawBrush(ctx, shape, scale, imageCache)
       break
     case 'image':
       drawImageShape(ctx, shape, scale, imageCache)
@@ -360,8 +360,23 @@ function drawImageShape(
   ctx.drawImage(img, x * scale, y * scale, w * scale, h * scale)
 }
 
-function drawBrush(ctx: CanvasRenderingContext2D, s: BrushShape, scale: number) {
+function drawBrush(
+  ctx: CanvasRenderingContext2D,
+  s: BrushShape,
+  scale: number,
+  imageCache?: ImageCache,
+) {
   if (s.points.length === 0) return
+  // Custom tip stamp (imported brush) — always goes through the stamped path
+  // so each step is a tinted blit of the user-provided tip image. Falls back
+  // to the soft-tip stamped path if the tip image isn't loaded yet.
+  if (s.tipDataUrl && imageCache) {
+    const tipImg = imageCache.get(s.tipDataUrl)
+    if (tipImg) {
+      drawBrushWithTipImage(ctx, s, scale, tipImg)
+      return
+    }
+  }
   // Dispatch — stamped path is required when the brush has a soft edge or
   // partial-flow stamps; otherwise the legacy polyline path renders identically
   // to the pre-options behavior (and is materially faster).
@@ -373,6 +388,99 @@ function drawBrush(ctx: CanvasRenderingContext2D, s: BrushShape, scale: number) 
     return
   }
   drawBrushPolyline(ctx, s, scale)
+}
+
+/**
+ * Custom-tip stamped brush. Each step blits the imported tip image, sized to
+ * the brush diameter, tinted to the stroke colour by alpha-multiplying a
+ * solid colour rect through the tip's own alpha channel. Same offscreen
+ * assembly as the soft-tip path so flow/opacity composition is identical.
+ */
+function drawBrushWithTipImage(
+  ctx: CanvasRenderingContext2D,
+  s: BrushShape,
+  scale: number,
+  tipImg: HTMLImageElement,
+) {
+  const diameter = Math.max(1, s.strokeWidth * scale)
+  const radius = diameter / 2
+  const spacing = clamp01(s.spacing ?? 0.25)
+  const stepPx = Math.max(1, diameter * (spacing > 0 ? spacing : 0.05))
+  const stamps = planStamps(s.points, scale, stepPx)
+  if (stamps.length === 0) return
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const p of stamps) {
+    if (p.x < minX) minX = p.x
+    if (p.y < minY) minY = p.y
+    if (p.x > maxX) maxX = p.x
+    if (p.y > maxY) maxY = p.y
+  }
+  const offX = Math.floor(minX - radius - 1)
+  const offY = Math.floor(minY - radius - 1)
+  const offW = Math.ceil(maxX + radius + 1) - offX
+  const offH = Math.ceil(maxY + radius + 1) - offY
+  if (offW < 1 || offH < 1) return
+
+  const tipColor = tipColorForBrush(s)
+  const tinted = getTintedTip(tipImg, Math.round(diameter), tipColor)
+  const off = document.createElement('canvas')
+  off.width = offW
+  off.height = offH
+  const offCtx = off.getContext('2d')
+  if (!offCtx) return
+  const flow = clamp01(s.flow ?? 1)
+  offCtx.globalAlpha = flow
+  for (const p of stamps) {
+    offCtx.drawImage(tinted, p.x - radius - offX, p.y - radius - offY)
+  }
+
+  if (s.eraser) {
+    ctx.globalCompositeOperation = 'destination-out'
+  } else if (s.mode === 'burn') {
+    ctx.globalCompositeOperation = 'multiply'
+  } else if (s.mode === 'dodge') {
+    ctx.globalCompositeOperation = 'lighter'
+  }
+  ctx.drawImage(off, offX, offY)
+}
+
+/**
+ * Build (and cache) a colour-tinted copy of the tip image at the given
+ * diameter. The tint preserves the tip's alpha so the user's imported
+ * texture still drives the silhouette of every stamp.
+ */
+const tintedTipCache = new Map<string, HTMLCanvasElement>()
+const TINTED_TIP_CACHE_MAX = 64
+function getTintedTip(
+  img: HTMLImageElement,
+  diameter: number,
+  color: string,
+): HTMLCanvasElement {
+  const D = Math.max(1, diameter)
+  const key = `${img.src.length}:${img.src.slice(-32)}|${D}|${color}`
+  const cached = tintedTipCache.get(key)
+  if (cached) {
+    tintedTipCache.delete(key)
+    tintedTipCache.set(key, cached)
+    return cached
+  }
+  const c = document.createElement('canvas')
+  c.width = D
+  c.height = D
+  const cx = c.getContext('2d')
+  if (cx) {
+    cx.drawImage(img, 0, 0, D, D)
+    cx.globalCompositeOperation = 'source-in'
+    cx.fillStyle = color
+    cx.fillRect(0, 0, D, D)
+  }
+  tintedTipCache.set(key, c)
+  if (tintedTipCache.size > TINTED_TIP_CACHE_MAX) {
+    const first = tintedTipCache.keys().next().value
+    if (first) tintedTipCache.delete(first)
+  }
+  return c
 }
 
 function drawBrushPolyline(

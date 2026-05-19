@@ -175,6 +175,15 @@ export type BrushShape = {
    * Undefined treated as 1. Forces the stamped path when < 1.
    */
   flow?: number
+  /**
+   * Optional custom brush tip image as a dataUrl. When set the renderer
+   * tints + stamps this image at every step instead of building a soft
+   * circular tip — same composite pipeline (offscreen flow / opacity), just
+   * a different stamp shape. Resolved via the same `imageCache` used by
+   * image-shape layers; unloaded tip falls back to the soft tip for the
+   * frame.
+   */
+  tipDataUrl?: string
 }
 export type ImageShape = {
   kind: 'image'
@@ -751,6 +760,41 @@ export type PhotoFilterParams = {
   preserveLuminosity: boolean
 }
 
+/**
+ * Camera Raw — one-stop ACR/Lightroom-style adjustment bundle. All ranges
+ * mirror Lightroom's basic panel (white balance + tone + presence). Since
+ * this lives on AdjustmentParams (per-pixel only), clarity / dehaze are
+ * approximated via global midtone contrast + saturation rather than the
+ * neighbourhood-based USM that ACR uses — looks plausible at moderate
+ * settings; users wanting precise local-contrast clarity should reach for
+ * the Unsharp Mask filter layer.
+ */
+export type CameraRawParams = {
+  kind: 'cameraRaw'
+  /** -100..100 — cool (blue-shift) ← 0 → warm (yellow-shift). */
+  temperature: number
+  /** -100..100 — green ← 0 → magenta. */
+  tint: number
+  /** -2..2 — additional exposure compensation in stops. */
+  exposure: number
+  /** -100..100 — positive recovers highlights (darker), negative brightens. */
+  highlights: number
+  /** -100..100 — positive opens shadows (brighter), negative darkens. */
+  shadows: number
+  /** -100..100 — shifts the white clipping point. */
+  whites: number
+  /** -100..100 — shifts the black clipping point. */
+  blacks: number
+  /** -100..100 — midtone contrast bump (per-pixel approximation). */
+  clarity: number
+  /** -100..100 — saturation that protects already-saturated pixels. */
+  vibrance: number
+  /** -100..100 — flat saturation multiplier. */
+  saturation: number
+  /** -100..100 — contrast + saturation boost approximating ACR dehaze. */
+  dehaze: number
+}
+
 export type AdjustmentParams =
   | LevelsParams
   | CurvesParams
@@ -765,6 +809,7 @@ export type AdjustmentParams =
   | ChannelMixerParams
   | GradientMapParams
   | PhotoFilterParams
+  | CameraRawParams
 
 export type AdjustmentKind = AdjustmentParams['kind']
 
@@ -1053,6 +1098,32 @@ export type EditorState = {
    * transient editing mode).
    */
   quickMask?: { dataUrl: string; w: number; h: number }
+  /**
+   * Saved Actions (PS "Actions" panel — really closer to PS "Snapshots"
+   * here because the editor doesn't store a command vocabulary it can
+   * replay). Each action captures one or more EditorState snapshots; one-
+   * shot snapshots restore instantly, multi-step recordings replay
+   * sequentially with a small per-step delay so the user sees the
+   * progression. Actions are stripped out of any captured snapshot to
+   * keep the structure non-recursive.
+   */
+  actions?: Action[]
+}
+
+/**
+ * One saved Action — name + chronologically ordered list of EditorState
+ * snapshots. A 1-step action restores instantly (just `history.set(steps[0])`);
+ * multi-step actions get replayed with a small delay between steps so the
+ * user sees each intermediate result. Actions don't carry image pixels
+ * (those live outside EditorState), so they're only meaningful when the
+ * bound image / smartSources are still compatible — same document.
+ */
+export type Action = {
+  id: string
+  name: string
+  /** ISO-8601 timestamp captured at save time. Display-only. */
+  createdAt: string
+  steps: EditorState[]
 }
 
 /** One saved layer composite — a named restore point for the layer stack. */
@@ -1094,6 +1165,11 @@ export type BrushOptions = {
   spacing: number // 0..1
   flow: number // 0..1
   opacity: number // 0..1, brush + eraser only
+  /** Optional imported brush tip image (dataUrl). When set, picks override
+   *  the soft-circle tip with this stamp. Persisted in custom brush presets;
+   *  not stored in EditorState (it lives on the editor instance like the
+   *  rest of BrushOptions). */
+  tipDataUrl?: string
 }
 
 /**
