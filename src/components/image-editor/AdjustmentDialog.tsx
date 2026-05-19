@@ -226,6 +226,8 @@ function LevelsForm({
   )
 }
 
+type CurvesChannel = 'rgb' | 'r' | 'g' | 'b'
+
 function CurvesForm({
   value,
   onChange,
@@ -234,24 +236,55 @@ function CurvesForm({
   onChange: (patch: Partial<CurvesParams>) => void
 }) {
   const { t } = useTranslation()
+  const [channel, setChannel] = useState<CurvesChannel>('rgb')
+  const identity = [
+    { x: 0, y: 0 },
+    { x: 255, y: 255 },
+  ]
+  const currentPoints =
+    channel === 'rgb'
+      ? value.points
+      : (value[channel] ?? identity)
+  const setCurrentPoints = (points: Array<{ x: number; y: number }>) => {
+    if (channel === 'rgb') {
+      onChange({ points })
+    } else {
+      onChange({ [channel]: points } as Partial<CurvesParams>)
+    }
+  }
+  const resetCurrent = () => {
+    if (channel === 'rgb') {
+      onChange({ points: identity })
+    } else {
+      // Setting to undefined cleans up the optional field — keeps round-trip
+      // JSON minimal for projects that never touched a channel.
+      onChange({ [channel]: undefined } as Partial<CurvesParams>)
+    }
+  }
+  const channelTint =
+    channel === 'r' ? '#ff5252' : channel === 'g' ? '#52ff7a' : channel === 'b' ? '#5288ff' : undefined
   return (
     <div className="flex flex-col items-center gap-2">
-      <CurvesEditor points={value.points} onChange={(points) => onChange({ points })} />
+      <div className="flex w-full items-center gap-1 text-xs">
+        <Label className="w-16 text-muted-foreground">
+          {t('pages.imageEditor.adjustments.curvesChannel')}
+        </Label>
+        <select
+          value={channel}
+          onChange={(e) => setChannel(e.target.value as CurvesChannel)}
+          className="h-7 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+        >
+          <option value="rgb">{t('pages.imageEditor.adjustments.curvesChannels.rgb')}</option>
+          <option value="r">{t('pages.imageEditor.adjustments.curvesChannels.r')}</option>
+          <option value="g">{t('pages.imageEditor.adjustments.curvesChannels.g')}</option>
+          <option value="b">{t('pages.imageEditor.adjustments.curvesChannels.b')}</option>
+        </select>
+      </div>
+      <CurvesEditor points={currentPoints} onChange={setCurrentPoints} tint={channelTint} />
       <p className="text-xs text-muted-foreground text-center">
         {t('pages.imageEditor.adjustments.curvesHint')}
       </p>
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={() =>
-          onChange({
-            points: [
-              { x: 0, y: 0 },
-              { x: 255, y: 255 },
-            ],
-          })
-        }
-      >
+      <Button size="sm" variant="ghost" onClick={resetCurrent}>
         {t('pages.imageEditor.reset')}
       </Button>
     </div>

@@ -18,6 +18,7 @@ import type {
   FilterParams,
   GaussianBlurParams,
   HighPassParams,
+  LocalContrastParams,
   MosaicParams,
   SharpenParams,
   UnsharpMaskParams,
@@ -116,6 +117,9 @@ function FilterDialogInner({
           </p>
         )}
         {draft.kind === 'emboss' && <EmbossForm value={draft} onChange={update} />}
+        {draft.kind === 'localContrast' && (
+          <LocalContrastForm value={draft} onChange={update} />
+        )}
       </div>
       <DialogFooter>
         <Button variant="ghost" onClick={onCancel}>
@@ -344,6 +348,42 @@ function EmbossForm({
         max={500}
         unit="%"
         onChange={(v) => onChange({ amount: Math.round(v) })}
+      />
+    </>
+  )
+}
+
+function LocalContrastForm({
+  value,
+  onChange,
+}: {
+  value: LocalContrastParams
+  onChange: (patch: Partial<LocalContrastParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <Slider
+        label={t('pages.imageEditor.filters.clarity')}
+        value={value.clarity}
+        min={-100}
+        max={100}
+        onChange={(v) => onChange({ clarity: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.dehaze')}
+        value={value.dehaze}
+        min={-100}
+        max={100}
+        onChange={(v) => onChange({ dehaze: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.radius')}
+        value={value.radius}
+        min={1}
+        max={100}
+        unit=" px"
+        onChange={(v) => onChange({ radius: Math.round(v) })}
       />
     </>
   )
