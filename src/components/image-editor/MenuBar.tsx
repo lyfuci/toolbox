@@ -30,6 +30,7 @@ type MenuDef = {
 type Props = {
   /** Action handlers — the editor wires only what it implements. */
   handlers: {
+    newDocument?: () => void
     open?: () => void
     save?: () => void
     saveAs?: () => void
@@ -98,6 +99,10 @@ type Props = {
     /** Add a per-adjustment / per-filter raster mask to the selected layer. */
     addAdjustmentMask?: () => void
     isAdjustmentOrFilterSelected?: boolean
+    /** Remove the mask from selected layer (deletes MaskLayer or clears
+     *  adjustment/filter mask). */
+    removeMask?: () => void
+    canRemoveMask?: boolean
     zoomIn?: () => void
     zoomOut?: () => void
     zoomFit?: () => void
@@ -131,6 +136,12 @@ export function MenuBar({ handlers }: Props) {
       label: t('pages.imageEditor.menu.file'),
       sections: [
         [
+          {
+            id: 'newDoc',
+            label: t('pages.imageEditor.menu.newDocument') + '…',
+            shortcut: '⌘N',
+            onClick: handlers.newDocument,
+          },
           { id: 'open', label: t('pages.imageEditor.menu.open'), shortcut: '⌘O', onClick: handlers.open },
           {
             id: 'save',
@@ -329,6 +340,16 @@ export function MenuBar({ handlers }: Props) {
             id: 'adj-channelMixer',
             label: t('pages.imageEditor.adjustments.channelMixer.title') + '…',
             onClick: () => handlers.openAdjustment?.('channelMixer'),
+          },
+          {
+            id: 'adj-gradientMap',
+            label: t('pages.imageEditor.adjustments.gradientMap') + '…',
+            onClick: () => handlers.openAdjustment?.('gradientMap'),
+          },
+          {
+            id: 'adj-photoFilter',
+            label: t('pages.imageEditor.adjustments.photoFilter') + '…',
+            onClick: () => handlers.openAdjustment?.('photoFilter'),
           },
         ],
       ],
@@ -609,6 +630,12 @@ export function MenuBar({ handlers }: Props) {
             label: t('pages.imageEditor.menu.addAdjustmentMask'),
             onClick: handlers.addAdjustmentMask,
             disabled: !handlers.isAdjustmentOrFilterSelected,
+          },
+          {
+            id: 'removeMask',
+            label: t('pages.imageEditor.menu.removeMask'),
+            onClick: handlers.removeMask,
+            disabled: !handlers.canRemoveMask,
           },
           {
             id: 'replaceSO',

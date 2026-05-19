@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import type { BrushOptions, FontStyle, FontWeight, TextAlign, TextOptions, Tool } from '@/lib/image-editor/types'
 
+import { CROP_ASPECTS } from '@/lib/image-editor/crop-presets'
+
 /** Curated web-safe font families. Browsers fall back per the CSS spec
  *  if a family isn't installed. Adding custom @font-face declarations is
  *  a follow-up; the curated list keeps the dropdown short and predictable. */
@@ -44,6 +46,9 @@ type Props = {
   /** True when an applied crop is in state — surfaces "Clear crop" button. */
   hasActiveCrop?: boolean
   onClearCrop?: () => void
+  /** Crop aspect-ratio preset id (from CROP_ASPECTS). */
+  cropAspectId: string
+  setCropAspectId: (id: string) => void
   /** True when a marquee selection is active — surfaces "Deselect" button. */
   hasSelection?: boolean
   onClearSelection?: () => void
@@ -76,6 +81,8 @@ export function OptionsBar({
   stubMessage,
   hasActiveCrop,
   onClearCrop,
+  cropAspectId,
+  setCropAspectId,
   hasSelection,
   onClearSelection,
 }: Props) {
@@ -285,6 +292,22 @@ export function OptionsBar({
   if (tool === 'crop') {
     return (
       <div className="pf-options">
+        <div className="pf-opt-group">
+          <span className="pf-opt-label">
+            {t('pages.imageEditor.cropAspect')}:
+          </span>
+          <select
+            value={cropAspectId}
+            onChange={(e) => setCropAspectId(e.target.value)}
+            className="h-6 rounded border border-input bg-background px-1 text-xs"
+          >
+            {CROP_ASPECTS.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="pf-opt-group">
           <span className="pf-opt-label" style={{ marginRight: 0 }}>
             {t('pages.imageEditor.cropPendingHint')}

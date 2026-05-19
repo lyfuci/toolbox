@@ -455,6 +455,27 @@
         "invert": "反相",
         "vibrance": "自然饱和度",
         "exposure": "曝光度",
+        "gradientMap": "渐变映射",
+        "gradientMapStops": {
+          "dark": "暗部颜色",
+          "light": "亮部颜色"
+        },
+        "photoFilter": "照片滤镜",
+        "photoFilterPreset": "预设",
+        "photoFilterColor": "颜色",
+        "photoFilterDensity": "浓度",
+        "photoFilterPreserveLum": "保留明度",
+        "photoFilterPresets": {
+          "warming85": "暖色滤镜 (85)",
+          "warming81": "暖色滤镜 (81)",
+          "cooling80": "冷色滤镜 (80)",
+          "cooling82": "冷色滤镜 (82)",
+          "sepia": "深褐色",
+          "red": "红",
+          "green": "绿",
+          "blue": "蓝",
+          "custom": "自定义"
+        },
         "channelMixer": {
           "title": "通道混合器",
           "outR": "输出：红",
@@ -555,6 +576,7 @@
         "exportJpeg": "导出为 JPEG",
         "exportWebp": "导出为 WebP",
         "saveForWeb": "存储为 Web 所用格式",
+        "newDocument": "新建文档",
         "undo": "撤销",
         "redo": "重做",
         "rotate90": "旋转 90°",
@@ -576,6 +598,7 @@
         "newRasterMask": "新建栅格蒙版图层",
         "convertMaskToRaster": "蒙版转换为栅格",
         "addAdjustmentMask": "为调整图层添加蒙版",
+        "removeMask": "移除蒙版",
         "imageSize": "图像大小",
         "canvasSize": "画布大小",
         "rotateArbitrary": "任意角度旋转",
@@ -680,6 +703,26 @@
         "exitedNoSel": "已退出快速蒙版 —— 蒙版未加载，选区未变",
         "exitedEmpty": "已退出快速蒙版 —— 没有选中的像素"
       },
+      "newDoc": {
+        "title": "新建文档",
+        "preset": "预设",
+        "width": "宽度",
+        "height": "高度",
+        "bgColor": "背景色",
+        "create": "创建",
+        "created": "已创建新文档",
+        "presets": {
+          "web1920": "Web — 1920×1080",
+          "web1280": "Web — 1280×720",
+          "a4": "A4 — 300 DPI",
+          "letter": "US Letter — 300 DPI",
+          "square2048": "正方形 — 2048",
+          "square1024": "正方形 — 1024",
+          "instagram": "Instagram 帖子",
+          "instagramStory": "Instagram 故事",
+          "custom": "自定义"
+        }
+      },
       "saveForWeb": {
         "title": "存储为 Web 格式",
         "format": "格式",
@@ -687,6 +730,11 @@
         "size": "估计大小：{{kb}} KB",
         "computing": "计算中…",
         "save": "保存"
+      },
+      "maskActions": {
+        "removedMaskLayer": "已移除蒙版图层",
+        "removedAdjMask": "已移除调整蒙版",
+        "noMaskToRemove": "所选图层没有蒙版。"
       },
       "adjMask": {
         "added": "已为图层添加蒙版 —— 用画笔涂抹以控制效果作用范围",
@@ -800,6 +848,7 @@
       "deselect": "取消选区",
       "rotateViewHint": "旋转视图 (R)：每次点击旋转工作区 90°，仅影响显示，不修改像素。",
       "textToolHint": "文字 (T)：在画布上单击以新增文字。",
+      "cropAspect": "比例",
       "text": {
         "fontFamily": "字体",
         "fontSize": "字号",

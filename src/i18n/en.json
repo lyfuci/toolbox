@@ -455,6 +455,27 @@
         "invert": "Invert",
         "vibrance": "Vibrance",
         "exposure": "Exposure",
+        "gradientMap": "Gradient Map",
+        "gradientMapStops": {
+          "dark": "Dark stop",
+          "light": "Light stop"
+        },
+        "photoFilter": "Photo Filter",
+        "photoFilterPreset": "Preset",
+        "photoFilterColor": "Color",
+        "photoFilterDensity": "Density",
+        "photoFilterPreserveLum": "Preserve luminosity",
+        "photoFilterPresets": {
+          "warming85": "Warming Filter (85)",
+          "warming81": "Warming Filter (81)",
+          "cooling80": "Cooling Filter (80)",
+          "cooling82": "Cooling Filter (82)",
+          "sepia": "Sepia",
+          "red": "Red",
+          "green": "Green",
+          "blue": "Blue",
+          "custom": "Custom"
+        },
         "channelMixer": {
           "title": "Channel Mixer",
           "outR": "Output: Red",
@@ -555,6 +576,7 @@
         "exportJpeg": "Export as JPEG",
         "exportWebp": "Export as WebP",
         "saveForWeb": "Save for Web",
+        "newDocument": "New Document",
         "undo": "Undo",
         "redo": "Redo",
         "rotate90": "Rotate 90° CW",
@@ -576,6 +598,7 @@
         "newRasterMask": "New Raster Mask Layer",
         "convertMaskToRaster": "Convert Mask to Raster",
         "addAdjustmentMask": "Add Mask to Adjustment",
+        "removeMask": "Remove Mask",
         "imageSize": "Image Size",
         "canvasSize": "Canvas Size",
         "rotateArbitrary": "Arbitrary Rotation",
@@ -680,6 +703,26 @@
         "exitedNoSel": "Quick Mask exited — mask wasn't loaded, selection unchanged",
         "exitedEmpty": "Quick Mask exited — no selected pixels"
       },
+      "newDoc": {
+        "title": "New Document",
+        "preset": "Preset",
+        "width": "Width",
+        "height": "Height",
+        "bgColor": "Background",
+        "create": "Create",
+        "created": "New document created",
+        "presets": {
+          "web1920": "Web — 1920×1080",
+          "web1280": "Web — 1280×720",
+          "a4": "A4 — 300 DPI",
+          "letter": "US Letter — 300 DPI",
+          "square2048": "Square — 2048",
+          "square1024": "Square — 1024",
+          "instagram": "Instagram Post",
+          "instagramStory": "Instagram Story",
+          "custom": "Custom"
+        }
+      },
       "saveForWeb": {
         "title": "Save for Web",
         "format": "Format",
@@ -687,6 +730,11 @@
         "size": "Estimated size: {{kb}} KB",
         "computing": "Estimating size…",
         "save": "Save"
+      },
+      "maskActions": {
+        "removedMaskLayer": "Mask layer removed",
+        "removedAdjMask": "Adjustment mask removed",
+        "noMaskToRemove": "No mask on the selected layer."
       },
       "adjMask": {
         "added": "Mask added to layer — paint with the brush to gate where the effect applies",
@@ -800,6 +848,7 @@
       "deselect": "Deselect",
       "rotateViewHint": "Rotate View (R): each click rotates the workspace 90°. Pixels are not modified — purely a viewing aid.",
       "textToolHint": "Type (T): click on the canvas to add text.",
+      "cropAspect": "Aspect",
       "text": {
         "fontFamily": "Font family",
         "fontSize": "Size",
