@@ -5,6 +5,9 @@ type Point = { x: number; y: number }
 type Props = {
   points: Point[]
   onChange: (points: Point[]) => void
+  /** Optional stroke colour for the curve line — used to tint per-channel
+   *  curves (R / G / B) so the user can tell which channel they're editing. */
+  tint?: string
 }
 
 const SIZE = 256
@@ -19,7 +22,7 @@ const HIT_RADIUS = 10
  * spans the full input range. All other points are sorted by x on every
  * change so the parent (curve LUT builder) sees a monotonic-x list.
  */
-export function CurvesEditor({ points, onChange }: Props) {
+export function CurvesEditor({ points, onChange, tint }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const dragRef = useRef<{ index: number } | null>(null)
 
@@ -50,7 +53,7 @@ export function CurvesEditor({ points, onChange }: Props) {
     ctx.stroke()
     // Draw the curve by sampling 256 LUT entries (Catmull-Rom).
     const lut = lutFromPoints(points)
-    ctx.strokeStyle = '#fff'
+    ctx.strokeStyle = tint ?? '#fff'
     ctx.lineWidth = 1.5
     ctx.beginPath()
     for (let x = 0; x < 256; x++) {
@@ -69,7 +72,7 @@ export function CurvesEditor({ points, onChange }: Props) {
       ctx.fill()
       ctx.stroke()
     }
-  }, [points])
+  }, [points, tint])
 
   const toCurveCoords = (e: React.MouseEvent<HTMLCanvasElement>): Point => {
     const rect = e.currentTarget.getBoundingClientRect()

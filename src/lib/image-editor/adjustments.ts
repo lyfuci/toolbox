@@ -145,7 +145,7 @@ export function applyAdjustment(
       applyLut(data, levelsLut(params))
       return
     case 'curves':
-      applyLut(data, curvesLut(params))
+      applyCurves(data, params)
       return
     case 'posterize':
       applyLut(data, posterizeLut(params))
@@ -468,6 +468,34 @@ function levelsLut(p: LevelsParams): Uint8ClampedArray {
     lut[i] = Math.round(v * outRange + outB)
   }
   return lut
+}
+
+/**
+ * Curves with optional per-channel layering. The master LUT applies to all
+ * three channels; if r / g / b curves are present, each channel passes
+ * through the master LUT first then the per-channel LUT — same composition
+ * order PS uses (RGB master then specific channel).
+ */
+function applyCurves(data: Uint8ClampedArray, p: CurvesParams): void {
+  const master = curvesLut(p)
+  const rExtra = p.r ? curveLutFromPoints(p.r) : null
+  const gExtra = p.g ? curveLutFromPoints(p.g) : null
+  const bExtra = p.b ? curveLutFromPoints(p.b) : null
+  for (let i = 0; i < data.length; i += 4) {
+    let r = master[data[i]]
+    let g = master[data[i + 1]]
+    let b = master[data[i + 2]]
+    if (rExtra) r = rExtra[r]
+    if (gExtra) g = gExtra[g]
+    if (bExtra) b = bExtra[b]
+    data[i] = r
+    data[i + 1] = g
+    data[i + 2] = b
+  }
+}
+
+function curveLutFromPoints(points: Array<{ x: number; y: number }>): Uint8ClampedArray {
+  return curvesLut({ kind: 'curves', points })
 }
 
 function curvesLut(p: CurvesParams): Uint8ClampedArray {

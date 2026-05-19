@@ -48,7 +48,14 @@ import { DEFAULT_BRUSH_OPTIONS, DEFAULT_TEXT_OPTIONS, initialState, PREVIEW_MAX 
 import { fillSelection, strokeSelection, type StrokePosition } from '@/lib/image-editor/edit-ops'
 import { floodFillMask, maskToDataUrl } from '@/lib/image-editor/flood-fill'
 import { useHistoryState } from '@/lib/image-editor/history'
+import { useActionHandlers } from '@/lib/image-editor/hooks/useActionHandlers'
+import { useBrushTipImport } from '@/lib/image-editor/hooks/useBrushTipImport'
 import { extractMaskContour } from '@/lib/image-editor/mask-contour'
+import {
+  combineRectSelection,
+  combinePathSelection,
+  type SelectionModifier,
+} from '@/lib/image-editor/selection-combine'
 import { fileToDataUrl, useImageCache } from '@/lib/image-editor/image-cache'
 import type { ImageCache } from '@/lib/image-editor/drawing'
 import {
@@ -80,7 +87,6 @@ import {
   serializeProject,
 } from '@/lib/image-editor/serialize'
 import type {
-  Action,
   AdjustmentKind,
   AdjustmentLayer,
   AdjustmentParams,
@@ -101,18 +107,6 @@ import type {
   Tool,
   Transforms,
 } from '@/lib/image-editor/types'
-
-/**
- * Strip the `actions` field off a state snapshot before storing it inside
- * an Action's steps. Stops actions from nesting recursively (an action that
- * captures the current state should not also capture every prior action).
- */
-function stripActions(s: EditorState): EditorState {
-  if (!s.actions) return s
-  const { actions: _omit, ...rest } = s
-  void _omit
-  return rest
-}
 
 /**
  * Image editor page (PixelForge shell).
@@ -222,26 +216,9 @@ export function ImageEditorPage() {
     if (brushTipDataUrl) ensureImage(brushTipDataUrl).catch(() => {})
   }, [brushTipDataUrl, ensureImage])
 
-  // ── Actions panel state ────────────────────────────────────────────────
-  //
-  // Recording captures every state transition while active. We stash the
-  // mutable list on a ref so the state-change effect can push without
-  // triggering itself; the step count is mirrored to React state for the
-  // UI badge.
-  const actionRecordingRef = useRef<{ name: string; steps: EditorState[] } | null>(null)
-  const [actionRecordingName, setActionRecordingName] = useState<string | undefined>(undefined)
-  const [actionRecordingStepCount, setActionRecordingStepCount] = useState(0)
-  const lastRecordedRef = useRef<EditorState | null>(null)
-  useEffect(() => {
-    const rec = actionRecordingRef.current
-    if (!rec) return
-    // Avoid recording the same state twice in a row (defensive — guards
-    // against the effect firing for no-op renders).
-    if (lastRecordedRef.current === state) return
-    rec.steps.push(stripActions(state))
-    lastRecordedRef.current = state
-    setActionRecordingStepCount(rec.steps.length)
-  }, [state])
+  // Actions panel state + handlers — bundled into a custom hook to keep
+  // this top-level component focused on orchestration.
+  const actionHandlers = useActionHandlers(state, history, t)
 
   const duplicateRef = useRef<() => void>(() => {})
   const moveLayerRef = useRef<(d: 'forward' | 'backward' | 'front' | 'back') => void>(() => {})
@@ -1434,177 +1411,17 @@ export function ImageEditorPage() {
     toast.success(t('pages.imageEditor.maskRaster.converted'))
   }, [image, selectedLayerId, state, ensureImage, patchLayer, t])
 
-  // ── Action / snapshot handlers ─────────────────────────────────────────
-  const handleSaveActionSnapshot = useCallback(
-    (name: string) => {
-      const action: Action = {
-        id: crypto.randomUUID(),
-        name,
-        createdAt: new Date().toISOString(),
-        steps: [stripActions(state)],
-      }
-      history.set({ ...state, actions: [...(state.actions ?? []), action] })
-      toast.success(t('pages.imageEditor.actions.snapshotSaved'))
-    },
-    [state, history, t],
-  )
-
-  const handleStartActionRecording = useCallback(
-    (name: string) => {
-      actionRecordingRef.current = { name, steps: [stripActions(state)] }
-      lastRecordedRef.current = state
-      setActionRecordingName(name)
-      setActionRecordingStepCount(1)
-      toast.message(t('pages.imageEditor.actions.recordStarted'))
-    },
-    [state, t],
-  )
-
-  const handleStopActionRecording = useCallback(() => {
-    const rec = actionRecordingRef.current
-    if (!rec) return
-    actionRecordingRef.current = null
-    setActionRecordingName(undefined)
-    setActionRecordingStepCount(0)
-    if (rec.steps.length < 2) {
-      toast.message(t('pages.imageEditor.actions.recordEmpty'))
-      return
-    }
-    const action: Action = {
-      id: crypto.randomUUID(),
-      name: rec.name,
-      createdAt: new Date().toISOString(),
-      steps: rec.steps,
-    }
-    history.set({ ...state, actions: [...(state.actions ?? []), action] })
-    toast.success(t('pages.imageEditor.actions.recordSaved', { n: rec.steps.length }))
-  }, [state, history, t])
-
-  const handleCancelActionRecording = useCallback(() => {
-    actionRecordingRef.current = null
-    setActionRecordingName(undefined)
-    setActionRecordingStepCount(0)
-    toast.message(t('pages.imageEditor.actions.recordCancelled'))
-  }, [t])
-
-  const handlePlayAction = useCallback(
-    (id: string) => {
-      const action = state.actions?.find((a) => a.id === id)
-      if (!action || action.steps.length === 0) return
-      // 1-step actions = instant snapshot restore.
-      if (action.steps.length === 1) {
-        history.set({ ...action.steps[0], actions: state.actions })
-        toast.success(t('pages.imageEditor.actions.played', { name: action.name }))
-        return
-      }
-      // Multi-step: replay each step with a short delay so the user can see
-      // the progression. Preserves the saved actions list across each step.
-      const steps = action.steps
-      const delay = 200
-      steps.forEach((step, i) => {
-        setTimeout(() => {
-          history.set({ ...step, actions: state.actions })
-        }, i * delay)
-      })
-      setTimeout(() => {
-        toast.success(t('pages.imageEditor.actions.played', { name: action.name }))
-      }, steps.length * delay)
-    },
-    [state, history, t],
-  )
-
-  const handleDeleteAction = useCallback(
-    (id: string) => {
-      const next = (state.actions ?? []).filter((a) => a.id !== id)
-      history.set({ ...state, actions: next })
-    },
-    [state, history],
-  )
-
-  /**
-   * Import a brush tip from a user-supplied image file (PNG / JPG / etc.).
-   * Resizes to a 128 px tip on a transparent square, derives the tip mask
-   * from the image's alpha (PNG) or luminance (no-alpha sources), and
-   * persists the result as a new custom brush preset that lights up the
-   * brush's stamped pipeline. Also flips the editor's active brush to the
-   * imported tip so the user can paint with it right away.
-   */
-  const handleImportBrushTip = useCallback(async (file: File) => {
-    try {
-      const dataUrl = await fileToDataUrl(file)
-      const img = await ensureImage(dataUrl)
-      const TIP = 128
-      const c = document.createElement('canvas')
-      c.width = TIP
-      c.height = TIP
-      const ctx = c.getContext('2d')
-      if (!ctx) return
-      // Centre-fit so non-square tips don't stretch; uses the largest dim
-      // as the fit edge.
-      const srcW = img.naturalWidth
-      const srcH = img.naturalHeight
-      const fit = Math.max(srcW, srcH, 1)
-      const dw = (srcW * TIP) / fit
-      const dh = (srcH * TIP) / fit
-      ctx.drawImage(img, (TIP - dw) / 2, (TIP - dh) / 2, dw, dh)
-      // If the source had no alpha (JPG), derive the tip silhouette from the
-      // luminance — bright pixels become opaque, dark pixels become
-      // transparent. Heuristic: check the four corner pixels; if all opaque,
-      // assume no usable alpha channel.
-      let needsLumKey = false
-      try {
-        const probe = ctx.getImageData(0, 0, TIP, TIP)
-        const a0 = probe.data[3]
-        const a1 = probe.data[(TIP - 1) * 4 + 3]
-        const a2 = probe.data[((TIP - 1) * TIP) * 4 + 3]
-        const a3 = probe.data[((TIP * TIP) - 1) * 4 + 3]
-        needsLumKey = a0 === 255 && a1 === 255 && a2 === 255 && a3 === 255
-        if (needsLumKey) {
-          for (let i = 0; i < probe.data.length; i += 4) {
-            const r = probe.data[i]
-            const g = probe.data[i + 1]
-            const b = probe.data[i + 2]
-            const lum = (r * 299 + g * 587 + b * 114) / 1000
-            // Invert: a black brush mark on white paper should be opaque.
-            probe.data[i + 3] = 255 - lum
-            // Force colour to white so the tint pass owns the appearance.
-            probe.data[i] = 255
-            probe.data[i + 1] = 255
-            probe.data[i + 2] = 255
-          }
-          ctx.putImageData(probe, 0, 0)
-        }
-      } catch {
-        // CORS-tainted (shouldn't happen for local file picks) — keep as-is.
-      }
-      const tipUrl = c.toDataURL('image/png')
-      await ensureImage(tipUrl).catch(() => {})
-      const name = (file.name || t('pages.imageEditor.brushes.defaultName', {
-        n: customBrushPresets.length + 1,
-      })).replace(/\.[^/.]+$/, '')
-      const preset: BrushPreset = {
-        id: crypto.randomUUID(),
-        name,
-        strokeWidth: 60,
-        options: {
-          hardness: 1,
-          spacing: 0.15,
-          flow: 1,
-          opacity: 1,
-          tipDataUrl: tipUrl,
-        },
-        thumbnailDataUrl: tipUrl,
-      }
-      const next = [...customBrushPresets, preset]
-      setCustomBrushPresets(next)
-      saveCustomBrushPresets(next)
-      setStrokeWidth(60)
-      setBrushOptions(preset.options)
-      toast.success(t('pages.imageEditor.brushes.importTipDone', { name }))
-    } catch {
-      toast.error(t('pages.imageEditor.errLoadFailed'))
-    }
-  }, [customBrushPresets, ensureImage, t])
+  // Brush tip import — extracted to a hook so the file-picker plumbing,
+  // alpha-vs-luminance discrimination, and preset persistence don't bloat
+  // this component. See useBrushTipImport for the heuristic.
+  const handleImportBrushTip = useBrushTipImport({
+    customBrushPresets,
+    setCustomBrushPresets,
+    setStrokeWidth,
+    setBrushOptions,
+    ensureImage,
+    t,
+  })
 
   // ── Quick Mask (Q) ─────────────────────────────────────────────────────
   const handleToggleQuickMask = useCallback(async () => {
@@ -2060,7 +1877,10 @@ export function ImageEditorPage() {
    * original-image preview-pixel space (where shape coords live).
    */
   const handleCommitSelection = useCallback(
-    (rect: { x: number; y: number; w: number; h: number }) => {
+    (
+      rect: { x: number; y: number; w: number; h: number },
+      mod: SelectionModifier,
+    ) => {
       const cropOriginX = state.cropRect
         ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w)
         : 0
@@ -2071,9 +1891,17 @@ export function ImageEditorPage() {
       const y0 = Math.min(rect.y, rect.y + rect.h) + cropOriginY
       const w = Math.abs(rect.w)
       const h = Math.abs(rect.h)
-      history.set({ ...state, selection: { x: x0, y: y0, w, h }, selectionPath: undefined })
+      const fresh = { x: x0, y: y0, w, h }
+      // Replace mode (default, no modifier) or no existing selection: just
+      // overwrite. Modifier flows need a previous selection to combine with.
+      if (mod === 'replace' || !state.selection) {
+        history.set({ ...state, selection: fresh, selectionPath: undefined, selectionInverse: false })
+        return
+      }
+      const combined = combineRectSelection(state, fresh, mod, image)
+      history.set({ ...state, ...combined })
     },
-    [history, state],
+    [history, state, image],
   )
 
   /**
@@ -2083,7 +1911,7 @@ export function ImageEditorPage() {
    * original-image preview-pixel space — same convention as marquee.
    */
   const handleCommitPolygonSelection = useCallback(
-    (points: Point[]) => {
+    (points: Point[], mod: SelectionModifier) => {
       if (points.length < 3) return
       const cropOriginX = state.cropRect
         ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w)
@@ -2102,13 +1930,20 @@ export function ImageEditorPage() {
         if (p.x > maxX) maxX = p.x
         if (p.y > maxY) maxY = p.y
       }
-      history.set({
-        ...state,
-        selection: { x: minX, y: minY, w: maxX - minX, h: maxY - minY },
-        selectionPath: shifted,
-      })
+      const fresh = { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+      if (mod === 'replace' || !state.selection) {
+        history.set({
+          ...state,
+          selection: fresh,
+          selectionPath: shifted,
+          selectionInverse: false,
+        })
+        return
+      }
+      const combined = combinePathSelection(state, shifted, fresh, mod, image)
+      history.set({ ...state, ...combined })
     },
-    [history, state],
+    [history, state, image],
   )
 
   /**
@@ -3090,15 +2925,15 @@ export function ImageEditorPage() {
           }}
           onImportBrushTip={handleImportBrushTip}
           actions={state.actions ?? []}
-          isActionRecording={actionRecordingName !== undefined}
-          actionRecordingName={actionRecordingName}
-          actionRecordingStepCount={actionRecordingStepCount}
-          onSaveActionSnapshot={handleSaveActionSnapshot}
-          onStartActionRecording={handleStartActionRecording}
-          onStopActionRecording={handleStopActionRecording}
-          onCancelActionRecording={handleCancelActionRecording}
-          onPlayAction={handlePlayAction}
-          onDeleteAction={handleDeleteAction}
+          isActionRecording={actionHandlers.isRecording}
+          actionRecordingName={actionHandlers.recordingName}
+          actionRecordingStepCount={actionHandlers.stepCount}
+          onSaveActionSnapshot={actionHandlers.handleSaveSnapshot}
+          onStartActionRecording={actionHandlers.handleStartRecording}
+          onStopActionRecording={actionHandlers.handleStopRecording}
+          onCancelActionRecording={actionHandlers.handleCancelRecording}
+          onPlayAction={actionHandlers.handlePlayAction}
+          onDeleteAction={actionHandlers.handleDeleteAction}
         />
 
         <StatusBar

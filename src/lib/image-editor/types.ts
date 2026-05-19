@@ -5,21 +5,48 @@
 
 export type Rotation = 0 | 90 | 180 | 270
 
+/**
+ * Layer blend modes. Maps to Canvas 2D `globalCompositeOperation` values
+ * one-to-one — every entry here has a native browser implementation, so
+ * the render pipeline doesn't need per-pixel fallbacks. List order mirrors
+ * Photoshop's blend-mode dropdown groupings (basic → darken → lighten →
+ * contrast → comparative → component).
+ */
 export type BlendMode =
   | 'normal'
-  | 'multiply'
-  | 'screen'
-  | 'overlay'
   | 'darken'
+  | 'multiply'
+  | 'color-burn'
   | 'lighten'
+  | 'screen'
+  | 'color-dodge'
+  | 'overlay'
+  | 'soft-light'
+  | 'hard-light'
+  | 'difference'
+  | 'exclusion'
+  | 'hue'
+  | 'saturation'
+  | 'color'
+  | 'luminosity'
 
 export const BLEND_MODES: BlendMode[] = [
   'normal',
-  'multiply',
-  'screen',
-  'overlay',
   'darken',
+  'multiply',
+  'color-burn',
   'lighten',
+  'screen',
+  'color-dodge',
+  'overlay',
+  'soft-light',
+  'hard-light',
+  'difference',
+  'exclusion',
+  'hue',
+  'saturation',
+  'color',
+  'luminosity',
 ]
 
 /**
@@ -654,10 +681,19 @@ export type LevelsParams = {
  * (Catmull-Rom-ish spline) into a 256-entry LUT. Points are stored sorted by
  * x; both x and y are in [0, 255]. Default identity curve has two endpoints
  * (0,0) and (255,255).
+ *
+ * `points` is the master ("RGB") curve applied to all three channels.
+ * Optional `r` / `g` / `b` curves apply on top of the master curve to that
+ * specific channel — PS-style "Channel: Red/Green/Blue" dropdown. Each
+ * channel-specific curve defaults to identity (linear 0,0 → 255,255) when
+ * absent, so old projects loaded from JSON keep working.
  */
 export type CurvesParams = {
   kind: 'curves'
   points: Array<{ x: number; y: number }>
+  r?: Array<{ x: number; y: number }>
+  g?: Array<{ x: number; y: number }>
+  b?: Array<{ x: number; y: number }>
 }
 /** Posterize — quantize each channel to N evenly-spaced levels. */
 export type PosterizeParams = {
@@ -904,6 +940,25 @@ export type EmbossParams = {
   height: number // preview-canvas px, 1..10
   amount: number // %, 1..500
 }
+/**
+ * Local Contrast (Clarity / Dehaze) — neighbourhood-based pass that lifts
+ * midtone contrast similarly to ACR / Lightroom's clarity slider. The
+ * implementation uses an unsharp-mask-style high-pass against a wide
+ * gaussian, weighted by midtone proximity so highlights / shadows don't
+ * over-saturate. `dehaze` adds an extra contrast + saturation stretch
+ * targeting low-contrast (hazy) regions.
+ */
+export type LocalContrastParams = {
+  kind: 'localContrast'
+  /** -100..100. Positive lifts local contrast; negative softens. */
+  clarity: number
+  /** -100..100. Positive lifts global contrast + saturation (dehaze);
+   *  negative adds a faded / hazy look. */
+  dehaze: number
+  /** Gaussian radius for the local-mean estimator, in preview-pixels.
+   *  Smaller = finer detail boost; larger = broader micro-contrast. */
+  radius: number // 1..100
+}
 
 export type FilterParams =
   | GaussianBlurParams
@@ -916,6 +971,7 @@ export type FilterParams =
   | MosaicParams
   | FindEdgesParams
   | EmbossParams
+  | LocalContrastParams
 
 export type FilterKind = FilterParams['kind']
 
