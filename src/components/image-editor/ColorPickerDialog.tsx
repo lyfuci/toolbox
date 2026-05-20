@@ -15,11 +15,15 @@ import { Label } from '@/components/ui/label'
  *
  *   - HSV "saturation × value" box (drag to pick)
  *   - Hue strip (drag to pick the H)
- *   - RGB / Hex text inputs (manual entry, both directions)
+ *   - RGB / HSL / Hex text inputs (manual entry, all directions)
  *
  * The dialog produces a `#rrggbb` string back to the caller. Alpha is not
  * exposed in v1 — callers wanting transparency layer it via opacity sliders
  * (which is how PS works for the foreground/background swatches too).
+ *
+ * Hex input is forgiving: paste / type `ff0000`, `#ff0000`, `f00`, or `#f00`
+ * — all work. Invalid input is held in the local buffer until corrected so
+ * the user can finish editing without the field snapping back.
  */
 type Props = {
   open: boolean
@@ -58,6 +62,36 @@ function Inner({
 
   const hex = hsvToHex(h, s, v)
   const rgb = hexToRgb(hex)
+  const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b)
+
+  // Local string buffers so users can mid-type freely without the field
+  // snapping while the value is still incomplete / invalid.
+  const [hexBuffer, setHexBuffer] = useState<string | null>(null)
+  const [hslBuffer, setHslBuffer] = useState<{ h: string | null; s: string | null; l: string | null }>(
+    { h: null, s: null, l: null },
+  )
+  const hexDisplay = hexBuffer ?? hex
+
+  const applyHexString = (raw: string) => {
+    const normalized = parseHexInput(raw)
+    if (!normalized) return false
+    const next = hexToHsv(normalized)
+    setH(next.h)
+    setS(next.s)
+    setV(next.v)
+    setHexBuffer(null)
+    setHslBuffer({ h: null, s: null, l: null })
+    return true
+  }
+
+  const applyHsl = (hh: number, ss: number, ll: number) => {
+    const { r, g, b } = hslToRgb(hh, ss, ll)
+    const next = rgbToHsv(r, g, b)
+    setH(next.h)
+    setS(next.s)
+    setV(next.v)
+    setHexBuffer(null)
+  }
 
   return (
     <DialogContent className="sm:max-w-md">
@@ -65,8 +99,8 @@ function Inner({
         <DialogTitle>{t('pages.imageEditor.colorPicker.title')}</DialogTitle>
       </DialogHeader>
       <div className="flex gap-3">
-        <SvBox h={h} s={s} v={v} onChange={(ns, nv) => { setS(ns); setV(nv) }} />
-        <HueStrip h={h} onChange={setH} />
+        <SvBox h={h} s={s} v={v} onChange={(ns, nv) => { setS(ns); setV(nv); setHexBuffer(null); setHslBuffer({ h: null, s: null, l: null }) }} />
+        <HueStrip h={h} onChange={(nh) => { setH(nh); setHexBuffer(null); setHslBuffer({ h: null, s: null, l: null }) }} />
       </div>
       <div className="space-y-2">
         <div className="flex items-center gap-2">
@@ -76,13 +110,31 @@ function Inner({
           />
           <input
             type="text"
-            value={hex}
+            value={hexDisplay}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
             onChange={(e) => {
-              const next = hexToHsv(e.target.value)
-              setH(next.h)
-              setS(next.s)
-              setV(next.v)
+              const raw = e.target.value
+              setHexBuffer(raw)
+              applyHexString(raw)
             }}
+            onPaste={(e) => {
+              const pasted = e.clipboardData.getData('text')
+              if (parseHexInput(pasted)) {
+                e.preventDefault()
+                applyHexString(pasted)
+              }
+              // else fall through to native paste so the user sees their text
+            }}
+            onBlur={() => {
+              // If buffer still doesn't resolve, drop it so we re-show the
+              // current canonical hex on next render.
+              if (hexBuffer !== null && !parseHexInput(hexBuffer)) {
+                setHexBuffer(null)
+              }
+            }}
+            placeholder="#rrggbb"
             className="h-8 flex-1 rounded-md border border-input bg-background px-2 font-mono text-xs text-foreground"
           />
           {/* Browser EyeDropper API (Chromium-only — Firefox / Safari
@@ -99,6 +151,8 @@ function Inner({
                   setH(next.h)
                   setS(next.s)
                   setV(next.v)
+                  setHexBuffer(null)
+                  setHslBuffer({ h: null, s: null, l: null })
                 } catch {
                   /* user cancelled or error — ignore */
                 }
@@ -127,11 +181,53 @@ function Inner({
                   setH(nextHsv.h)
                   setS(nextHsv.s)
                   setV(nextHsv.v)
+                  setHexBuffer(null)
+                  setHslBuffer({ h: null, s: null, l: null })
                 }}
                 className="h-7 flex-1 rounded border border-input bg-background px-1 text-xs text-foreground"
               />
             </div>
           ))}
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {(
+            [
+              { k: 'h', max: 360, label: t('pages.imageEditor.colorPicker.hsl.h') },
+              { k: 's', max: 100, label: t('pages.imageEditor.colorPicker.hsl.s') },
+              { k: 'l', max: 100, label: t('pages.imageEditor.colorPicker.hsl.l') },
+            ] as const
+          ).map(({ k, max, label }) => {
+            const numeric = k === 'h' ? hsl.h : k === 's' ? hsl.s : hsl.l
+            const buffered = hslBuffer[k]
+            const display = buffered ?? String(numeric)
+            return (
+              <div key={k} className="flex items-center gap-1">
+                <Label className="w-4 text-xs uppercase text-muted-foreground">{label}</Label>
+                <input
+                  type="number"
+                  min={0}
+                  max={max}
+                  value={display}
+                  onChange={(e) => {
+                    const raw = e.target.value
+                    setHslBuffer((b) => ({ ...b, [k]: raw }))
+                    if (raw === '' || raw === '-') return
+                    const num = Number(raw)
+                    if (!Number.isFinite(num)) return
+                    const clamped = Math.max(0, Math.min(max, num))
+                    const next = {
+                      h: k === 'h' ? clamped : hsl.h,
+                      s: k === 's' ? clamped : hsl.s,
+                      l: k === 'l' ? clamped : hsl.l,
+                    }
+                    applyHsl(next.h, next.s, next.l)
+                  }}
+                  onBlur={() => setHslBuffer((b) => ({ ...b, [k]: null }))}
+                  className="h-7 flex-1 rounded border border-input bg-background px-1 text-xs text-foreground"
+                />
+              </div>
+            )
+          })}
         </div>
       </div>
       <DialogFooter>
@@ -271,11 +367,22 @@ async function openEyeDropper(): Promise<string | null> {
 
 // ── Color math helpers ──────────────────────────────────────────────────
 
-function hexToRgb(hex: string): { r: number; g: number; b: number } {
-  let s = hex.trim().replace('#', '')
+/** Normalize a free-form hex string into `#rrggbb`, or null if it isn't a
+ *  valid 3- or 6-digit hex value. Strips `#` and surrounding whitespace,
+ *  expands shorthand (`f00` → `ff0000`), and rejects anything with stray
+ *  non-hex characters. Used for both manual typing and clipboard paste. */
+function parseHexInput(raw: string): string | null {
+  let s = raw.trim().replace(/^#/, '').trim()
+  if (!/^[0-9a-fA-F]+$/.test(s)) return null
   if (s.length === 3) s = s.split('').map((c) => c + c).join('')
-  if (s.length !== 6) return { r: 0, g: 0, b: 0 }
-  const n = parseInt(s, 16)
+  if (s.length !== 6) return null
+  return `#${s.toLowerCase()}`
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const normalized = parseHexInput(hex)
+  if (!normalized) return { r: 0, g: 0, b: 0 }
+  const n = parseInt(normalized.slice(1), 16)
   return { r: (n >> 16) & 0xff, g: (n >> 8) & 0xff, b: n & 0xff }
 }
 
@@ -329,4 +436,55 @@ function hexToHsv(hex: string): { h: number; s: number; v: number } {
 
 function hsvToHex(h: number, s: number, v: number): string {
   return rgbToHex(hsvToRgb(h, s, v))
+}
+
+/** RGB (0-255) → HSL with H in [0, 360], S/L in [0, 100] (PS-style ranges).
+ *  Standard formula, integer-rounded for display so the inputs show clean
+ *  whole numbers. */
+function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
+  const R = r / 255
+  const G = g / 255
+  const B = b / 255
+  const max = Math.max(R, G, B)
+  const min = Math.min(R, G, B)
+  const d = max - min
+  const l = (max + min) / 2
+  let h = 0
+  let s = 0
+  if (d > 0) {
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+    if (max === R) h = ((G - B) / d) % 6
+    else if (max === G) h = (B - R) / d + 2
+    else h = (R - G) / d + 4
+    h = Math.round(h * 60)
+    if (h < 0) h += 360
+  }
+  return { h, s: Math.round(s * 100), l: Math.round(l * 100) }
+}
+
+/** HSL (H 0-360, S/L 0-100) → RGB (0-255). Inverse of `rgbToHsl`. */
+function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
+  const H = ((h % 360) + 360) % 360 / 360
+  const S = Math.max(0, Math.min(100, s)) / 100
+  const L = Math.max(0, Math.min(100, l)) / 100
+  if (S === 0) {
+    const v = Math.round(L * 255)
+    return { r: v, g: v, b: v }
+  }
+  const q = L < 0.5 ? L * (1 + S) : L + S - L * S
+  const p = 2 * L - q
+  const hueToRgb = (t: number) => {
+    let x = t
+    if (x < 0) x += 1
+    if (x > 1) x -= 1
+    if (x < 1 / 6) return p + (q - p) * 6 * x
+    if (x < 1 / 2) return q
+    if (x < 2 / 3) return p + (q - p) * (2 / 3 - x) * 6
+    return p
+  }
+  return {
+    r: Math.round(hueToRgb(H + 1 / 3) * 255),
+    g: Math.round(hueToRgb(H) * 255),
+    b: Math.round(hueToRgb(H - 1 / 3) * 255),
+  }
 }

@@ -737,7 +737,12 @@
       },
       "colorPicker": {
         "title": "Color Picker",
-        "eyedropper": "Pick from screen (Chromium-only)"
+        "eyedropper": "Pick from screen (Chromium-only)",
+        "hsl": {
+          "h": "H",
+          "s": "S",
+          "l": "L"
+        }
       },
       "clippingMask": {
         "created": "Clipping mask created — layer masked to layer below",
