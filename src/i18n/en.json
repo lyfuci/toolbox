@@ -549,7 +549,11 @@
       "byWords": "Words",
       "original": "Original",
       "modified": "Modified",
-      "diff": "Diff"
+      "diff": "Diff",
+      "inline": "Inline",
+      "sideBySide": "Side by side",
+      "ignoreWs": "Ignore whitespace",
+      "ignoreCase": "Ignore case"
     },
     "case": {
       "description": "Convert between common naming styles: camelCase / PascalCase / snake_case / kebab-case / Title Case etc.",
@@ -563,19 +567,37 @@
       "snake": "snake_case",
       "constant": "CONSTANT_CASE",
       "kebab": "kebab-case",
-      "dot": "dot.case"
+      "train": "Train-Case",
+      "httpHeader": "HTTP-Header-Case",
+      "dot": "dot.case",
+      "statWords": "{{n}} words",
+      "statChars": "{{n}} chars",
+      "statLines": "{{n}} lines",
+      "transformInPlace": "Transform input in place",
+      "transformed": "Input replaced with {{label}}"
     },
     "sortDedupe": {
-      "description": "Per-line processing: sort, dedupe, trim, ignore case.",
+      "description": "Per-line processing: sort, dedupe, trim, ignore case. Sort mode and custom delimiter included.",
       "sort": "Sort",
       "noSort": "No sort",
       "asc": "A → Z",
       "desc": "Z → A",
       "dedupe": "Dedupe",
+      "withCount": "uniq -c (with count)",
       "trim": "Trim",
       "removeBlank": "Remove blank",
       "ignoreCase": "Ignore case",
-      "lineCount": "{{n}} lines"
+      "lineCount": "{{n}} lines",
+      "modeLabel": "Mode",
+      "modeLex": "Lexicographic",
+      "modeNumeric": "Numeric",
+      "modeNatural": "Natural (img2 < img10)",
+      "modeLength": "Length",
+      "delimiterLabel": "Delimiter",
+      "delimiterPlaceholder": ", ; |",
+      "delimiterNewline": "newline (default)",
+      "reverse": "Reverse",
+      "shuffle": "Shuffle"
     },
     "regex": {
       "description": "Based on the browser's native RegExp. Supports every ECMAScript flag.",
@@ -590,7 +612,53 @@
       "matches": "Matches",
       "noMatch": "No matches",
       "replacement": "Replacement (supports $1 / $<name> back-references)",
-      "replacePreview": "Replace preview"
+      "replacePreview": "Replace preview",
+      "matchNOfM": "Match {{n}} of {{m}}",
+      "pcreWarn": "Looks like PCRE-only syntax — JavaScript RegExp does NOT support:",
+      "pcre": {
+        "recursion": "(?R) — recursive pattern reference",
+        "recursionNum": "(?N) — numeric subpattern recursion",
+        "posixClass": "[[:class:]] — POSIX character class",
+        "keepOut": "\\K — keep-out anchor (cut left side of match)",
+        "inlineComment": "(?# … ) — inline comment",
+        "verbs": "(*VERB) — backtracking-control verbs (e.g. (*FAIL))",
+        "backrefBraces": "\\g{name} / \\G{name} — non-JS back-reference syntax"
+      },
+      "cheatTitle": "Cheat sheet — common patterns",
+      "cheatSec": {
+        "classes": "Character classes",
+        "anchors": "Anchors",
+        "quant": "Quantifiers",
+        "groups": "Groups & lookaround"
+      },
+      "cheat": {
+        "digit": "Any digit (0-9)",
+        "nonDigit": "Any non-digit",
+        "word": "Word char [A-Za-z0-9_]",
+        "nonWord": "Non-word char",
+        "space": "Whitespace",
+        "nonSpace": "Non-whitespace",
+        "dot": "Any char except newline (with s: any char)",
+        "set": "Any char in the set",
+        "negSet": "Any char NOT in the set",
+        "range": "Char in range",
+        "start": "Start of input (m: each line)",
+        "end": "End of input (m: each line)",
+        "boundary": "Word boundary",
+        "nonBoundary": "Non-boundary",
+        "zeroPlus": "0 or more (greedy)",
+        "onePlus": "1 or more (greedy)",
+        "zeroOne": "0 or 1 (optional)",
+        "exact": "Exactly n",
+        "range2": "n to m repetitions",
+        "lazy": "Lazy quantifier (match as few as possible)",
+        "capture": "Capturing group",
+        "nonCapture": "Non-capturing group",
+        "named": "Named capture group",
+        "lookahead": "Positive lookahead",
+        "negLook": "Negative lookahead",
+        "lookbehind": "Lookbehind (positive)"
+      }
     },
     "ipInfo": {
       "description": "IP lookup. Only makes a request to ipapi.co on click (free tier 1k/day/IP).",
@@ -605,16 +673,26 @@
       "rowTimezone": "Timezone",
       "rowAsn": "ASN",
       "rowOrg": "Organization",
-      "empty": "Click <1>Lookup</1> or <3>Look up my IP</3> to start"
+      "rowPtr": "Reverse DNS (PTR)",
+      "empty": "Click <1>Lookup</1> or <3>Look up my IP</3> to start",
+      "map": "Approximate location",
+      "openInOsm": "Open in OpenStreetMap",
+      "recent": "Recent:"
     },
     "dns": {
-      "description": "Based on Cloudflare DoH (cloudflare-dns.com). Only queries on click.",
+      "description": "DoH-based DNS lookup. Default resolver is Cloudflare; enable Compare resolvers to fan out to Google + Quad9. Queries only fire on click.",
       "typeLabel": "Type",
       "status": "Status",
       "answers": "{{n}} answers",
       "noAnswers": "no answers",
       "noDirect": "No direct answer; authority: {{authority}}",
-      "empty": "Enter a domain + record type, then click <1>Lookup</1>"
+      "empty": "Enter a domain + record type, then click <1>Lookup</1>",
+      "compareResolvers": "Compare resolvers",
+      "txt": {
+        "spfHint": "SPF — Sender Policy Framework (RFC 7208). Mechanisms list who may send mail for this domain.",
+        "dkimHint": "DKIM — DomainKeys Identified Mail (RFC 6376). p= holds the public key.",
+        "dmarcHint": "DMARC — Domain-based Message Authentication (RFC 7489). p= sets the policy."
+      }
     },
     "imageEditor": {
       "description": "Local image editor — layers, masks, brush/eraser, adjustments, annotations, undo/redo. Save a project file (.json) to resume editing later.",
@@ -1381,18 +1459,38 @@
       "downloaded": "Downloaded {{format}}"
     },
     "cidr": {
-      "description": "IPv4 subnet math: network / broadcast / mask / usable range / host count.",
+      "description": "IPv4 + IPv6 subnet math: network / broadcast / mask / usable range / host count, with VLSM planner and overlap checker.",
       "cidrLabel": "CIDR",
-      "placeholder": "192.168.1.0/24",
+      "placeholder": "192.168.1.0/24 or 2001:db8::/32",
+      "rowIp": "IP",
       "rowNetwork": "Network",
       "rowBroadcast": "Broadcast",
       "rowNetmask": "Netmask",
       "rowWildcard": "Wildcard",
       "rowFirstUsable": "First usable",
       "rowLastUsable": "Last usable",
+      "rowFirstAddr": "First address",
+      "rowLastAddr": "Last address",
       "rowHosts": "Usable hosts",
       "rowTotal": "Total addresses",
-      "rowClass": "Class"
+      "rowClass": "Class",
+      "binaryBreakdown": "Binary breakdown (network portion highlighted)",
+      "vlsmTitle": "VLSM / Subnet Split Planner",
+      "vlsmHint": "Paste a parent CIDR and list of required host counts (one per line). Each request is rounded up to the smallest fitting block; allocations are packed in order.",
+      "vlsmParent": "Parent CIDR",
+      "vlsmSizes": "Required host counts",
+      "vlsmAllocated": "{{requested}} requested · {{total}} addresses",
+      "overlapTitle": "Containment / overlap",
+      "overlapA": "CIDR A",
+      "overlapB": "CIDR B",
+      "relation": {
+        "equal": "A and B are equal",
+        "aContainsB": "A contains B",
+        "bContainsA": "B contains A",
+        "overlap": "A and B overlap (neither contains the other)",
+        "disjoint": "A and B are disjoint",
+        "familyMismatch": "A and B are in different families (IPv4 vs IPv6)"
+      }
     }
   },
   "fieldMeta": {
