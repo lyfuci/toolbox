@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { diffLines, diffWords, diffWordsWithSpace, type Change } from 'diff'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
+import { CodeEditor } from '@/components/CodeEditor'
 import { Label } from '@/components/ui/label'
 
 const SAMPLE_A = `function greet(name) {
@@ -251,22 +251,24 @@ export function DiffPage() {
           <Label className="mb-1.5 block text-xs text-muted-foreground">
             {t('pages.diff.original')}
           </Label>
-          <Textarea
+          <CodeEditor
             value={a}
-            onChange={(e) => setA(e.target.value)}
-            spellCheck={false}
-            className="min-h-[240px] font-mono text-sm leading-relaxed"
+            onChange={(v) => setA(v)}
+            language="plain"
+            className="min-h-[240px]"
+            height="240px"
           />
         </div>
         <div>
           <Label className="mb-1.5 block text-xs text-muted-foreground">
             {t('pages.diff.modified')}
           </Label>
-          <Textarea
+          <CodeEditor
             value={b}
-            onChange={(e) => setB(e.target.value)}
-            spellCheck={false}
-            className="min-h-[240px] font-mono text-sm leading-relaxed"
+            onChange={(v) => setB(v)}
+            language="plain"
+            className="min-h-[240px]"
+            height="240px"
           />
         </div>
       </div>
