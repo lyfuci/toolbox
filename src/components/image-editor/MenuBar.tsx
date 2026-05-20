@@ -18,8 +18,20 @@ export type MenuAction = {
   shortcut?: string
   onClick?: () => void
   disabled?: boolean
+  /** When set, hovering the item reveals a right-side flyout listing
+   *  these children instead of firing `onClick`. Used for Export-with-preset
+   *  (and the planned Open-Recent submenu). One level deep only. */
+  submenu?: MenuAction[]
 }
 export type MenuSection = MenuAction[] | { sep: true }
+
+/** Minimal shape MenuBar needs to render the "Export with preset" flyout —
+ *  intentionally a structural subset of `ExportPreset` so MenuBar stays
+ *  agnostic of the preset module's full type / persistence concerns. */
+export type ExportPresetSummary = {
+  id: string
+  name: string
+}
 
 type MenuDef = {
   id: string
@@ -39,6 +51,10 @@ type Props = {
     saveForWeb?: () => void
     exportJpeg?: () => void
     exportWebp?: () => void
+    /** Preset list for the "Export with preset" submenu. Each item becomes
+     *  a child entry; clicking it fires `onExportWithPreset(id)`. */
+    exportPresets?: ExportPresetSummary[]
+    onExportWithPreset?: (id: string) => void
     undo?: () => void
     redo?: () => void
     canUndo?: boolean
@@ -163,6 +179,19 @@ export function MenuBar({ handlers }: Props) {
             label: t('pages.imageEditor.menu.saveForWeb') + '…',
             shortcut: '⌥⇧⌘S',
             onClick: handlers.saveForWeb,
+          },
+          {
+            id: 'exportPreset',
+            label: t('pages.imageEditor.menu.exportWithPreset'),
+            // Always render the submenu container. If the user has no
+            // presets at all (built-ins are seeded by the editor, so this
+            // is rare) the empty list disables the parent item.
+            disabled: !handlers.exportPresets || handlers.exportPresets.length === 0,
+            submenu: (handlers.exportPresets ?? []).map((p) => ({
+              id: `preset-${p.id}`,
+              label: p.name,
+              onClick: () => handlers.onExportWithPreset?.(p.id),
+            })),
           },
         ],
       ],
@@ -781,26 +810,73 @@ function MenuDropdown({
   sections: (MenuAction[] | { sep: true })[]
   onClose: () => void
 }) {
+  const [openSubId, setOpenSubId] = useState<string | null>(null)
   return (
     <div className="pf-menu-dd" onClick={(e) => e.stopPropagation()}>
       {sections.flatMap((sec, i) => {
         if ('sep' in sec) return [<div key={`s${i}`} className="pf-mi pf-sep" />]
-        return sec.map((it) => (
-          <div
-            key={`${i}-${it.id}`}
-            className={`pf-mi ${it.disabled ? 'pf-disabled' : ''}`}
-            onClick={(e) => {
-              e.stopPropagation()
-              if (it.disabled) return
-              it.onClick?.()
-              onClose()
-            }}
-          >
-            <span />
-            <span>{it.label}</span>
-            {it.shortcut ? <span className="pf-kbd">{it.shortcut}</span> : <span />}
-          </div>
-        ))
+        return sec.map((it) => {
+          const hasSub = !!(it.submenu && it.submenu.length > 0)
+          const key = `${i}-${it.id}`
+          return (
+            <div
+              key={key}
+              className={`pf-mi ${it.disabled ? 'pf-disabled' : ''}`}
+              style={hasSub ? { position: 'relative' } : undefined}
+              onMouseEnter={() => {
+                if (hasSub && !it.disabled) setOpenSubId(key)
+                else setOpenSubId(null)
+              }}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (it.disabled) return
+                // Items with a submenu don't fire their own click — the
+                // user has to pick a child.
+                if (hasSub) return
+                it.onClick?.()
+                onClose()
+              }}
+            >
+              <span />
+              <span>{it.label}</span>
+              {hasSub ? (
+                <span className="pf-kbd">▸</span>
+              ) : it.shortcut ? (
+                <span className="pf-kbd">{it.shortcut}</span>
+              ) : (
+                <span />
+              )}
+              {hasSub && openSubId === key && (
+                <div
+                  className="pf-menu-dd"
+                  style={{ top: 0, left: '100%' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {it.submenu!.map((sub) => (
+                    <div
+                      key={sub.id}
+                      className={`pf-mi ${sub.disabled ? 'pf-disabled' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (sub.disabled) return
+                        sub.onClick?.()
+                        onClose()
+                      }}
+                    >
+                      <span />
+                      <span>{sub.label}</span>
+                      {sub.shortcut ? (
+                        <span className="pf-kbd">{sub.shortcut}</span>
+                      ) : (
+                        <span />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })
       })}
     </div>
   )

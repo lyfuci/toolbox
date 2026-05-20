@@ -44,6 +44,12 @@ import {
   saveCustomBrushPresets,
   type BrushPreset,
 } from '@/lib/image-editor/brush-presets'
+import {
+  applyFilenamePattern,
+  BUILTIN_EXPORT_PRESETS,
+  loadExportPresets,
+  type ExportPreset,
+} from '@/lib/image-editor/export-presets'
 import { DEFAULT_BRUSH_OPTIONS, DEFAULT_TEXT_OPTIONS, initialState, PREVIEW_MAX } from '@/lib/image-editor/defaults'
 import { fillSelection, strokeSelection, type StrokePosition } from '@/lib/image-editor/edit-ops'
 import { floodFillMask, maskToDataUrl } from '@/lib/image-editor/flood-fill'
@@ -177,6 +183,13 @@ export function ImageEditorPage() {
 
   const [outFormat, setOutFormat] = useState<OutputFormat>('png')
   const [outQuality, setOutQuality] = useState<number>(92)
+  // Export presets: built-ins are always present + user-defined ones
+  // loaded once from localStorage. Edits to user presets happen elsewhere
+  // (future preset editor); the menu just reads from this list.
+  const [exportPresets] = useState<ExportPreset[]>(() => [
+    ...BUILTIN_EXPORT_PRESETS,
+    ...loadExportPresets(),
+  ])
 
   const [focused, setFocused] = useState(false)
   const canvasRef = useRef<CanvasHandle | null>(null)
@@ -2687,6 +2700,56 @@ export function ImageEditorPage() {
   )
   const handleDownload = useCallback(() => exportImage(), [exportImage])
 
+  /**
+   * Re-export using a saved preset: render the canvas at the preset's
+   * scale, encode as its format/quality, and download with the preset's
+   * filename pattern. The native canvas is rendered once at scale=1 (via
+   * the same exportTo path the other export handlers use) and then
+   * upscaled / downscaled into the destination canvas via drawImage —
+   * cheap, and avoids re-running the full layer compositor at a custom
+   * preview scale.
+   */
+  const handleExportWithPreset = useCallback(
+    async (id: string) => {
+      if (!image || !canvasRef.current) return
+      const preset = exportPresets.find((p) => p.id === id)
+      if (!preset) return
+      const intermediate = document.createElement('canvas')
+      canvasRef.current.exportTo(intermediate)
+      const dst = document.createElement('canvas')
+      dst.width = Math.max(1, Math.round(intermediate.width * preset.scale))
+      dst.height = Math.max(1, Math.round(intermediate.height * preset.scale))
+      const ctx = dst.getContext('2d')
+      if (!ctx) return
+      ctx.drawImage(intermediate, 0, 0, dst.width, dst.height)
+      const mime =
+        preset.format === 'png'
+          ? 'image/png'
+          : preset.format === 'jpeg'
+            ? 'image/jpeg'
+            : 'image/webp'
+      const ext = preset.format === 'jpeg' ? 'jpg' : preset.format
+      const quality = preset.format === 'png' ? undefined : preset.quality / 100
+      const blob: Blob | null = await new Promise((resolve) =>
+        dst.toBlob((b) => resolve(b), mime, quality),
+      )
+      if (!blob) {
+        toast.error(t('pages.imageEditor.errExport'))
+        return
+      }
+      const name = applyFilenamePattern(preset.filenamePattern, {
+        name: filename,
+        scale: preset.scale,
+        ext,
+      })
+      triggerDownload(blob, name)
+      toast.success(
+        t('pages.imageEditor.downloaded', { format: preset.format.toUpperCase() }),
+      )
+    },
+    [image, exportPresets, filename, t],
+  )
+
   const handleNewDocument = useCallback(
     async (args: { w: number; h: number; bgColor: string }) => {
       const c = document.createElement('canvas')
@@ -2800,6 +2863,8 @@ export function ImageEditorPage() {
             exportPng: () => exportImage('png'),
             exportJpeg: () => exportImage('jpeg'),
             exportWebp: () => exportImage('webp'),
+            exportPresets: exportPresets.map((p) => ({ id: p.id, name: p.name })),
+            onExportWithPreset: handleExportWithPreset,
             saveForWeb: () => {
               setSaveForWebOpenSeq((n) => n + 1)
               setSaveForWebOpen(true)
