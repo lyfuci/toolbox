@@ -358,7 +358,11 @@
       "byWords": "按词",
       "original": "原始",
       "modified": "修改后",
-      "diff": "差异"
+      "diff": "差异",
+      "inline": "内联",
+      "sideBySide": "左右对照",
+      "ignoreWs": "忽略空白",
+      "ignoreCase": "忽略大小写"
     },
     "case": {
       "description": "常见命名风格互转：camelCase / PascalCase / snake_case / kebab-case / Title Case 等。",
@@ -372,19 +376,37 @@
       "snake": "snake_case",
       "constant": "CONSTANT_CASE",
       "kebab": "kebab-case",
-      "dot": "dot.case"
+      "train": "Train-Case",
+      "httpHeader": "HTTP-Header-Case",
+      "dot": "dot.case",
+      "statWords": "{{n}} 词",
+      "statChars": "{{n}} 字符",
+      "statLines": "{{n}} 行",
+      "transformInPlace": "用此风格覆盖输入",
+      "transformed": "输入已替换为 {{label}}"
     },
     "sortDedupe": {
-      "description": "按行处理：排序、去重、修剪空白、忽略大小写。",
+      "description": "按行处理：排序、去重、修剪空白、忽略大小写。支持多种排序模式与自定义分隔符。",
       "sort": "排序",
       "noSort": "不排序",
       "asc": "A → Z",
       "desc": "Z → A",
       "dedupe": "去重",
+      "withCount": "uniq -c（带计数）",
       "trim": "修剪空白",
       "removeBlank": "删除空行",
       "ignoreCase": "忽略大小写",
-      "lineCount": "{{n}} 行"
+      "lineCount": "{{n}} 行",
+      "modeLabel": "模式",
+      "modeLex": "字典序",
+      "modeNumeric": "数值",
+      "modeNatural": "自然序（img2 < img10）",
+      "modeLength": "按长度",
+      "delimiterLabel": "分隔符",
+      "delimiterPlaceholder": ", ; |",
+      "delimiterNewline": "换行（默认）",
+      "reverse": "反转",
+      "shuffle": "打乱"
     },
     "regex": {
       "description": "基于浏览器原生 RegExp。支持全部 ECMAScript 标志。",
@@ -399,7 +421,53 @@
       "matches": "匹配",
       "noMatch": "无匹配",
       "replacement": "替换字符串（支持 $1 / $<name> 等反向引用）",
-      "replacePreview": "替换后预览"
+      "replacePreview": "替换后预览",
+      "matchNOfM": "第 {{n}} / {{m}} 个匹配",
+      "pcreWarn": "检测到 PCRE 特有语法 — JavaScript 的 RegExp 不支持：",
+      "pcre": {
+        "recursion": "(?R) — 整体递归引用",
+        "recursionNum": "(?N) — 编号子模式递归",
+        "posixClass": "[[:class:]] — POSIX 字符类",
+        "keepOut": "\\K — 截断左侧的匹配锚",
+        "inlineComment": "(?# … ) — 行内注释",
+        "verbs": "(*VERB) — 回溯控制（如 (*FAIL)）",
+        "backrefBraces": "\\g{name} / \\G{name} — 非 JS 的反向引用语法"
+      },
+      "cheatTitle": "速查表 — 常用正则元字符",
+      "cheatSec": {
+        "classes": "字符类",
+        "anchors": "锚点",
+        "quant": "量词",
+        "groups": "分组 & 环视"
+      },
+      "cheat": {
+        "digit": "任意数字 (0-9)",
+        "nonDigit": "非数字",
+        "word": "单词字符 [A-Za-z0-9_]",
+        "nonWord": "非单词字符",
+        "space": "空白字符",
+        "nonSpace": "非空白",
+        "dot": "除换行外的任意字符（带 s 时含换行）",
+        "set": "字符集合中的任意一个",
+        "negSet": "不在集合中的任意字符",
+        "range": "区间字符",
+        "start": "输入起点（m 时为每行起点）",
+        "end": "输入终点（m 时为每行终点）",
+        "boundary": "单词边界",
+        "nonBoundary": "非单词边界",
+        "zeroPlus": "0 或更多（贪婪）",
+        "onePlus": "1 或更多（贪婪）",
+        "zeroOne": "0 或 1（可选）",
+        "exact": "正好 n 次",
+        "range2": "n 到 m 次",
+        "lazy": "懒惰量词（尽量少匹配）",
+        "capture": "捕获组",
+        "nonCapture": "非捕获组",
+        "named": "命名捕获组",
+        "lookahead": "正向先行断言",
+        "negLook": "负向先行断言",
+        "lookbehind": "后行断言（正向）"
+      }
     },
     "ipInfo": {
       "description": "IP 归属查询。点击按钮才会向 ipapi.co 公共服务发起请求（免费档 1k 次/天/IP）。",
@@ -414,16 +482,26 @@
       "rowTimezone": "时区",
       "rowAsn": "ASN",
       "rowOrg": "组织",
-      "empty": "点击 <1>查询</1> 或 <3>查我自己</3> 开始"
+      "rowPtr": "反向 DNS（PTR）",
+      "empty": "点击 <1>查询</1> 或 <3>查我自己</3> 开始",
+      "map": "大致位置",
+      "openInOsm": "在 OpenStreetMap 中打开",
+      "recent": "最近："
     },
     "dns": {
-      "description": "基于 Cloudflare DoH（cloudflare-dns.com）。点击查询才会发起请求。",
+      "description": "基于 DoH 的 DNS 查询。默认解析器为 Cloudflare；勾选「对比解析器」会同时查 Google + Quad9。点击查询才会发起请求。",
       "typeLabel": "类型",
       "status": "Status",
       "answers": "{{n}} answers",
       "noAnswers": "no answers",
       "noDirect": "No direct answer; authority: {{authority}}",
-      "empty": "填入域名 + 选择记录类型，点击 <1>查询</1>"
+      "empty": "填入域名 + 选择记录类型，点击 <1>查询</1>",
+      "compareResolvers": "对比解析器",
+      "txt": {
+        "spfHint": "SPF — 邮件发送方策略（RFC 7208），列出谁可以代表此域名发邮件。",
+        "dkimHint": "DKIM — 域名密钥邮件签名（RFC 6376）。p= 是公钥。",
+        "dmarcHint": "DMARC — 域名邮件认证策略（RFC 7489）。p= 设定策略。"
+      }
     },
     "imageEditor": {
       "description": "本地图片编辑——图层、蒙版、笔刷/橡皮、调色、标注、撤销/重做。可保存 .json 项目文件下次继续编辑。",
@@ -1190,18 +1268,38 @@
       "downloaded": "已下载 {{format}}"
     },
     "cidr": {
-      "description": "IPv4 子网计算：网络 / 广播 / 掩码 / 可用范围 / 主机数。",
+      "description": "IPv4 + IPv6 子网计算：网络 / 广播 / 掩码 / 可用范围 / 主机数，附 VLSM 规划与包含/重叠检查。",
       "cidrLabel": "CIDR",
-      "placeholder": "192.168.1.0/24",
+      "placeholder": "192.168.1.0/24 或 2001:db8::/32",
+      "rowIp": "IP",
       "rowNetwork": "网络地址",
       "rowBroadcast": "广播地址",
       "rowNetmask": "子网掩码",
       "rowWildcard": "通配符掩码",
       "rowFirstUsable": "首个可用",
       "rowLastUsable": "最后可用",
+      "rowFirstAddr": "首个地址",
+      "rowLastAddr": "最后地址",
       "rowHosts": "可用主机数",
       "rowTotal": "地址总数",
-      "rowClass": "类别"
+      "rowClass": "类别",
+      "binaryBreakdown": "二进制分解（网络位用色块标出）",
+      "vlsmTitle": "VLSM / 子网划分规划",
+      "vlsmHint": "粘贴父 CIDR 和所需主机数列表（每行一个）。每次需求向上取整到最小可容纳块；按顺序紧排。",
+      "vlsmParent": "父 CIDR",
+      "vlsmSizes": "所需主机数",
+      "vlsmAllocated": "需求 {{requested}} · 实际 {{total}} 个地址",
+      "overlapTitle": "包含 / 重叠检查",
+      "overlapA": "CIDR A",
+      "overlapB": "CIDR B",
+      "relation": {
+        "equal": "A 和 B 完全相同",
+        "aContainsB": "A 包含 B",
+        "bContainsA": "B 包含 A",
+        "overlap": "A 与 B 部分重叠（互不包含）",
+        "disjoint": "A 与 B 完全不重叠",
+        "familyMismatch": "A 与 B 不在同一协议族（IPv4 vs IPv6）"
+      }
     }
   },
   "fieldMeta": {

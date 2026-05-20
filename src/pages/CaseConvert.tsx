@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Copy } from 'lucide-react'
+import { Copy, Wand2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
@@ -18,6 +18,14 @@ function splitWords(input: string): string[] {
     .filter(Boolean)
 }
 
+// Words that stay lowercase in HTTP header style except as the first segment.
+// HTTP header case capitalises every hyphen-separated token (e.g.
+// `Content-Type`, `X-Forwarded-For`).
+function capitalize(w: string): string {
+  if (!w) return ''
+  return w[0].toUpperCase() + w.slice(1)
+}
+
 type ConversionKey =
   | 'lower'
   | 'upper'
@@ -28,6 +36,8 @@ type ConversionKey =
   | 'snake'
   | 'constant'
   | 'kebab'
+  | 'train'
+  | 'httpHeader'
   | 'dot'
 
 const CONVERSIONS: { key: ConversionKey; fn: (input: string) => string }[] = [
@@ -35,7 +45,7 @@ const CONVERSIONS: { key: ConversionKey; fn: (input: string) => string }[] = [
   { key: 'upper', fn: (s) => s.toUpperCase() },
   {
     key: 'title',
-    fn: (s) => splitWords(s).map((w) => w[0].toUpperCase() + w.slice(1)).join(' '),
+    fn: (s) => splitWords(s).map(capitalize).join(' '),
   },
   { key: 'sentence', fn: (s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() },
   {
@@ -43,16 +53,18 @@ const CONVERSIONS: { key: ConversionKey; fn: (input: string) => string }[] = [
     fn: (s) => {
       const ws = splitWords(s)
       if (ws.length === 0) return ''
-      return ws[0] + ws.slice(1).map((w) => w[0].toUpperCase() + w.slice(1)).join('')
+      return ws[0] + ws.slice(1).map(capitalize).join('')
     },
   },
   {
     key: 'pascal',
-    fn: (s) => splitWords(s).map((w) => w[0].toUpperCase() + w.slice(1)).join(''),
+    fn: (s) => splitWords(s).map(capitalize).join(''),
   },
   { key: 'snake', fn: (s) => splitWords(s).join('_') },
   { key: 'constant', fn: (s) => splitWords(s).join('_').toUpperCase() },
   { key: 'kebab', fn: (s) => splitWords(s).join('-') },
+  { key: 'train', fn: (s) => splitWords(s).map(capitalize).join('-') },
+  { key: 'httpHeader', fn: (s) => splitWords(s).map(capitalize).join('-') },
   { key: 'dot', fn: (s) => splitWords(s).join('.') },
 ]
 
@@ -65,9 +77,21 @@ export function CaseConvertPage() {
     [input],
   )
 
+  const stats = useMemo(() => {
+    const chars = input.length
+    const lines = input === '' ? 0 : input.split(/\r?\n/).length
+    const words = input.trim() === '' ? 0 : input.trim().split(/\s+/).length
+    return { chars, lines, words }
+  }, [input])
+
   const handleCopy = async (label: string, v: string) => {
     await navigator.clipboard.writeText(v)
     toast.success(t('common.copiedLabel', { label }))
+  }
+
+  const handleReplaceInput = (label: string, v: string) => {
+    setInput(v)
+    toast.success(t('pages.case.transformed', { label }))
   }
 
   return (
@@ -81,9 +105,16 @@ export function CaseConvertPage() {
         value={input}
         onChange={(e) => setInput(e.target.value)}
         spellCheck={false}
-        className="mb-6 min-h-[120px] font-mono text-sm leading-relaxed"
+        className="mb-2 min-h-[120px] font-mono text-sm leading-relaxed"
         placeholder={t('pages.case.placeholder')}
       />
+      <div className="mb-6 flex items-center justify-end gap-3 text-xs text-muted-foreground">
+        <span>{t('pages.case.statWords', { n: stats.words })}</span>
+        <span aria-hidden>·</span>
+        <span>{t('pages.case.statChars', { n: stats.chars })}</span>
+        <span aria-hidden>·</span>
+        <span>{t('pages.case.statLines', { n: stats.lines })}</span>
+      </div>
 
       <div className="flex flex-col gap-2">
         {rows.map(({ key, value }) => {
@@ -93,10 +124,19 @@ export function CaseConvertPage() {
               key={key}
               className="flex items-center gap-3 rounded-md border border-border bg-card/40 px-3 py-2"
             >
-              <span className="w-36 shrink-0 text-xs font-medium text-muted-foreground">
+              <span className="w-44 shrink-0 text-xs font-medium text-muted-foreground">
                 {name}
               </span>
               <code className="flex-1 truncate font-mono text-sm">{value}</code>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleReplaceInput(name, value)}
+                disabled={!value}
+                title={t('pages.case.transformInPlace')}
+              >
+                <Wand2 className="h-3.5 w-3.5" />
+              </Button>
               <Button
                 size="sm"
                 variant="ghost"
