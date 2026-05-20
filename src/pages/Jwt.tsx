@@ -1,41 +1,48 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   decodeJwt,
   decodeProtectedHeader,
   jwtVerify,
+  SignJWT,
   importSPKI,
+  importPKCS8,
+  importJWK,
+  base64url,
   errors,
 } from 'jose'
-import { CheckCircle2, ShieldQuestion, XCircle, Loader2 } from 'lucide-react'
+import {
+  CheckCircle2,
+  ShieldQuestion,
+  XCircle,
+  Loader2,
+  Clock,
+  CircleAlert,
+  CircleDot,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { FieldTooltip } from '@/components/FieldTooltip'
-import { formatTimestampBreakdown } from '@/lib/time'
+import { formatRelative } from '@/lib/time'
 
 const SAMPLE_TOKEN =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
 const SAMPLE_SECRET = 'your-256-bit-secret'
 
-const HMAC_ALGS = new Set(['HS256', 'HS384', 'HS512'])
-const ASYMMETRIC_ALGS = new Set([
-  'RS256', 'RS384', 'RS512',
-  'PS256', 'PS384', 'PS512',
-  'ES256', 'ES256K', 'ES384', 'ES512',
-  'EdDSA',
-])
+const HMAC_ALGS = ['HS256', 'HS384', 'HS512'] as const
+const RSA_ALGS = ['RS256', 'RS384', 'RS512', 'PS256', 'PS384', 'PS512'] as const
+const EC_ALGS = ['ES256', 'ES384'] as const
+const ALL_ALGS = [...HMAC_ALGS, ...RSA_ALGS, ...EC_ALGS] as const
+type Alg = (typeof ALL_ALGS)[number]
 
-// Payload claims that are Unix-second timestamps (RFC 7519 + OIDC).
-const TIMESTAMP_CLAIMS = new Set(['iat', 'exp', 'nbf', 'auth_time', 'updated_at'])
-
-type DecodeOk = {
-  ok: true
-  header: Record<string, unknown>
-  payload: Record<string, unknown>
-  signaturePart: string
-}
-type DecodeState = DecodeOk | { ok: false; error: string }
+const HMAC_SET = new Set<string>(HMAC_ALGS)
+const ASYMMETRIC_SET = new Set<string>([...RSA_ALGS, ...EC_ALGS])
 
 type VerifyState =
   | { kind: 'idle' }
@@ -45,11 +52,35 @@ type VerifyState =
 
 type Translator = (key: string, opts?: Record<string, unknown>) => string
 
-function decode(token: string, t: Translator): DecodeState {
-  if (!token.trim()) return { ok: false, error: '' }
+function pretty(obj: unknown): string {
+  return JSON.stringify(obj, null, 2)
+}
+
+function tryParseJson(text: string):
+  | { ok: true; value: Record<string, unknown> }
+  | { ok: false; error: string } {
+  try {
+    const value = JSON.parse(text)
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      return { ok: false, error: 'must be a JSON object' }
+    }
+    return { ok: true, value: value as Record<string, unknown> }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+function decodeToken(token: string):
+  | {
+      ok: true
+      header: Record<string, unknown>
+      payload: Record<string, unknown>
+      signaturePart: string
+    }
+  | { ok: false; error: string } {
   const parts = token.trim().split('.')
   if (parts.length !== 3) {
-    return { ok: false, error: t('pages.jwt.structureError') }
+    return { ok: false, error: 'structure' }
   }
   try {
     return {
@@ -63,28 +94,105 @@ function decode(token: string, t: Translator): DecodeState {
   }
 }
 
+/** Tries hard to parse text as JWK; returns null if it doesn't look like a JWK. */
+function tryParseJwk(text: string): Record<string, unknown> | null {
+  const trimmed = text.trim()
+  if (!trimmed.startsWith('{')) return null
+  try {
+    const obj = JSON.parse(trimmed)
+    if (obj && typeof obj === 'object' && typeof obj.kty === 'string') {
+      return obj as Record<string, unknown>
+    }
+  } catch {
+    /* not JSON */
+  }
+  return null
+}
+
+/** Decode base64 (standard or url) into Uint8Array. Throws on failure. */
+function decodeBase64Loose(input: string): Uint8Array {
+  // jose's base64url.decode accepts URL-safe; convert standard b64 first
+  const normalized = input.trim().replace(/\s+/g, '')
+  // try base64url first
+  try {
+    return base64url.decode(normalized)
+  } catch {
+    /* fall through */
+  }
+  // standard base64: convert to url-safe, strip padding
+  const urlSafe = normalized.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  return base64url.decode(urlSafe)
+}
+
+type LoadKeyResult =
+  | { ok: true; key: Uint8Array | CryptoKey }
+  | { ok: false; reason: string }
+
+async function loadKey(
+  alg: string,
+  secret: string,
+  secretIsBase64: boolean,
+  forSigning: boolean,
+  t: Translator,
+): Promise<LoadKeyResult> {
+  if (!secret.trim()) {
+    return {
+      ok: false,
+      reason: forSigning && ASYMMETRIC_SET.has(alg)
+        ? t('pages.jwt.needPrivateKey')
+        : t('pages.jwt.needSecret'),
+    }
+  }
+  try {
+    if (HMAC_SET.has(alg)) {
+      let bytes: Uint8Array
+      if (secretIsBase64) {
+        try {
+          bytes = decodeBase64Loose(secret)
+        } catch {
+          return { ok: false, reason: t('pages.jwt.base64DecodeError') }
+        }
+      } else {
+        bytes = new TextEncoder().encode(secret)
+      }
+      return { ok: true, key: bytes }
+    }
+    if (ASYMMETRIC_SET.has(alg)) {
+      const jwk = tryParseJwk(secret)
+      if (jwk) {
+        const key = await importJWK(jwk as never, alg)
+        // importJWK can return Uint8Array (oct keys) — for asymmetric we need CryptoKey
+        if (!(key instanceof Uint8Array)) {
+          return { ok: true, key }
+        }
+        // Got a symmetric (oct) JWK for an asymmetric alg — not valid
+        return { ok: false, reason: t('pages.jwt.unsupportedAlg', { alg }) }
+      }
+      const pem = secret.trim()
+      if (forSigning) {
+        const key = await importPKCS8(pem, alg)
+        return { ok: true, key }
+      }
+      const key = await importSPKI(pem, alg)
+      return { ok: true, key }
+    }
+    return { ok: false, reason: t('pages.jwt.unsupportedAlg', { alg }) }
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error ? e.message : String(e) }
+  }
+}
+
 async function runVerify(
   token: string,
   secret: string,
+  secretIsBase64: boolean,
   alg: string,
   t: Translator,
 ): Promise<VerifyState> {
-  if (!secret.trim()) {
-    return { kind: 'invalid', reason: t('pages.jwt.needSecret') }
-  }
+  const loaded = await loadKey(alg, secret, secretIsBase64, false, t)
+  if (!loaded.ok) return { kind: 'invalid', reason: loaded.reason }
   try {
-    let key: Uint8Array | CryptoKey
-    if (HMAC_ALGS.has(alg)) {
-      key = new TextEncoder().encode(secret)
-    } else if (ASYMMETRIC_ALGS.has(alg)) {
-      key = await importSPKI(secret.trim(), alg)
-    } else {
-      return {
-        kind: 'invalid',
-        reason: t('pages.jwt.unsupportedAlg', { alg: alg || '(empty)' }),
-      }
-    }
-    await jwtVerify(token, key)
+    await jwtVerify(token, loaded.key)
     return { kind: 'verified' }
   } catch (e) {
     if (e instanceof errors.JWSSignatureVerificationFailed) {
@@ -103,30 +211,269 @@ async function runVerify(
   }
 }
 
+/**
+ * Build a token from header + payload. If a key is loadable, we sign;
+ * otherwise we produce header.payload.<placeholder> so the user still sees
+ * how their edits affect the encoded form.
+ */
+async function reSign(
+  header: Record<string, unknown>,
+  payload: Record<string, unknown>,
+  alg: string,
+  secret: string,
+  secretIsBase64: boolean,
+  placeholder: string,
+  t: Translator,
+): Promise<{ token: string; signed: boolean; error?: string }> {
+  const headerWithAlg = { ...header, alg }
+  // If no secret provided OR not a supported alg, emit placeholder.
+  const trimmed = secret.trim()
+  if (!trimmed || (!HMAC_SET.has(alg) && !ASYMMETRIC_SET.has(alg))) {
+    const h = base64url.encode(new TextEncoder().encode(JSON.stringify(headerWithAlg)))
+    const p = base64url.encode(new TextEncoder().encode(JSON.stringify(payload)))
+    return { token: `${h}.${p}.${placeholder}`, signed: false }
+  }
+  const loaded = await loadKey(alg, secret, secretIsBase64, true, t)
+  if (!loaded.ok) {
+    const h = base64url.encode(new TextEncoder().encode(JSON.stringify(headerWithAlg)))
+    const p = base64url.encode(new TextEncoder().encode(JSON.stringify(payload)))
+    return { token: `${h}.${p}.${placeholder}`, signed: false, error: loaded.reason }
+  }
+  try {
+    const jwt = await new SignJWT(payload)
+      .setProtectedHeader(headerWithAlg as never)
+      .sign(loaded.key as never)
+    return { token: jwt, signed: true }
+  } catch (e) {
+    const h = base64url.encode(new TextEncoder().encode(JSON.stringify(headerWithAlg)))
+    const p = base64url.encode(new TextEncoder().encode(JSON.stringify(payload)))
+    return {
+      token: `${h}.${p}.${placeholder}`,
+      signed: false,
+      error: e instanceof Error ? e.message : String(e),
+    }
+  }
+}
+
+// -- Status badge ------------------------------------------------------------
+
+type ExpStatus =
+  | { kind: 'valid' }
+  | { kind: 'expired'; date: Date }
+  | { kind: 'not-yet'; date: Date }
+  | { kind: 'none' }
+
+function computeExpStatus(payload: Record<string, unknown> | null): ExpStatus {
+  if (!payload) return { kind: 'none' }
+  const exp = typeof payload.exp === 'number' ? payload.exp : undefined
+  const nbf = typeof payload.nbf === 'number' ? payload.nbf : undefined
+  if (exp === undefined && nbf === undefined) return { kind: 'none' }
+  const now = Date.now() / 1000
+  if (exp !== undefined && exp < now) {
+    return { kind: 'expired', date: new Date(exp * 1000) }
+  }
+  if (nbf !== undefined && nbf > now) {
+    return { kind: 'not-yet', date: new Date(nbf * 1000) }
+  }
+  return { kind: 'valid' }
+}
+
+// Pre-compute decoded sample once at module load.
+const INITIAL: { headerText: string; payloadText: string; alg: Alg } = (() => {
+  const d = decodeToken(SAMPLE_TOKEN)
+  if (!d.ok) {
+    return {
+      headerText: pretty({ alg: 'HS256', typ: 'JWT' }),
+      payloadText: pretty({ sub: '1234567890', name: 'John Doe', iat: 1516239022 }),
+      alg: 'HS256',
+    }
+  }
+  const headerAlg =
+    typeof d.header.alg === 'string' ? (d.header.alg as string) : 'HS256'
+  return {
+    headerText: pretty(d.header),
+    payloadText: pretty(d.payload),
+    alg: ((ALL_ALGS as readonly string[]).includes(headerAlg)
+      ? headerAlg
+      : 'HS256') as Alg,
+  }
+})()
+
+// -- Page --------------------------------------------------------------------
+
 export function JwtPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n.resolvedLanguage ?? i18n.language
+
   const [token, setToken] = useState(SAMPLE_TOKEN)
+  const [headerText, setHeaderText] = useState(INITIAL.headerText)
+  const [payloadText, setPayloadText] = useState(INITIAL.payloadText)
   const [secret, setSecret] = useState(SAMPLE_SECRET)
+  const [secretB64, setSecretB64] = useState(false)
+  const [algState, setAlgState] = useState<Alg>(INITIAL.alg)
   const [verify, setVerify] = useState<VerifyState>({ kind: 'idle' })
+  const [signing, setSigning] = useState(false)
+  const [signError, setSignError] = useState<string | null>(null)
+  const [tokenDecodeError, setTokenDecodeError] = useState<string | null>(null)
+  const [unsigned, setUnsigned] = useState(false)
 
-  const decoded = useMemo(() => decode(token, t), [token, t])
-  const alg = decoded.ok ? String(decoded.header.alg ?? '') : ''
-  const isHmac = HMAC_ALGS.has(alg)
-  const isAsym = ASYMMETRIC_ALGS.has(alg)
+  // Bumped before every async re-sign; the .then() bails if a newer one started.
+  const reSignVersionRef = useRef(0)
 
+  // Parse header / payload texts.
+  const headerParse = useMemo(() => tryParseJson(headerText), [headerText])
+  const payloadParse = useMemo(() => tryParseJson(payloadText), [payloadText])
+
+  const headerObj = headerParse.ok ? headerParse.value : null
+  const payloadObj = payloadParse.ok ? payloadParse.value : null
+
+  const alg: string = algState
+
+  const isHmac = HMAC_SET.has(alg)
+  const isAsym = ASYMMETRIC_SET.has(alg)
+
+  /**
+   * Kick off an async re-sign. Captures the latest inputs at call time; uses
+   * a version counter to ignore the result of any prior in-flight sign. All
+   * setState happens inside the async body — never in a render effect —
+   * which keeps React 19's cascading-render lint happy.
+   */
+  const reSignNow = useCallback(
+    async (
+      h: Record<string, unknown>,
+      p: Record<string, unknown>,
+      a: string,
+      sec: string,
+      b64: boolean,
+    ) => {
+      const version = ++reSignVersionRef.current
+      setSigning(true)
+      setSignError(null)
+      setVerify({ kind: 'idle' })
+      const result = await reSign(
+        h,
+        p,
+        a,
+        sec,
+        b64,
+        t('pages.jwt.placeholderSignature'),
+        t,
+      )
+      if (reSignVersionRef.current !== version) return
+      setToken(result.token)
+      setUnsigned(!result.signed)
+      setSignError(result.error ?? null)
+      setSigning(false)
+    },
+    [t],
+  )
+
+  /** Try to re-sign with whatever the latest header/payload JSON parses to. */
+  const reSignWith = useCallback(
+    (nextHeaderText: string, nextPayloadText: string, a: string, sec: string, b64: boolean) => {
+      const hp = tryParseJson(nextHeaderText)
+      const pp = tryParseJson(nextPayloadText)
+      if (!hp.ok || !pp.ok) {
+        // JSON broken — leave the encoded token alone; the JSON error notice
+        // is already shown next to the offending pane.
+        return
+      }
+      void reSignNow(hp.value, pp.value, a, sec, b64)
+    },
+    [reSignNow],
+  )
+
+  // ---- Handlers ----
   const onTokenChange = (next: string) => {
     setToken(next)
     setVerify({ kind: 'idle' })
+    if (!next.trim()) {
+      setTokenDecodeError(null)
+      setHeaderText('')
+      setPayloadText('')
+      setUnsigned(false)
+      setSignError(null)
+      return
+    }
+    const decoded = decodeToken(next)
+    if (!decoded.ok) {
+      setTokenDecodeError(
+        decoded.error === 'structure' ? t('pages.jwt.structureError') : decoded.error,
+      )
+      return
+    }
+    setTokenDecodeError(null)
+    setHeaderText(pretty(decoded.header))
+    setPayloadText(pretty(decoded.payload))
+    const newAlg =
+      typeof decoded.header.alg === 'string' ? (decoded.header.alg as string) : ''
+    if (newAlg && (ALL_ALGS as readonly string[]).includes(newAlg)) {
+      setAlgState(newAlg as Alg)
+    }
+    setUnsigned(false)
+    setSignError(null)
+    // Discard any in-flight sign for the previous decoded state.
+    reSignVersionRef.current++
+  }
+  const onHeaderTextChange = (next: string) => {
+    setHeaderText(next)
+    // If the user edits `alg` inside the header JSON itself, mirror it back
+    // into the picker so the UI stays consistent.
+    const parsed = tryParseJson(next)
+    if (parsed.ok && typeof parsed.value.alg === 'string') {
+      const v = parsed.value.alg as string
+      if ((ALL_ALGS as readonly string[]).includes(v) && v !== algState) {
+        setAlgState(v as Alg)
+        reSignWith(next, payloadText, v, secret, secretB64)
+        return
+      }
+    }
+    reSignWith(next, payloadText, alg, secret, secretB64)
+  }
+  const onPayloadTextChange = (next: string) => {
+    setPayloadText(next)
+    reSignWith(headerText, next, alg, secret, secretB64)
   }
   const onSecretChange = (next: string) => {
     setSecret(next)
+    reSignWith(headerText, payloadText, alg, next, secretB64)
+  }
+  const onSecretB64Change = (next: boolean) => {
+    setSecretB64(next)
+    reSignWith(headerText, payloadText, alg, secret, next)
+  }
+  const onAlgChange = (next: Alg) => {
+    setAlgState(next)
+    let nextHeaderText = headerText
+    if (headerObj) {
+      nextHeaderText = pretty({ ...headerObj, alg: next })
+      setHeaderText(nextHeaderText)
+    }
+    reSignWith(nextHeaderText, payloadText, next, secret, secretB64)
+  }
+  const onSample = () => {
+    onTokenChange(SAMPLE_TOKEN)
+    setSecret(SAMPLE_SECRET)
+    setSecretB64(false)
+  }
+  const onClear = () => {
+    setToken('')
+    setHeaderText('')
+    setPayloadText('')
+    setSignError(null)
+    setUnsigned(false)
+    setTokenDecodeError(null)
     setVerify({ kind: 'idle' })
+    reSignVersionRef.current++
   }
+
   const handleVerify = async () => {
-    if (!decoded.ok) return
+    if (!token.trim() || tokenDecodeError) return
     setVerify({ kind: 'verifying' })
-    setVerify(await runVerify(token, secret, alg, t))
+    setVerify(await runVerify(token, secret, secretB64, alg, t))
   }
+
+  const expStatus = useMemo(() => computeExpStatus(payloadObj), [payloadObj])
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-12">
@@ -136,25 +483,23 @@ export function JwtPage() {
       </header>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* LEFT: encoded token input */}
+        {/* LEFT: encoded token */}
         <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <Label htmlFor="token" className="text-sm font-medium">
               {t('pages.jwt.encoded')}
             </Label>
-            <div className="flex gap-1">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onTokenChange(SAMPLE_TOKEN)}
-              >
+            <div className="flex items-center gap-1">
+              {signing && (
+                <span className="flex items-center gap-1 pr-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  {t('pages.jwt.signing')}
+                </span>
+              )}
+              <Button size="sm" variant="ghost" onClick={onSample}>
                 {t('common.sample')}
               </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => onTokenChange('')}
-              >
+              <Button size="sm" variant="ghost" onClick={onClear}>
                 {t('common.clear')}
               </Button>
             </div>
@@ -164,43 +509,89 @@ export function JwtPage() {
             value={token}
             onChange={(e) => onTokenChange(e.target.value)}
             spellCheck={false}
-            className="min-h-[400px] resize-y break-all font-mono text-sm leading-relaxed"
+            className={`min-h-[400px] resize-y break-all font-mono text-sm leading-relaxed ${
+              unsigned ? 'text-muted-foreground/70' : ''
+            }`}
             placeholder={t('pages.jwt.tokenPlaceholder')}
           />
-          {!decoded.ok && decoded.error && (
-            <p className="text-xs text-destructive">⚠ {decoded.error}</p>
+          {tokenDecodeError && (
+            <p className="text-xs text-destructive">⚠ {tokenDecodeError}</p>
+          )}
+          {!tokenDecodeError && unsigned && token.trim() && (
+            <p className="text-xs text-muted-foreground">
+              {signError ?? t('pages.jwt.statusNoSig')}
+            </p>
           )}
         </section>
 
         {/* RIGHT: decoded panels */}
         <section className="flex flex-col gap-5">
+          {/* Header pane */}
           <Panel
             title={t('pages.jwt.header')}
-            subtitle={alg ? t('pages.jwt.algorithm', { alg }) : undefined}
+            subtitle={t('pages.jwt.algorithm', { alg })}
           >
-            <ClaimsView
-              panel="header"
-              value={decoded.ok ? decoded.header : null}
-              maxHeight="9rem"
+            <Textarea
+              value={headerText}
+              onChange={(e) => onHeaderTextChange(e.target.value)}
+              spellCheck={false}
+              className="min-h-[7rem] resize-y font-mono text-sm leading-relaxed"
             />
+            {!headerParse.ok && headerText.trim() && (
+              <p className="mt-1 text-xs text-destructive">
+                ⚠ {t('pages.jwt.jsonError')}: {headerParse.error}
+              </p>
+            )}
           </Panel>
 
-          <Panel title={t('pages.jwt.payload')}>
-            <ClaimsView
-              panel="payload"
-              value={decoded.ok ? decoded.payload : null}
-              maxHeight="14rem"
+          {/* Payload pane */}
+          <Panel
+            title={t('pages.jwt.payload')}
+            subtitle={
+              <ExpStatusPill status={expStatus} locale={locale} t={t} />
+            }
+          >
+            <Textarea
+              value={payloadText}
+              onChange={(e) => onPayloadTextChange(e.target.value)}
+              spellCheck={false}
+              className="min-h-[12rem] resize-y font-mono text-sm leading-relaxed"
             />
+            {!payloadParse.ok && payloadText.trim() && (
+              <p className="mt-1 text-xs text-destructive">
+                ⚠ {t('pages.jwt.jsonError')}: {payloadParse.error}
+              </p>
+            )}
           </Panel>
 
+          {/* Signature pane */}
           <Panel title={t('pages.jwt.signature')}>
             <div className="flex flex-col gap-3">
+              {/* Algorithm picker */}
+              <div className="flex items-center gap-3">
+                <Label className="text-xs text-muted-foreground">
+                  {t('pages.jwt.algLabel')}
+                </Label>
+                <select
+                  value={alg}
+                  onChange={(e) => onAlgChange(e.target.value as Alg)}
+                  className="h-9 rounded-md border border-input bg-background px-3 font-mono text-sm text-foreground"
+                >
+                  {ALL_ALGS.map((a) => (
+                    <option key={a} value={a} className="bg-background text-foreground">
+                      {a}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Secret / key input */}
               <div>
                 <Label className="mb-1.5 block text-xs text-muted-foreground">
                   {isHmac
-                    ? t('pages.jwt.secretHmac')
+                    ? t('pages.jwt.secretLabel')
                     : isAsym
-                      ? t('pages.jwt.secretAsymmetric')
+                      ? t('pages.jwt.privateKeyLabel')
                       : t('pages.jwt.secretGeneric')}
                 </Label>
                 <Textarea
@@ -212,15 +603,32 @@ export function JwtPage() {
                   }`}
                   placeholder={
                     isAsym
-                      ? t('pages.jwt.secretPlaceholderAsymmetric')
+                      ? t('pages.jwt.secretPlaceholderPrivate')
                       : t('pages.jwt.secretPlaceholderHmac')
                   }
                 />
               </div>
+
+              {/* base64 toggle — only meaningful for HMAC */}
+              {isHmac && (
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={secretB64}
+                    onChange={(e) => onSecretB64Change(e.target.checked)}
+                    className="accent-primary"
+                  />
+                  {t('pages.jwt.base64Secret')}
+                </label>
+              )}
+
+              {/* Verify row */}
               <div className="flex items-center gap-3">
                 <Button
                   onClick={handleVerify}
-                  disabled={!decoded.ok || verify.kind === 'verifying'}
+                  disabled={
+                    !token.trim() || !!tokenDecodeError || verify.kind === 'verifying'
+                  }
                   size="sm"
                 >
                   {t('pages.jwt.verify')}
@@ -235,21 +643,25 @@ export function JwtPage() {
   )
 }
 
+// -- Sub-components ----------------------------------------------------------
+
 function Panel({
   title,
   subtitle,
   children,
 }: {
   title: string
-  subtitle?: string
+  subtitle?: ReactNode
   children: ReactNode
 }) {
   return (
     <div>
-      <div className="mb-2 flex items-baseline justify-between">
+      <div className="mb-2 flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-medium">{title}</h2>
-        {subtitle && (
+        {typeof subtitle === 'string' ? (
           <span className="text-xs text-muted-foreground">{subtitle}</span>
+        ) : (
+          subtitle ?? null
         )}
       </div>
       {children}
@@ -257,98 +669,44 @@ function Panel({
   )
 }
 
-/**
- * Pretty-print a JWT header or payload object with hover tooltips on:
- * - top-level claim keys (RFC 7515/7519/OIDC explanations)
- * - timestamp values like iat/exp/nbf (formatted date breakdown)
- *
- * Nested objects/arrays are inlined as JSON.stringify for now — could expand
- * later if we have nested claims worth annotating.
- */
-function ClaimsView({
-  panel,
-  value,
-  maxHeight,
-}: {
-  panel: 'header' | 'payload'
-  value: Record<string, unknown> | null
-  maxHeight: string
-}) {
-  const { t, i18n } = useTranslation()
-  const locale = i18n.resolvedLanguage ?? i18n.language
-
-  if (!value) {
-    return (
-      <pre
-        className="overflow-auto rounded-md border border-border bg-card/50 p-3 font-mono text-sm text-foreground/90"
-        style={{ maxHeight }}
-      >
-        —
-      </pre>
-    )
-  }
-
-  const entries = Object.entries(value)
-  const keyMetaPrefix = panel === 'header' ? 'pages.jwt.headerField' : 'pages.jwt.claim'
-
-  return (
-    <div
-      className="overflow-auto rounded-md border border-border bg-card/50 p-3 font-mono text-sm leading-relaxed text-foreground/90"
-      style={{ maxHeight }}
-    >
-      <span className="text-muted-foreground">{'{'}</span>
-      {entries.map(([key, val], idx) => {
-        const isLast = idx === entries.length - 1
-        const isTimestamp =
-          panel === 'payload' &&
-          TIMESTAMP_CLAIMS.has(key) &&
-          typeof val === 'number' &&
-          isFinite(val)
-        return (
-          <div key={key} className="pl-4">
-            <span className="text-muted-foreground">{'"'}</span>
-            <FieldTooltip body={`${keyMetaPrefix}.${key}`} bodyIsKey>
-              <span className="text-sky-600 dark:text-sky-300">{key}</span>
-            </FieldTooltip>
-            <span className="text-muted-foreground">{'": '}</span>
-            {isTimestamp ? (
-              <TimestampValue unixSeconds={val as number} locale={locale} t={t} />
-            ) : (
-              <span className="text-foreground/90">{stringifyValue(val)}</span>
-            )}
-            {!isLast && <span className="text-muted-foreground">,</span>}
-          </div>
-        )
-      })}
-      <span className="text-muted-foreground">{'}'}</span>
-    </div>
-  )
-}
-
-function stringifyValue(v: unknown): string {
-  if (typeof v === 'string') return JSON.stringify(v)
-  if (typeof v === 'number' || typeof v === 'boolean' || v === null) {
-    return JSON.stringify(v)
-  }
-  // arrays / objects: compact one-line
-  return JSON.stringify(v)
-}
-
-function TimestampValue({
-  unixSeconds,
+function ExpStatusPill({
+  status,
   locale,
   t,
 }: {
-  unixSeconds: number
+  status: ExpStatus
   locale: string
   t: Translator
 }) {
-  const { utc, local, relative } = formatTimestampBreakdown(unixSeconds, locale)
-  const body = t('tooltip.tsBreakdown', { utc, local, relative })
+  if (status.kind === 'none') {
+    return (
+      <span className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+        <CircleDot className="h-3 w-3" />
+        {t('pages.jwt.statusNoClaims')}
+      </span>
+    )
+  }
+  if (status.kind === 'valid') {
+    return (
+      <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-500">
+        <CheckCircle2 className="h-3 w-3" />
+        {t('pages.jwt.statusValid')}
+      </span>
+    )
+  }
+  if (status.kind === 'expired') {
+    return (
+      <span className="flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">
+        <CircleAlert className="h-3 w-3" />
+        {t('pages.jwt.statusExpired', { when: formatRelative(status.date, locale) })}
+      </span>
+    )
+  }
   return (
-    <FieldTooltip body={body}>
-      <span className="text-amber-600 dark:text-amber-300">{unixSeconds}</span>
-    </FieldTooltip>
+    <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-500">
+      <Clock className="h-3 w-3" />
+      {t('pages.jwt.statusNotYet', { when: formatRelative(status.date, locale) })}
+    </span>
   )
 }
 
