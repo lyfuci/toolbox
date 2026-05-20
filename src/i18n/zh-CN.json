@@ -708,7 +708,12 @@
       },
       "colorPicker": {
         "title": "拾色器",
-        "eyedropper": "从屏幕取色（仅 Chromium 内核）"
+        "eyedropper": "从屏幕取色（仅 Chromium 内核）",
+        "hsl": {
+          "h": "H",
+          "s": "S",
+          "l": "L"
+        }
       },
       "clippingMask": {
         "created": "已创建剪贴蒙版 —— 图层被下方图层蒙版剪贴",
