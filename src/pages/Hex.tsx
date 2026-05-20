@@ -105,6 +105,11 @@ export function HexPage() {
   )
 
   if (tab === 'text') {
+    // Dump view needs a <pre> output panel that the generic EncodeDecode harness can't host,
+    // so we render a bespoke panel for that case and fall back to the shared harness otherwise.
+    if (dumpView) {
+      return <HexTextDumpPanel options={optionsBlock} />
+    }
     return (
       <EncodeDecode
         title={t('tools.hex.name')}
@@ -118,6 +123,58 @@ export function HexPage() {
   }
 
   return <HexFilePanel options={optionsBlock} dumpView={dumpView} withSpace={withSpace} />
+}
+
+function HexTextDumpPanel({ options }: { options: React.ReactNode }) {
+  const { t } = useTranslation()
+  const [input, setInput] = useState(SAMPLE)
+  const dump = useMemo(() => formatHexDump(new TextEncoder().encode(input)), [input])
+
+  const handleCopy = async () => {
+    if (!dump) return
+    await navigator.clipboard.writeText(dump)
+    toast.success(t('common.copied'))
+  }
+
+  return (
+    <div className="mx-auto max-w-5xl px-8 py-12">
+      <header className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.hex.name')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('pages.hex.description')}</p>
+      </header>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="ml-auto flex items-center gap-3">{options}</div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <Label className="mb-1.5 block text-xs text-muted-foreground">
+            {t('common.input')}
+          </Label>
+          <Textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            spellCheck={false}
+            className="min-h-[360px] font-mono text-sm leading-relaxed"
+            placeholder={t('pages.encodeDecode.inputPlaceholderEncode')}
+          />
+        </div>
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">{t('common.output')}</Label>
+            <Button size="sm" variant="ghost" onClick={handleCopy} disabled={!dump}>
+              <Copy className="h-3.5 w-3.5" />
+              {t('common.copy')}
+            </Button>
+          </div>
+          <pre className="min-h-[360px] overflow-auto rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre">
+            {dump || t('pages.hex.dumpEmpty')}
+          </pre>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function HexFilePanel({
