@@ -1,42 +1,112 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Copy } from 'lucide-react'
+import { Check, Copy, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { HASH_ALGOS, type HashAlgo, hashText } from '@/lib/hash'
+import {
+  HASH_ALGOS,
+  type HashAlgo,
+  type DigestEncoding,
+  encodeBytes,
+  hashBytes,
+} from '@/lib/hash'
 import { FieldTooltip } from '@/components/FieldTooltip'
+import { FileDrop } from '@/components/FileDrop'
+import { formatSize } from '@/lib/file-bytes'
 
 const SAMPLE = 'The quick brown fox jumps over the lazy dog'
 
+type Tab = 'text' | 'file'
+
+const ENCODINGS: DigestEncoding[] = ['hex', 'base64', 'base64url']
+
+function emptyResults(): Record<HashAlgo, Uint8Array | null> {
+  return {
+    MD5: null,
+    'SHA-1': null,
+    'SHA-256': null,
+    'SHA-384': null,
+    'SHA-512': null,
+  }
+}
+
 export function HashPage() {
   const { t } = useTranslation()
+  const [tab, setTab] = useState<Tab>('text')
   const [input, setInput] = useState(SAMPLE)
-  const [results, setResults] = useState<Record<HashAlgo, string>>({
-    'MD5': '',
+  const [encoding, setEncoding] = useState<DigestEncoding>('hex')
+  const [pickedFile, setPickedFile] = useState<{ name: string; size: number } | null>(null)
+  const [computing, setComputing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  // ^ `computing` only flips during the file-mode async path (text mode is instant);
+  //   the text-mode useEffect intentionally doesn't touch it to satisfy the
+  //   react-hooks/set-state-in-effect rule.
+  const [verify, setVerify] = useState<Record<HashAlgo, string>>({
+    MD5: '',
     'SHA-1': '',
     'SHA-256': '',
     'SHA-384': '',
     'SHA-512': '',
   })
+  // Raw digest bytes per algo. Formatting happens at render time so the encoding
+  // toggle doesn't trigger re-hashing.
+  const [digests, setDigests] = useState<Record<HashAlgo, Uint8Array | null>>(emptyResults)
 
+  // Hash text whenever input changes (text mode only).
   useEffect(() => {
+    if (tab !== 'text') return
     let cancelled = false
-    Promise.all(
-      HASH_ALGOS.map(async (algo) => [algo, await hashText(algo, input)] as const),
-    ).then((pairs) => {
-      if (cancelled) return
-      const next = {} as Record<HashAlgo, string>
-      for (const [algo, hex] of pairs) next[algo] = hex
-      setResults(next)
-    })
+    const bytes = new TextEncoder().encode(input)
+    Promise.all(HASH_ALGOS.map(async (algo) => [algo, await hashBytes(algo, bytes)] as const))
+      .then((pairs) => {
+        if (cancelled) return
+        const next = emptyResults()
+        for (const [algo, d] of pairs) next[algo] = d
+        setDigests(next)
+        setError(null)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setError(err instanceof Error ? err.message : String(err))
+      })
     return () => {
       cancelled = true
     }
-  }, [input])
+  }, [input, tab])
+
+  const handlePick = async (file: File) => {
+    setError(null)
+    setComputing(true)
+    setPickedFile({ name: file.name, size: file.size })
+    setDigests(emptyResults)
+    try {
+      const buf = await file.arrayBuffer()
+      const bytes = new Uint8Array(buf)
+      const pairs = await Promise.all(
+        HASH_ALGOS.map(async (algo) => [algo, await hashBytes(algo, bytes)] as const),
+      )
+      const next = emptyResults()
+      for (const [algo, d] of pairs) next[algo] = d
+      setDigests(next)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setComputing(false)
+    }
+  }
+
+  const formatted = (algo: HashAlgo): string => {
+    const d = digests[algo]
+    return d ? encodeBytes(d, encoding) : ''
+  }
 
   const handleCopy = async (algo: HashAlgo) => {
-    await navigator.clipboard.writeText(results[algo])
+    const value = formatted(algo)
+    if (!value) return
+    await navigator.clipboard.writeText(value)
     toast.success(t('common.copiedLabel', { label: algo }))
   }
 
@@ -47,37 +117,133 @@ export function HashPage() {
         <p className="mt-1 text-sm text-muted-foreground">{t('pages.hash.description')}</p>
       </header>
 
-      <Textarea
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        spellCheck={false}
-        className="mb-6 min-h-[180px] font-mono text-sm leading-relaxed"
-        placeholder={t('pages.hash.placeholder')}
-      />
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="flex rounded-md border border-input bg-transparent text-sm">
+          {(['text', 'file'] as Tab[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setTab(m)}
+              className={`px-3 py-1.5 transition-colors ${
+                tab === m
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {m === 'text' ? t('pages.hash.modeText') : t('pages.hash.modeFile')}
+            </button>
+          ))}
+        </div>
+
+        <div className="ml-auto flex items-center gap-2">
+          <Label className="text-xs text-muted-foreground">
+            {t('pages.hash.outputEncoding')}
+          </Label>
+          <div className="flex rounded-md border border-input bg-transparent text-xs">
+            {ENCODINGS.map((e) => (
+              <button
+                key={e}
+                type="button"
+                onClick={() => setEncoding(e)}
+                className={`px-2.5 py-1 transition-colors ${
+                  encoding === e
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {tab === 'text' ? (
+        <Textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          spellCheck={false}
+          className="mb-6 min-h-[180px] font-mono text-sm leading-relaxed"
+          placeholder={t('pages.hash.placeholder')}
+        />
+      ) : (
+        <div className="mb-6 space-y-2">
+          <FileDrop
+            onFile={handlePick}
+            label={t('pages.hash.fileDrop')}
+            hint={t('pages.hash.fileHint')}
+          />
+          {pickedFile ? (
+            <p className="text-xs text-muted-foreground">
+              {t('pages.hash.fileInfo', {
+                name: pickedFile.name,
+                size: formatSize(pickedFile.size),
+              })}
+              {computing ? ` — ${t('pages.hash.computing')}` : ''}
+            </p>
+          ) : null}
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
-        {HASH_ALGOS.map((algo) => (
-          <div
-            key={algo}
-            className="flex items-center gap-3 rounded-md border border-border bg-card/40 px-3 py-2"
-          >
-            <FieldTooltip body={`fieldMeta.hashAlg.${algo}`} bodyIsKey>
-              <span className="w-20 shrink-0 font-mono text-xs font-medium text-muted-foreground">
-                {algo}
-              </span>
-            </FieldTooltip>
-            <code className="flex-1 truncate font-mono text-xs">{results[algo]}</code>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => handleCopy(algo)}
-              disabled={!results[algo]}
+        {HASH_ALGOS.map((algo) => {
+          const value = formatted(algo)
+          const expected = verify[algo].trim()
+          const match = expected ? expected.toLowerCase() === value.toLowerCase() : null
+          return (
+            <div
+              key={algo}
+              className="flex flex-col gap-2 rounded-md border border-border bg-card/40 px-3 py-2"
             >
-              <Copy className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        ))}
+              <div className="flex items-center gap-3">
+                <FieldTooltip body={`fieldMeta.hashAlg.${algo}`} bodyIsKey>
+                  <span className="w-20 shrink-0 font-mono text-xs font-medium text-muted-foreground">
+                    {algo}
+                  </span>
+                </FieldTooltip>
+                <code className="flex-1 truncate font-mono text-xs">{value}</code>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleCopy(algo)}
+                  disabled={!value}
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2 pl-[5.75rem]">
+                <Label className="text-xs text-muted-foreground">{t('pages.hash.verify')}</Label>
+                <Input
+                  value={verify[algo]}
+                  onChange={(e) => setVerify((v) => ({ ...v, [algo]: e.target.value }))}
+                  placeholder={t('pages.hash.verifyPlaceholder')}
+                  spellCheck={false}
+                  className="h-7 font-mono text-xs"
+                />
+                {match === true ? (
+                  <span
+                    className="flex shrink-0 items-center gap-1 text-xs text-emerald-500"
+                    title={t('pages.hash.verifyMatch')}
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    {t('pages.hash.verifyMatch')}
+                  </span>
+                ) : match === false ? (
+                  <span
+                    className="flex shrink-0 items-center gap-1 text-xs text-destructive"
+                    title={t('pages.hash.verifyMismatch')}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    {t('pages.hash.verifyMismatch')}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          )
+        })}
       </div>
+
+      {error ? <div className="mt-3 text-xs text-destructive">⚠ {error}</div> : null}
     </div>
   )
 }
