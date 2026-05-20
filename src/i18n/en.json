@@ -621,6 +621,7 @@
         "exportPng": "Export as PNG",
         "exportJpeg": "Export as JPEG",
         "exportWebp": "Export as WebP",
+        "exportWithPreset": "Export with preset",
         "saveForWeb": "Save for Web",
         "newDocument": "New Document",
         "undo": "Undo",
@@ -782,6 +783,10 @@
         "size": "Estimated size: {{kb}} KB",
         "computing": "Estimating size…",
         "save": "Save"
+      },
+      "exportPresets": {
+        "title": "Export presets",
+        "empty": "No export presets yet"
       },
       "maskActions": {
         "removedMaskLayer": "Mask layer removed",

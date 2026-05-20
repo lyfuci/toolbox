@@ -18,11 +18,20 @@ export type MenuAction = {
   shortcut?: string
   onClick?: () => void
   disabled?: boolean
-  /** Optional submenu — when set, the item renders with a "›" hint and a
-   *  nested flyout opens on hover instead of firing onClick. */
+  /** Optional submenu — when set, the item renders with a "›" hint and
+   *  a nested flyout opens on hover instead of firing `onClick`. Used by
+   *  Open Recent + Export-with-preset. One level deep only. */
   submenu?: MenuAction[]
 }
 export type MenuSection = MenuAction[] | { sep: true }
+
+/** Minimal shape MenuBar needs to render the "Export with preset" flyout —
+ *  intentionally a structural subset of `ExportPreset` so MenuBar stays
+ *  agnostic of the preset module's full type / persistence concerns. */
+export type ExportPresetSummary = {
+  id: string
+  name: string
+}
 
 type MenuDef = {
   id: string
@@ -45,6 +54,10 @@ type Props = {
     saveForWeb?: () => void
     exportJpeg?: () => void
     exportWebp?: () => void
+    /** Preset list for the "Export with preset" submenu. Each item becomes
+     *  a child entry; clicking it fires `onExportWithPreset(id)`. */
+    exportPresets?: ExportPresetSummary[]
+    onExportWithPreset?: (id: string) => void
     undo?: () => void
     redo?: () => void
     canUndo?: boolean
@@ -184,6 +197,19 @@ export function MenuBar({ handlers }: Props) {
             label: t('pages.imageEditor.menu.saveForWeb') + '…',
             shortcut: '⌥⇧⌘S',
             onClick: handlers.saveForWeb,
+          },
+          {
+            id: 'exportPreset',
+            label: t('pages.imageEditor.menu.exportWithPreset'),
+            // Always render the submenu container. If the user has no
+            // presets at all (built-ins are seeded by the editor, so this
+            // is rare) the empty list disables the parent item.
+            disabled: !handlers.exportPresets || handlers.exportPresets.length === 0,
+            submenu: (handlers.exportPresets ?? []).map((p) => ({
+              id: `preset-${p.id}`,
+              label: p.name,
+              onClick: () => handlers.onExportWithPreset?.(p.id),
+            })),
           },
         ],
       ],

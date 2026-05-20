@@ -621,6 +621,7 @@
         "exportPng": "导出为 PNG",
         "exportJpeg": "导出为 JPEG",
         "exportWebp": "导出为 WebP",
+        "exportWithPreset": "使用预设导出",
         "saveForWeb": "存储为 Web 所用格式",
         "newDocument": "新建文档",
         "undo": "撤销",
@@ -782,6 +783,10 @@
         "size": "估计大小：{{kb}} KB",
         "computing": "计算中…",
         "save": "保存"
+      },
+      "exportPresets": {
+        "title": "导出预设",
+        "empty": "暂无导出预设"
       },
       "maskActions": {
         "removedMaskLayer": "已移除蒙版图层",
