@@ -294,6 +294,9 @@ function renderLayer(
     ctx.globalAlpha = layer.opacity / 100
     ctx.globalCompositeOperation = blendModeToOp(layer.blend)
     applyLayerClip(ctx, layer, rc.annoScale)
+    // Free Transform rotation: apply around the shape's bbox centre so the
+    // visual pivot matches the rotation handle position.
+    applyLayerRotation(ctx, layer, rc.annoScale)
     // Mosaic + Blur both sample the underlying composite — snapshot first
     // so they read pre-shape pixels rather than their own output.
     const needsUnderlying = layer.shape.kind === 'mosaic' || layer.shape.kind === 'blur'
@@ -516,12 +519,63 @@ function renderAnnotationWithEffects(
   // Layer clip applies INSIDE the offscreen so the fx pipeline sees the
   // post-clip silhouette (stroke / inner glow trace the clipped edge).
   applyLayerClip(octx, layer, rc.annoScale)
+  applyLayerRotation(octx, layer, rc.annoScale)
   const needsUnderlying = layer.shape.kind === 'mosaic' || layer.shape.kind === 'blur'
   // Pixel-sampling shapes (mosaic / blur) read the *destination* canvas, not
   // their own offscreen — same as the fast path's "snapshot before draw".
   const underlying = needsUnderlying ? snapshotCanvas(canvas) : offscreen
   drawShape(octx, layer.shape, rc.annoScale, underlying, rc.imageCache)
   compositeLayerWithEffects(canvas, ctx, layer, offscreen, rc)
+}
+
+/**
+ * Apply Free-Transform rotation (in degrees, stored on layer.rotation) to
+ * the ctx, pivoting around the shape's bbox centre. No-op when rotation is
+ * 0 / undefined. Translates → rotates → translates back so subsequent
+ * drawShape calls land rotated around the pivot in target-pixel space.
+ */
+function applyLayerRotation(
+  ctx: CanvasRenderingContext2D,
+  layer: AnnotationLayer,
+  scale: number,
+) {
+  const deg = layer.rotation ?? 0
+  if (!deg) return
+  const bbox = annotationShapeBBox(layer.shape)
+  if (!bbox) return
+  const cx = (bbox.x + bbox.w / 2) * scale
+  const cy = (bbox.y + bbox.h / 2) * scale
+  ctx.translate(cx, cy)
+  ctx.rotate((deg * Math.PI) / 180)
+  ctx.translate(-cx, -cy)
+}
+
+/** Same bbox helper as transform.ts — duplicated here to avoid a cross-file
+ *  import cycle (transform imports HandleId from hit, render imports from
+ *  many). Trivial enough that drift is unlikely. */
+function annotationShapeBBox(shape: AnnotationLayer['shape']): Rect | null {
+  switch (shape.kind) {
+    case 'rect':
+    case 'mosaic':
+    case 'image':
+    case 'ellipse':
+    case 'blur':
+    case 'frame':
+      return { x: shape.x, y: shape.y, w: shape.w, h: shape.h }
+    case 'arrow':
+    case 'line': {
+      const x = Math.min(shape.x1, shape.x2)
+      const y = Math.min(shape.y1, shape.y2)
+      return {
+        x,
+        y,
+        w: Math.abs(shape.x2 - shape.x1),
+        h: Math.abs(shape.y2 - shape.y1),
+      }
+    }
+    default:
+      return null
+  }
 }
 
 /**

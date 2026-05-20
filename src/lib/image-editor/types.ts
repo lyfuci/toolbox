@@ -80,6 +80,7 @@ export type Tool =
   | 'marquee'
   | 'lasso'
   | 'polyLasso'
+  | 'magneticLasso'
   | 'wand'
   | 'spotHeal'
   | 'stamp'
@@ -408,14 +409,36 @@ export type ColorOverlayEffect = {
   blend: BlendMode
 }
 
-/** Linear gradient overlay across the layer's alpha. */
+/** A single gradient stop in the multi-stop form. `pos` is normalised
+ *  to 0..1 (clamped at render time); `color` is any CSS colour string
+ *  the canvas 2D context understands (hex, rgba(), etc). */
+export type GradientStop = {
+  pos: number
+  color: string
+}
+
+/** Linear gradient overlay across the layer's alpha.
+ *
+ *  Two storage forms are supported, both ship in the same effect object:
+ *  - **Legacy 2-stop:** `color` + `endColor` describe the start (pos=0)
+ *    and end (pos=1) colours. This is the original wire format and the
+ *    default for newly added effects, so old projects round-trip exactly.
+ *  - **Multi-stop:** when `stops` is set with at least 2 entries, the
+ *    renderer uses it verbatim and ignores `color`/`endColor`. Stops are
+ *    sorted by `pos` before being applied to the canvas gradient.
+ *
+ *  `color` + `endColor` are kept populated even in multi-stop mode so
+ *  toggling back to "simple" doesn't drop the user's previous values. */
 export type GradientOverlayEffect = {
   kind: 'gradientOverlay'
   enabled: boolean
-  /** Start colour at gradient position 0. */
+  /** Start colour at gradient position 0. Used when `stops` is unset. */
   color: string
-  /** End colour at gradient position 1. */
+  /** End colour at gradient position 1. Used when `stops` is unset. */
   endColor: string
+  /** Optional multi-stop gradient definition. Take precedence over
+   *  `color`/`endColor` when set with >= 2 entries. */
+  stops?: GradientStop[]
   opacity: number
   blend: BlendMode
   /** Gradient sweep angle, degrees. 0 = left→right. */
@@ -638,6 +661,13 @@ type LayerCommon = {
    * masked against the base layer's contribution, then composites.
    */
   clipping?: boolean
+  /**
+   * Free-Transform rotation in degrees, clockwise, applied around the
+   * layer's bbox centre at render time. Annotation + group layers honour
+   * this; smart-object layers carry their own `transform.rotation` and
+   * ignore this field. Defaults to 0 (no rotation) for back-compat.
+   */
+  rotation?: number
 }
 
 export type ImageLayerProps = LayerCommon & { kind: 'image' }
@@ -959,6 +989,66 @@ export type LocalContrastParams = {
    *  Smaller = finer detail boost; larger = broader micro-contrast. */
   radius: number // 1..100
 }
+/** Motion Blur — directional blur along (angle, distance). */
+export type MotionBlurParams = {
+  kind: 'motionBlur'
+  angle: number // degrees, -180..180
+  distance: number // preview-px, 1..200
+}
+/**
+ * Radial Blur — `zoom` (radial streaks from centre) or `spin` (rotational
+ * smear). `amount` controls strength.
+ */
+export type RadialBlurParams = {
+  kind: 'radialBlur'
+  mode: 'zoom' | 'spin'
+  amount: number // 1..100
+}
+/** Pinch — pull pixels toward or push away from centre. Positive = pinch in. */
+export type PinchParams = {
+  kind: 'pinch'
+  amount: number // -100..100
+}
+/** Twirl — rotate pixels around centre, strength falls with radius. */
+export type TwirlParams = {
+  kind: 'twirl'
+  angle: number // degrees, -360..360
+}
+/** Spherize — fish-eye distortion; positive = bulge, negative = pinch. */
+export type SpherizeParams = {
+  kind: 'spherize'
+  amount: number // -100..100
+}
+/**
+ * Polar Coordinates — convert between rectangular ↔ polar. `mode: 'polar'`
+ * wraps the image into a disc (rectangular → polar); `mode: 'rect'`
+ * unwraps a disc into a strip (polar → rectangular).
+ */
+export type PolarCoordinatesParams = {
+  kind: 'polarCoordinates'
+  mode: 'polar' | 'rect'
+}
+/**
+ * Lens Flare — a bright sun + halo + chromatic streaks centred at
+ * (x, y) (preview-pixels). Brightness controls overall intensity.
+ */
+export type LensFlareParams = {
+  kind: 'lensFlare'
+  x: number // 0..1, fraction of canvas width
+  y: number // 0..1, fraction of canvas height
+  brightness: number // 0..200
+}
+/**
+ * Smart Sharpen — sharper than Unsharp Mask via a deconvolution-style
+ * pass: builds a gaussian blur, subtracts to get high-frequency, then
+ * re-adds * amount with a noise-floor threshold so flat areas stay quiet.
+ */
+export type SmartSharpenParams = {
+  kind: 'smartSharpen'
+  amount: number // %, 0..500
+  radius: number // preview-px, 0.5..50
+  threshold: number // 0..255
+}
 
 export type FilterParams =
   | GaussianBlurParams
@@ -972,6 +1062,14 @@ export type FilterParams =
   | FindEdgesParams
   | EmbossParams
   | LocalContrastParams
+  | MotionBlurParams
+  | RadialBlurParams
+  | PinchParams
+  | TwirlParams
+  | SpherizeParams
+  | PolarCoordinatesParams
+  | LensFlareParams
+  | SmartSharpenParams
 
 export type FilterKind = FilterParams['kind']
 

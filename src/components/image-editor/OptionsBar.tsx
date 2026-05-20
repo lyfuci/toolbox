@@ -46,6 +46,9 @@ type Props = {
   /** True when an applied crop is in state — surfaces "Clear crop" button. */
   hasActiveCrop?: boolean
   onClearCrop?: () => void
+  cropPending?: boolean
+  onCropApply?: () => void
+  onCropCancel?: () => void
   /** Crop aspect-ratio preset id (from CROP_ASPECTS). */
   cropAspectId: string
   setCropAspectId: (id: string) => void
@@ -81,6 +84,9 @@ export function OptionsBar({
   stubMessage,
   hasActiveCrop,
   onClearCrop,
+  cropPending,
+  onCropApply,
+  onCropCancel,
   cropAspectId,
   setCropAspectId,
   hasSelection,
@@ -313,6 +319,28 @@ export function OptionsBar({
             {t('pages.imageEditor.cropPendingHint')}
           </span>
         </div>
+        {cropPending && (
+          <div className="pf-opt-group">
+            <button
+              type="button"
+              className="pf-opt-btn"
+              onClick={onCropApply}
+              style={{ width: 'auto', padding: '0 8px', color: 'var(--pf-accent, #6aa9ff)' }}
+              title={t('pages.imageEditor.cropApply') + ' (Enter)'}
+            >
+              ✓ {t('pages.imageEditor.cropApply')}
+            </button>
+            <button
+              type="button"
+              className="pf-opt-btn"
+              onClick={onCropCancel}
+              style={{ width: 'auto', padding: '0 8px' }}
+              title={t('pages.imageEditor.cropCancel') + ' (Esc)'}
+            >
+              ✕ {t('pages.imageEditor.cropCancel')}
+            </button>
+          </div>
+        )}
         {hasActiveCrop && (
           <div className="pf-opt-group" style={{ borderRight: 0 }}>
             <button

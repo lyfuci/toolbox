@@ -18,6 +18,7 @@ import {
   type BlendMode,
   type DropShadowEffect,
   type GradientOverlayEffect,
+  type GradientStop,
   type InnerGlowEffect,
   type InnerShadowEffect,
   type LayerEffect,
@@ -290,37 +291,7 @@ function EffectPanel({
         </div>
       )}
       {effect.kind === 'gradientOverlay' && (
-        <>
-          <div className="flex items-center gap-2">
-            <Label className="w-16 text-xs text-muted-foreground">
-              {t('pages.imageEditor.layerStyle.endColor')}
-            </Label>
-            <input
-              type="color"
-              value={hexFromColor(effect.endColor)}
-              onChange={(e) =>
-                onChange({ ...effect, endColor: e.target.value } as GradientOverlayEffect)
-              }
-              className="h-7 w-12 cursor-pointer rounded border border-input bg-transparent"
-            />
-          </div>
-          <Slider
-            label={t('pages.imageEditor.layerStyle.angle')}
-            value={effect.angle}
-            min={-180}
-            max={180}
-            unit="°"
-            onChange={(v) => onChange({ ...effect, angle: v } as GradientOverlayEffect)}
-          />
-          <Slider
-            label={t('pages.imageEditor.layerStyle.scale')}
-            value={effect.scale}
-            min={10}
-            max={200}
-            unit="%"
-            onChange={(v) => onChange({ ...effect, scale: v } as GradientOverlayEffect)}
-          />
-        </>
+        <GradientOverlayControls effect={effect} onChange={onChange} />
       )}
       {effect.kind === 'patternOverlay' && (
         <>
@@ -512,6 +483,273 @@ function EffectPanel({
   )
 }
 
+/** Gradient Overlay parameter pane.
+ *
+ *  Two modes (toggled by a select):
+ *  - **simple**: legacy 2-stop driven by `color` + `endColor`. The
+ *    effect's `stops` field is left undefined so on-disk projects keep
+ *    their original wire shape.
+ *  - **multi**: free-form N-stop list. Each row has a colour swatch and
+ *    a position slider (0..100, mapped to 0..1 internally). "+ Add" picks
+ *    the largest gap between consecutive stops and inserts at its midpoint.
+ *    Removal is disabled when only 2 stops remain so the renderer always
+ *    has something meaningful to draw.
+ *
+ *  `color` + `endColor` are preserved when switching back and forth so
+ *  the user doesn't lose their original two-colour pick if they toggle
+ *  modes mid-edit. */
+function GradientOverlayControls({
+  effect,
+  onChange,
+}: {
+  effect: GradientOverlayEffect
+  onChange: (e: LayerEffect) => void
+}) {
+  const { t } = useTranslation()
+  const isMulti = !!effect.stops && effect.stops.length >= 2
+  // Render-only view of stops; in simple mode we synthesise from
+  // color/endColor so the same row component can preview either.
+  const viewStops: GradientStop[] = isMulti
+    ? [...effect.stops!]
+    : [
+        { pos: 0, color: effect.color },
+        { pos: 1, color: effect.endColor },
+      ]
+  const sortedView = [...viewStops].sort((a, b) => a.pos - b.pos)
+
+  const setStops = (stops: GradientStop[]) => {
+    const sorted = [...stops].sort((a, b) => a.pos - b.pos)
+    onChange({
+      ...effect,
+      stops: sorted,
+      // Keep color/endColor in sync with the visible endpoints so
+      // toggling back to simple mode picks the closest analogue.
+      color: sorted[0]?.color ?? effect.color,
+      endColor: sorted[sorted.length - 1]?.color ?? effect.endColor,
+    } as GradientOverlayEffect)
+  }
+
+  const switchMode = (next: 'simple' | 'multi') => {
+    if (next === 'multi' && !isMulti) {
+      onChange({
+        ...effect,
+        stops: [
+          { pos: 0, color: effect.color },
+          { pos: 1, color: effect.endColor },
+        ],
+      } as GradientOverlayEffect)
+    } else if (next === 'simple' && isMulti) {
+      // Drop `stops` entirely so the wire format reverts to 2-stop.
+      const { stops: _stops, ...rest } = effect
+      void _stops
+      onChange(rest as GradientOverlayEffect)
+    }
+  }
+
+  const addStop = () => {
+    const stops = isMulti
+      ? [...effect.stops!]
+      : [
+          { pos: 0, color: effect.color },
+          { pos: 1, color: effect.endColor },
+        ]
+    const sorted = [...stops].sort((a, b) => a.pos - b.pos)
+    // Largest gap between consecutive stops; insert at its midpoint.
+    let bestGap = -1
+    let bestMid = 0.5
+    let bestLeftColor = sorted[0]?.color ?? '#888888'
+    let bestRightColor = sorted[sorted.length - 1]?.color ?? '#888888'
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const gap = sorted[i + 1].pos - sorted[i].pos
+      if (gap > bestGap) {
+        bestGap = gap
+        bestMid = (sorted[i].pos + sorted[i + 1].pos) / 2
+        bestLeftColor = sorted[i].color
+        bestRightColor = sorted[i + 1].color
+      }
+    }
+    // Halfway colour: simple per-channel hex mix of the two flanking stops.
+    const mid = mixHex(bestLeftColor, bestRightColor)
+    const next = [...sorted, { pos: bestMid, color: mid }]
+    // Force multi-mode if we were in simple — addStop only makes sense there.
+    if (!isMulti) {
+      onChange({
+        ...effect,
+        stops: [...next].sort((a, b) => a.pos - b.pos),
+      } as GradientOverlayEffect)
+    } else {
+      setStops(next)
+    }
+  }
+
+  const removeStop = (index: number) => {
+    if (!isMulti) return
+    const stops = effect.stops!
+    if (stops.length <= 2) return // guard: never go below 2
+    setStops(stops.filter((_, i) => i !== index))
+  }
+
+  const updateStop = (index: number, patch: Partial<GradientStop>) => {
+    if (!isMulti) {
+      // In simple mode the two virtual rows map onto color / endColor.
+      const sorted = sortedView
+      const target = sorted[index]
+      if (!target) return
+      const isStart = target.pos === sortedView[0].pos
+      onChange({
+        ...effect,
+        ...(isStart
+          ? { color: patch.color ?? effect.color }
+          : { endColor: patch.color ?? effect.endColor }),
+      } as GradientOverlayEffect)
+      return
+    }
+    const stops = effect.stops!
+    const updated = stops.map((s, i) => (i === index ? { ...s, ...patch } : s))
+    setStops(updated)
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <Label className="w-16 text-xs text-muted-foreground">
+          {t('pages.imageEditor.layerStyle.gradient.mode')}
+        </Label>
+        <select
+          value={isMulti ? 'multi' : 'simple'}
+          onChange={(e) => switchMode(e.target.value as 'simple' | 'multi')}
+          className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+        >
+          <option value="simple">
+            {t('pages.imageEditor.layerStyle.gradient.simple')}
+          </option>
+          <option value="multi">
+            {t('pages.imageEditor.layerStyle.gradient.multi')}
+          </option>
+        </select>
+      </div>
+
+      {!isMulti && (
+        <>
+          <div className="flex items-center gap-2">
+            <Label className="w-16 text-xs text-muted-foreground">
+              {t('pages.imageEditor.layerStyle.color')}
+            </Label>
+            <input
+              type="color"
+              value={hexFromColor(effect.color)}
+              onChange={(e) =>
+                onChange({ ...effect, color: e.target.value } as GradientOverlayEffect)
+              }
+              className="h-7 w-12 cursor-pointer rounded border border-input bg-transparent"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Label className="w-16 text-xs text-muted-foreground">
+              {t('pages.imageEditor.layerStyle.endColor')}
+            </Label>
+            <input
+              type="color"
+              value={hexFromColor(effect.endColor)}
+              onChange={(e) =>
+                onChange({ ...effect, endColor: e.target.value } as GradientOverlayEffect)
+              }
+              className="h-7 w-12 cursor-pointer rounded border border-input bg-transparent"
+            />
+          </div>
+        </>
+      )}
+
+      {isMulti && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">
+              {t('pages.imageEditor.layerStyle.gradient.stops')}
+            </Label>
+            <button
+              type="button"
+              onClick={addStop}
+              className="rounded border border-input bg-background px-2 py-0.5 text-[11px] hover:bg-accent/40"
+              title={t('pages.imageEditor.layerStyle.gradient.addStop')}
+            >
+              + {t('pages.imageEditor.layerStyle.gradient.addStop')}
+            </button>
+          </div>
+          <div className="space-y-1.5">
+            {effect.stops!.map((stop, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={hexFromColor(stop.color)}
+                  onChange={(e) => updateStop(i, { color: e.target.value })}
+                  className="h-7 w-10 shrink-0 cursor-pointer rounded border border-input bg-transparent"
+                />
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={Math.round(stop.pos * 100)}
+                  onChange={(e) =>
+                    updateStop(i, { pos: Number(e.target.value) / 100 })
+                  }
+                  className="flex-1 accent-primary"
+                />
+                <span className="w-10 text-right text-[11px] tabular-nums text-muted-foreground">
+                  {Math.round(stop.pos * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeStop(i)}
+                  disabled={effect.stops!.length <= 2}
+                  className="rounded px-1.5 text-xs text-muted-foreground hover:text-destructive disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-muted-foreground"
+                  title={t('pages.imageEditor.layerStyle.gradient.removeStop')}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <Slider
+        label={t('pages.imageEditor.layerStyle.angle')}
+        value={effect.angle}
+        min={-180}
+        max={180}
+        unit="°"
+        onChange={(v) => onChange({ ...effect, angle: v } as GradientOverlayEffect)}
+      />
+      <Slider
+        label={t('pages.imageEditor.layerStyle.scale')}
+        value={effect.scale}
+        min={10}
+        max={200}
+        unit="%"
+        onChange={(v) => onChange({ ...effect, scale: v } as GradientOverlayEffect)}
+      />
+    </>
+  )
+}
+
+/** Simple per-channel midpoint of two #rrggbb strings. Used by
+ *  "+ Add stop" to choose a sensible default colour for the new stop. */
+function mixHex(a: string, b: string): string {
+  const ax = hexFromColor(a)
+  const bx = hexFromColor(b)
+  const ar = parseInt(ax.slice(1, 3), 16)
+  const ag = parseInt(ax.slice(3, 5), 16)
+  const ab = parseInt(ax.slice(5, 7), 16)
+  const br = parseInt(bx.slice(1, 3), 16)
+  const bg = parseInt(bx.slice(3, 5), 16)
+  const bb = parseInt(bx.slice(5, 7), 16)
+  const mix = (x: number, y: number) =>
+    Math.round((x + y) / 2)
+      .toString(16)
+      .padStart(2, '0')
+  return `#${mix(ar, br)}${mix(ag, bg)}${mix(ab, bb)}`
+}
+
 /** Color + opacity + blend controls. `color` is omitted for effects that
  *  don't carry a single colour field (pattern overlay, bevel/emboss, gradient
  *  — those expose their own colour pickers in their specialised panes). */
@@ -523,9 +761,16 @@ function CommonRow({
   onChange: (e: LayerEffect) => void
 }) {
   const { t } = useTranslation()
-  // Discriminate against the only effect without a top-level `color`.
+  // Discriminate against effects without a relevant top-level `color`:
+  //  - Pattern Overlay / Bevel & Emboss never have one.
+  //  - Gradient Overlay in multi-stop mode hides the start-colour swatch
+  //    (each stop has its own picker), and the start swatch alone in
+  //    legacy 2-stop mode would be misleading anyway, so we always show
+  //    the start/end pair inside the gradient pane itself.
   const hasColor =
-    effect.kind !== 'patternOverlay' && effect.kind !== 'bevelEmboss'
+    effect.kind !== 'patternOverlay' &&
+    effect.kind !== 'bevelEmboss' &&
+    effect.kind !== 'gradientOverlay'
   return (
     <>
       {hasColor && 'color' in effect && (

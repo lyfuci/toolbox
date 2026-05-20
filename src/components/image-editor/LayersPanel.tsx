@@ -34,6 +34,9 @@ type Props = {
   onOpenStyle: (id: string) => void
   /** Right-click on a layer row. Caller opens a ContextMenu at (x, y). */
   onLayerContextMenu?: (id: string, x: number, y: number) => void
+  /** Add a mask to the given layer. For annotation / SO / group: insert a
+   *  new raster MaskLayer above. For adjustment / filter: add maskDataUrl. */
+  onAddMask?: (id: string) => void
 }
 
 type DropMode = 'into' | 'sibling' | 'top'
@@ -62,6 +65,7 @@ export function LayersPanel({
   deleteLayer,
   onOpenStyle,
   onLayerContextMenu,
+  onAddMask,
 }: Props) {
   const { t } = useTranslation()
 
@@ -151,6 +155,7 @@ export function LayersPanel({
           onDrop={(dragId, targetId, mode) => moveLayer(dragId, targetId, mode)}
           onOpenStyle={onOpenStyle}
           onLayerContextMenu={onLayerContextMenu}
+          onAddMask={onAddMask}
         />
       ))}
 
@@ -219,6 +224,7 @@ function LayerSubtree({
   onDrop,
   onOpenStyle,
   onLayerContextMenu,
+  onAddMask,
 }: {
   layer: Layer
   depth: number
@@ -231,6 +237,7 @@ function LayerSubtree({
   onDrop: (dragId: string, targetId: string, mode: 'into' | 'sibling') => void
   onOpenStyle: (id: string) => void
   onLayerContextMenu?: (id: string, x: number, y: number) => void
+  onAddMask?: (id: string) => void
 }) {
   const group = isGroup(layer) ? layer : null
   return (
@@ -249,6 +256,7 @@ function LayerSubtree({
         onDrop={(dragId, mode) => onDrop(dragId, layer.id, mode)}
         onOpenStyle={() => onOpenStyle(layer.id)}
         onContextMenu={(x, y) => onLayerContextMenu?.(layer.id, x, y)}
+        onAddMask={onAddMask}
       />
       {group && group.expanded &&
         [...group.children].reverse().map((c) => (
@@ -265,6 +273,7 @@ function LayerSubtree({
             onDrop={onDrop}
             onOpenStyle={onOpenStyle}
             onLayerContextMenu={onLayerContextMenu}
+            onAddMask={onAddMask}
           />
         ))}
     </>
@@ -294,6 +303,7 @@ function LayerRow({
   onDrop,
   onOpenStyle,
   onContextMenu,
+  onAddMask,
 }: {
   layer: Layer
   depth: number
@@ -308,6 +318,7 @@ function LayerRow({
   onDrop: (dragId: string, mode: 'into' | 'sibling') => void
   onOpenStyle: () => void
   onContextMenu?: (x: number, y: number) => void
+  onAddMask?: (layerId: string) => void
 }) {
   const { t } = useTranslation()
   const showFx = hasEffects(layer)
@@ -416,6 +427,18 @@ function LayerRow({
           fx
         </button>
       )}
+      {onAddMask && canAddMaskTo(layer) && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onAddMask(layer.id)
+          }}
+          className="rounded border border-border/60 px-1 font-mono text-[10px] text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+          title={t('pages.imageEditor.layers.addMask')}
+        >
+          ▢
+        </button>
+      )}
       <span className="font-mono text-muted-foreground">#{index}</span>
       <button
         onClick={(e) => {
@@ -500,4 +523,16 @@ function isAncestorOf(
     list = node.children
   }
   return false
+}
+
+/**
+ * Which layer kinds accept a mask. For annotation / smartObject / group, a
+ * new MaskLayer is added above; for adjustment / filter, the layer gets a
+ * per-layer maskDataUrl. Existing MaskLayers don't get a +mask button —
+ * masking a mask is rarely what users want.
+ */
+function canAddMaskTo(l: Layer): boolean {
+  if (l.kind === 'mask') return false
+  if (l.kind === 'adjustment' || l.kind === 'filter') return !l.maskDataUrl
+  return true
 }

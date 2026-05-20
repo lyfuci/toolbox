@@ -18,9 +18,17 @@ import type {
   FilterParams,
   GaussianBlurParams,
   HighPassParams,
+  LensFlareParams,
   LocalContrastParams,
   MosaicParams,
+  MotionBlurParams,
+  PinchParams,
+  PolarCoordinatesParams,
+  RadialBlurParams,
   SharpenParams,
+  SmartSharpenParams,
+  SpherizeParams,
+  TwirlParams,
   UnsharpMaskParams,
 } from '@/lib/image-editor/types'
 
@@ -87,6 +95,12 @@ function FilterDialogInner({
     onPreview(next)
   }
 
+  const reset = () => {
+    const fresh = cloneDefaults(kind)
+    setDraft(fresh)
+    onPreview(fresh)
+  }
+
   const title = t(`pages.imageEditor.filters.${kind}`)
 
   return (
@@ -120,8 +134,31 @@ function FilterDialogInner({
         {draft.kind === 'localContrast' && (
           <LocalContrastForm value={draft} onChange={update} />
         )}
+        {draft.kind === 'motionBlur' && (
+          <MotionBlurForm value={draft} onChange={update} />
+        )}
+        {draft.kind === 'radialBlur' && (
+          <RadialBlurForm value={draft} onChange={update} />
+        )}
+        {draft.kind === 'pinch' && <PinchForm value={draft} onChange={update} />}
+        {draft.kind === 'twirl' && <TwirlForm value={draft} onChange={update} />}
+        {draft.kind === 'spherize' && (
+          <SpherizeForm value={draft} onChange={update} />
+        )}
+        {draft.kind === 'polarCoordinates' && (
+          <PolarCoordinatesForm value={draft} onChange={update} />
+        )}
+        {draft.kind === 'lensFlare' && (
+          <LensFlareForm value={draft} onChange={update} />
+        )}
+        {draft.kind === 'smartSharpen' && (
+          <SmartSharpenForm value={draft} onChange={update} />
+        )}
       </div>
       <DialogFooter>
+        <Button variant="ghost" onClick={reset}>
+          {t('pages.imageEditor.reset')}
+        </Button>
         <Button variant="ghost" onClick={onCancel}>
           {t('pages.imageEditor.cancel')}
         </Button>
@@ -384,6 +421,231 @@ function LocalContrastForm({
         max={100}
         unit=" px"
         onChange={(v) => onChange({ radius: Math.round(v) })}
+      />
+    </>
+  )
+}
+
+function MotionBlurForm({
+  value,
+  onChange,
+}: {
+  value: MotionBlurParams
+  onChange: (patch: Partial<MotionBlurParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <Slider
+        label={t('pages.imageEditor.filters.angle')}
+        value={value.angle}
+        min={-180}
+        max={180}
+        unit="°"
+        onChange={(v) => onChange({ angle: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.distance')}
+        value={value.distance}
+        min={1}
+        max={200}
+        unit=" px"
+        onChange={(v) => onChange({ distance: Math.round(v) })}
+      />
+    </>
+  )
+}
+
+function RadialBlurForm({
+  value,
+  onChange,
+}: {
+  value: RadialBlurParams
+  onChange: (patch: Partial<RadialBlurParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <label className="w-24 text-xs text-muted-foreground">
+          {t('pages.imageEditor.filters.radialMode')}
+        </label>
+        <select
+          value={value.mode}
+          onChange={(e) => onChange({ mode: e.target.value as RadialBlurParams['mode'] })}
+          className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+        >
+          <option value="zoom">{t('pages.imageEditor.filters.radialZoom')}</option>
+          <option value="spin">{t('pages.imageEditor.filters.radialSpin')}</option>
+        </select>
+      </div>
+      <Slider
+        label={t('pages.imageEditor.filters.amount')}
+        value={value.amount}
+        min={1}
+        max={100}
+        onChange={(v) => onChange({ amount: Math.round(v) })}
+      />
+    </>
+  )
+}
+
+function PinchForm({
+  value,
+  onChange,
+}: {
+  value: PinchParams
+  onChange: (patch: Partial<PinchParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <Slider
+      label={t('pages.imageEditor.filters.amount')}
+      value={value.amount}
+      min={-100}
+      max={100}
+      onChange={(v) => onChange({ amount: Math.round(v) })}
+    />
+  )
+}
+
+function TwirlForm({
+  value,
+  onChange,
+}: {
+  value: TwirlParams
+  onChange: (patch: Partial<TwirlParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <Slider
+      label={t('pages.imageEditor.filters.angle')}
+      value={value.angle}
+      min={-360}
+      max={360}
+      unit="°"
+      onChange={(v) => onChange({ angle: Math.round(v) })}
+    />
+  )
+}
+
+function SpherizeForm({
+  value,
+  onChange,
+}: {
+  value: SpherizeParams
+  onChange: (patch: Partial<SpherizeParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <Slider
+      label={t('pages.imageEditor.filters.amount')}
+      value={value.amount}
+      min={-100}
+      max={100}
+      onChange={(v) => onChange({ amount: Math.round(v) })}
+    />
+  )
+}
+
+function PolarCoordinatesForm({
+  value,
+  onChange,
+}: {
+  value: PolarCoordinatesParams
+  onChange: (patch: Partial<PolarCoordinatesParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div className="flex items-center gap-2">
+      <label className="w-24 text-xs text-muted-foreground">
+        {t('pages.imageEditor.filters.polarMode')}
+      </label>
+      <select
+        value={value.mode}
+        onChange={(e) =>
+          onChange({ mode: e.target.value as PolarCoordinatesParams['mode'] })
+        }
+        className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+      >
+        <option value="polar">{t('pages.imageEditor.filters.polarRectToPolar')}</option>
+        <option value="rect">{t('pages.imageEditor.filters.polarPolarToRect')}</option>
+      </select>
+    </div>
+  )
+}
+
+function LensFlareForm({
+  value,
+  onChange,
+}: {
+  value: LensFlareParams
+  onChange: (patch: Partial<LensFlareParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <Slider
+        label={t('pages.imageEditor.filters.flareX')}
+        value={value.x * 100}
+        min={0}
+        max={100}
+        unit="%"
+        onChange={(v) => onChange({ x: v / 100 })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.flareY')}
+        value={value.y * 100}
+        min={0}
+        max={100}
+        unit="%"
+        onChange={(v) => onChange({ y: v / 100 })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.brightness')}
+        value={value.brightness}
+        min={0}
+        max={200}
+        unit="%"
+        onChange={(v) => onChange({ brightness: Math.round(v) })}
+      />
+    </>
+  )
+}
+
+function SmartSharpenForm({
+  value,
+  onChange,
+}: {
+  value: SmartSharpenParams
+  onChange: (patch: Partial<SmartSharpenParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <Slider
+        label={t('pages.imageEditor.filters.amount')}
+        value={value.amount}
+        min={0}
+        max={500}
+        unit="%"
+        onChange={(v) => onChange({ amount: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.radius')}
+        value={value.radius}
+        min={0.5}
+        max={50}
+        step={0.1}
+        unit=" px"
+        onChange={(v) => onChange({ radius: v })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.threshold')}
+        value={value.threshold}
+        min={0}
+        max={255}
+        onChange={(v) => onChange({ threshold: Math.round(v) })}
       />
     </>
   )

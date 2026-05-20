@@ -12,6 +12,7 @@ import {
   Hand,
   Lasso,
   LayoutTemplate,
+  Magnet,
   Moon,
   MousePointer,
   MousePointer2,
@@ -70,6 +71,11 @@ const GROUPS: ToolDef[][] = [
       id: 'polyLasso',
       icon: <PenTool className="h-4 w-4" />,
       labelKey: 'pages.imageEditor.tool.polyLasso',
+    },
+    {
+      id: 'magneticLasso',
+      icon: <Magnet className="h-4 w-4" />,
+      labelKey: 'pages.imageEditor.tool.magneticLasso',
     },
     {
       id: 'wand',
@@ -238,7 +244,7 @@ export function ToolsPalette({
               <div
                 key={td.id}
                 className={`pf-tool-btn ${active ? 'pf-active' : ''} ${td.stub ? 'pf-stub' : ''}`}
-                title={td.shortcut ? `${t(td.labelKey)} (${td.shortcut})` : t(td.labelKey)}
+                title={tooltipFor(t, td)}
                 onClick={() => {
                   if (td.stub) onStubClick(t(td.labelKey))
                   else setTool(active ? 'none' : td.id)
@@ -304,4 +310,19 @@ export function ToolsPalette({
       </div>
     </div>
   )
+}
+
+/**
+ * Build the full tooltip string for a tool button. Includes name, shortcut,
+ * and (when available) a one-line hint from i18n. Hints live under keys like
+ * `pages.imageEditor.toolHint.brush`; missing hints just produce the
+ * compact "Name (Shortcut)" form.
+ */
+function tooltipFor(t: (k: string) => string, td: ToolDef): string {
+  const base = td.shortcut ? `${t(td.labelKey)} (${td.shortcut})` : t(td.labelKey)
+  const hintKey = `pages.imageEditor.toolHint.${td.id}`
+  const hint = t(hintKey)
+  // i18next returns the key itself if missing — gate on that.
+  if (hint && hint !== hintKey) return `${base}\n${hint}`
+  return base
 }

@@ -34,6 +34,12 @@ type Props = {
   onReplaceSmartObjectContents: () => void
   /** Right-click on a layer row — parent opens the ContextMenu. */
   onLayerContextMenu?: (id: string, x: number, y: number) => void
+  /** Inline +Mask button in the layer row — adds an adjustment mask or a
+   *  new MaskLayer above, depending on the target layer's kind. */
+  onAddMaskToLayer?: (id: string) => void
+  /** Paths panel — convert active selection ↔ vector path layer. */
+  onMakeWorkPath?: () => void
+  onMakeSelectionFromPath?: () => void
   /** Channels panel needs the rendered composite source. */
   image: HTMLImageElement | null
   imageCache?: ImageCache
@@ -89,6 +95,9 @@ export function RightSidebar({
   onOpenStyle,
   onReplaceSmartObjectContents,
   onLayerContextMenu,
+  onAddMaskToLayer,
+  onMakeWorkPath,
+  onMakeSelectionFromPath,
   image,
   imageCache,
   history,
@@ -177,6 +186,7 @@ export function RightSidebar({
               deleteLayer={deleteLayer}
               onOpenStyle={onOpenStyle}
               onLayerContextMenu={onLayerContextMenu}
+              onAddMask={onAddMaskToLayer}
             />
           </div>
         )}
@@ -184,7 +194,13 @@ export function RightSidebar({
           <ChannelsPanel image={image} state={state} imageCache={imageCache} />
         )}
         {g1 === 'paths' && (
-          <PathsPanel state={state} selectedId={selectedId} onSelect={onSelect} />
+          <PathsPanel
+            state={state}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            onMakeWorkPath={onMakeWorkPath}
+            onMakeSelectionFromPath={onMakeSelectionFromPath}
+          />
         )}
       </PanelGroup>
       <div
