@@ -40,11 +40,16 @@ type XmlNodeProps = {
 
 function XmlElementNode({ node, depth, matched, hasQuery, firstMatchRef }: XmlNodeProps) {
   const isMatch = matched.has(node)
-  const [open, setOpen] = useState(depth < 2)
-  useEffect(() => {
-    if (hasQuery && hasMatchedDescendant(node, matched) && !open) setOpen(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasQuery, matched])
+  // Auto-expand to reveal matched descendants. Derived from `matched` rather
+  // than synced via effect → avoids the setState-in-effect lint rule and the
+  // accompanying double render. `useMemo` recomputes only when inputs change.
+  const autoOpen = useMemo(
+    () => hasQuery && hasMatchedDescendant(node, matched),
+    [hasQuery, matched, node],
+  )
+  const [userOpen, setUserOpen] = useState<boolean | null>(null)
+  const open = userOpen ?? (autoOpen || depth < 2)
+  const setOpen = (v: boolean) => setUserOpen(v)
 
   const rowRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
@@ -98,7 +103,7 @@ function XmlElementNode({ node, depth, matched, hasQuery, firstMatchRef }: XmlNo
         {hasContainerChildren ? (
           <button
             type="button"
-            onClick={() => setOpen((o) => !o)}
+            onClick={() => setOpen(!open)}
             aria-label={open ? 'Collapse' : 'Expand'}
             className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-foreground"
           >
