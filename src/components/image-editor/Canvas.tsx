@@ -10,6 +10,7 @@ import {
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PREVIEW_MAX } from '@/lib/image-editor/defaults'
+import { buildEdgeMap, snapToEdge } from '@/lib/image-editor/edge-snap'
 import {
   getHandles,
   pickHandle,
@@ -223,6 +224,14 @@ type Interaction =
   | { kind: 'marquee-drawing'; rect: { x: number; y: number; w: number; h: number }; mod: SelectionModifier }
   /** Lasso freeform drag — accumulating points in canvas-pixel space. */
   | { kind: 'lasso-drawing'; points: Point[]; mod: SelectionModifier }
+  /** Magnetic lasso freeform drag — same as lasso, but each appended point is
+   *  snapped to the nearest local edge maximum in the pre-built `edgeMap`. */
+  | {
+      kind: 'magnetic-lasso-drawing'
+      points: Point[]
+      mod: SelectionModifier
+      edgeMap: import('@/lib/image-editor/edge-snap').EdgeMap | null
+    }
   /**
    * Polygonal Lasso click-by-click. `points` are committed; `cursor` is the
    * current mouse position so the live preview can show the next pending
@@ -445,6 +454,9 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       drawMarqueePreview(canvasRef.current, interaction.rect)
     }
     if (interaction.kind === 'lasso-drawing') {
+      drawPolygonPreview(canvasRef.current, interaction.points, false)
+    }
+    if (interaction.kind === 'magnetic-lasso-drawing') {
       drawPolygonPreview(canvasRef.current, interaction.points, false)
     }
     if (interaction.kind === 'polylasso-drawing') {
@@ -725,6 +737,20 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       return
     }
 
+    // Magnetic Lasso: same drag-to-trace, but every appended point is
+    // snapped to the strongest edge pixel nearby (pre-built Sobel map).
+    if (tool === 'magneticLasso') {
+      const edgeMap = canvasRef.current ? buildEdgeMap(canvasRef.current) : null
+      const snapped = edgeMap ? snapToEdge(edgeMap, p.x, p.y, 12) : p
+      setInteraction({
+        kind: 'magnetic-lasso-drawing',
+        points: [snapped],
+        mod: selectionModFromEvent(e),
+        edgeMap,
+      })
+      return
+    }
+
     // Polygonal Lasso: each click adds a vertex; double-click closes. Esc
     // cancels (handled below in the keydown path).
     if (tool === 'polyLasso') {
@@ -924,6 +950,39 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
         const layer = findLayerById(state.layers, hit.layerId)
         if (layer) {
           onSelect(hit.layerId)
+          // Alt-click on an anchor toggles smooth ↔ corner. Smooth = both
+          // handles present (mirrored); corner = no handles, segments
+          // become straight lines into and out of the anchor.
+          if (e.altKey && layer.kind === 'annotation' && layer.shape.kind === 'path') {
+            const m = /^path-anchor-(\d+)$/.exec(hit.handleId)
+            if (m) {
+              const idx = parseInt(m[1], 10)
+              const anchor = layer.shape.anchors[idx]
+              if (anchor) {
+                const next = { ...layer.shape, anchors: layer.shape.anchors.slice() }
+                if (anchor.hin || anchor.hout) {
+                  next.anchors[idx] = { x: anchor.x, y: anchor.y }
+                } else {
+                  // Synthesise symmetric handles aligned along the local
+                  // tangent (between prev and next anchor). Falls back to
+                  // a small axis-aligned handle if neighbours are missing.
+                  const N = next.anchors.length
+                  const prev = next.anchors[(idx - 1 + N) % N]
+                  const nxt = next.anchors[(idx + 1) % N]
+                  const tx = (nxt.x - prev.x) / 4
+                  const ty = (nxt.y - prev.y) / 4
+                  next.anchors[idx] = {
+                    x: anchor.x,
+                    y: anchor.y,
+                    hin: { x: -tx, y: -ty },
+                    hout: { x: tx, y: ty },
+                  }
+                }
+                onCommitLayerUpdate(layer.id, { ...layer, shape: next })
+                return
+              }
+            }
+          }
           setInteraction({
             kind: 'resizing',
             layerId: hit.layerId,
@@ -1029,6 +1088,23 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       return
     }
 
+    if (interaction.kind === 'magnetic-lasso-drawing') {
+      // Subsample at larger step (6 px) — magnetic snap math is heavier
+      // than plain lasso, and dense points obscure the edge follow.
+      const last = interaction.points[interaction.points.length - 1]
+      if (Math.abs(p.x - last.x) < 6 && Math.abs(p.y - last.y) < 6) return
+      const snapped = interaction.edgeMap
+        ? snapToEdge(interaction.edgeMap, p.x, p.y, 12)
+        : p
+      setInteraction({
+        kind: 'magnetic-lasso-drawing',
+        points: [...interaction.points, snapped],
+        mod: interaction.mod,
+        edgeMap: interaction.edgeMap,
+      })
+      return
+    }
+
     if (interaction.kind === 'polylasso-drawing') {
       // Just update cursor — no point committed until next click.
       setInteraction({ ...interaction, cursor: p })
@@ -1131,6 +1207,13 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     }
     if (interaction.kind === 'lasso-drawing') {
       // Need ≥3 distinct points to make a polygon. Otherwise drop.
+      if (interaction.points.length >= 3) {
+        onCommitPolygonSelection?.(interaction.points, interaction.mod)
+      }
+      setInteraction({ kind: 'idle' })
+      return
+    }
+    if (interaction.kind === 'magnetic-lasso-drawing') {
       if (interaction.points.length >= 3) {
         onCommitPolygonSelection?.(interaction.points, interaction.mod)
       }

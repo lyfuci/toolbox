@@ -80,6 +80,7 @@ export type Tool =
   | 'marquee'
   | 'lasso'
   | 'polyLasso'
+  | 'magneticLasso'
   | 'wand'
   | 'spotHeal'
   | 'stamp'
@@ -660,6 +661,13 @@ type LayerCommon = {
    * masked against the base layer's contribution, then composites.
    */
   clipping?: boolean
+  /**
+   * Free-Transform rotation in degrees, clockwise, applied around the
+   * layer's bbox centre at render time. Annotation + group layers honour
+   * this; smart-object layers carry their own `transform.rotation` and
+   * ignore this field. Defaults to 0 (no rotation) for back-compat.
+   */
+  rotation?: number
 }
 
 export type ImageLayerProps = LayerCommon & { kind: 'image' }

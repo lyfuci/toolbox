@@ -251,7 +251,9 @@ export function getHandles(layer: Layer): Handle[] {
     case 'ellipse':
     case 'blur':
     case 'frame':
-      return rectCornerHandles(
+      // 4 corners + rotation handle (Free Transform — any layer can now
+      // rotate via the floating handle above the bbox centre-top).
+      return rectEightHandlesWithRotate(
         normalizeRect({
           x: layer.shape.x,
           y: layer.shape.y,

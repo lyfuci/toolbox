@@ -591,6 +591,7 @@
         "marquee": "矩形选框",
         "lasso": "套索",
         "polyLasso": "多边形套索",
+        "magneticLasso": "磁性套索",
         "wand": "魔棒",
         "spotHeal": "污点修复画笔",
         "stamp": "仿制图章",

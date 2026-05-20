@@ -12,6 +12,7 @@ import {
   Hand,
   Lasso,
   LayoutTemplate,
+  Magnet,
   Moon,
   MousePointer,
   MousePointer2,
@@ -70,6 +71,11 @@ const GROUPS: ToolDef[][] = [
       id: 'polyLasso',
       icon: <PenTool className="h-4 w-4" />,
       labelKey: 'pages.imageEditor.tool.polyLasso',
+    },
+    {
+      id: 'magneticLasso',
+      icon: <Magnet className="h-4 w-4" />,
+      labelKey: 'pages.imageEditor.tool.magneticLasso',
     },
     {
       id: 'wand',

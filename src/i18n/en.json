@@ -591,6 +591,7 @@
         "marquee": "Rectangular Marquee",
         "lasso": "Lasso",
         "polyLasso": "Polygonal Lasso",
+        "magneticLasso": "Magnetic Lasso",
         "wand": "Magic Wand",
         "spotHeal": "Spot Healing Brush",
         "stamp": "Clone Stamp",

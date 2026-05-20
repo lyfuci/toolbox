@@ -168,6 +168,19 @@ export function resizeLayer(
   if (layer.kind === 'smartObject') {
     return resizeSmartObject(layer, handleId, newPoint)
   }
+  // Free Transform rotation handle — annotation layers with a rectangular
+  // bbox carry one above the top edge centre. Compute the angle from the
+  // bbox centre to the new mouse point; subtract 90° so the handle's
+  // resting position (straight up) corresponds to 0° rotation.
+  if (handleId === 'rotate' && layer.kind === 'annotation') {
+    const bbox = annotationBBox(layer.shape)
+    if (bbox) {
+      const cx = bbox.x + bbox.w / 2
+      const cy = bbox.y + bbox.h / 2
+      const ang = (Math.atan2(newPoint.y - cy, newPoint.x - cx) * 180) / Math.PI + 90
+      return { ...layer, rotation: ang }
+    }
+  }
   const s = layer.shape
   switch (s.kind) {
     case 'rect':
@@ -406,5 +419,42 @@ function scaleShape(shape: Shape, sx: number, sy: number): Shape {
         })),
         strokeWidth: shape.strokeWidth * sAvg,
       }
+  }
+}
+
+/**
+ * Compute the unrotated bbox of an annotation's shape. Used by the
+ * Free-Transform rotation handle to find the pivot (bbox centre).
+ * Returns null for shapes that don't have a meaningful rect (brush,
+ * text, note — those are move-only / single-point).
+ */
+function annotationBBox(shape: Shape): Rect | null {
+  switch (shape.kind) {
+    case 'rect':
+    case 'mosaic':
+    case 'image':
+    case 'ellipse':
+    case 'blur':
+    case 'frame':
+      return { x: shape.x, y: shape.y, w: shape.w, h: shape.h }
+    case 'arrow':
+    case 'line': {
+      const x = Math.min(shape.x1, shape.x2)
+      const y = Math.min(shape.y1, shape.y2)
+      return { x, y, w: Math.abs(shape.x2 - shape.x1), h: Math.abs(shape.y2 - shape.y1) }
+    }
+    case 'path': {
+      if (shape.anchors.length === 0) return null
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+      for (const a of shape.anchors) {
+        if (a.x < minX) minX = a.x
+        if (a.y < minY) minY = a.y
+        if (a.x > maxX) maxX = a.x
+        if (a.y > maxY) maxY = a.y
+      }
+      return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+    }
+    default:
+      return null
   }
 }
