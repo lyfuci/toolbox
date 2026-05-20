@@ -118,15 +118,15 @@
     },
     "timestamp": {
       "name": "Timestamp",
-      "description": "时间戳 ↔ 日期（Unix / ISO / RFC）"
+      "description": "时间戳 ↔ 日期（Unix / ISO / RFC）+ 多时区时钟、分字段合成、批量"
     },
     "color": {
       "name": "Color",
-      "description": "HEX / RGB / HSL 互转"
+      "description": "HEX / RGB / HSL / OKLCH + WCAG 对比度 + 配色方案"
     },
     "number-base": {
       "name": "Number Base",
-      "description": "整数进制互转（基于 BigInt）"
+      "description": "整数进制互转（BigInt）+ 位网格 + 位运算"
     },
     "csv-json": {
       "name": "CSV ↔ JSON",
@@ -134,19 +134,19 @@
     },
     "uuid": {
       "name": "UUID",
-      "description": "UUID v4 批量生成（crypto.randomUUID）"
+      "description": "UUID v1 / v3 / v4 / v5 / v7 + 解码（版本、变体、时间戳）"
     },
     "password": {
       "name": "Password",
-      "description": "CSPRNG 随机密码生成器"
+      "description": "CSPRNG 密码 + Diceware 密码短语生成器"
     },
     "qr-code": {
       "name": "QR Code",
-      "description": "二维码生成（SVG / PNG，本地）"
+      "description": "二维码生成 URL / WiFi / vCard / Email / SMS / Geo（SVG / PNG，本地）"
     },
     "lorem": {
       "name": "Lorem Ipsum",
-      "description": "占位文本生成（段落 / 句子 / 单词）"
+      "description": "占位文本 — Lorem / Hipster / 海盗 / 培根 主题"
     },
     "diff": {
       "name": "Diff",

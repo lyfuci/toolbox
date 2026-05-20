@@ -118,15 +118,15 @@
     },
     "timestamp": {
       "name": "Timestamp",
-      "description": "Timestamp ↔ date (Unix / ISO / RFC)"
+      "description": "Timestamp ↔ date (Unix / ISO / RFC) + multi-zone clock, compose, batch"
     },
     "color": {
       "name": "Color",
-      "description": "HEX / RGB / HSL conversion"
+      "description": "HEX / RGB / HSL / OKLCH + WCAG contrast + palettes"
     },
     "number-base": {
       "name": "Number Base",
-      "description": "Integer base conversion (BigInt)"
+      "description": "Integer base conversion (BigInt) + bit grid + bitwise ops"
     },
     "csv-json": {
       "name": "CSV ↔ JSON",
@@ -134,19 +134,19 @@
     },
     "uuid": {
       "name": "UUID",
-      "description": "UUID v4 batch (crypto.randomUUID)"
+      "description": "UUID v1 / v3 / v4 / v5 / v7 + decode (version, variant, timestamp)"
     },
     "password": {
       "name": "Password",
-      "description": "CSPRNG password generator"
+      "description": "CSPRNG password + Diceware passphrase generator"
     },
     "qr-code": {
       "name": "QR Code",
-      "description": "QR generation (SVG / PNG, local)"
+      "description": "QR for URL / WiFi / vCard / Email / SMS / Geo (SVG / PNG, local)"
     },
     "lorem": {
       "name": "Lorem Ipsum",
-      "description": "Placeholder text (paragraphs / sentences / words)"
+      "description": "Placeholder text — Lorem / Hipster / Pirate / Bacon themes"
     },
     "diff": {
       "name": "Diff",

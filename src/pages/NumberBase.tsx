@@ -164,6 +164,9 @@ export function NumberBasePage() {
     const a = toUnsigned(value, width)
     const b = toUnsigned(r.value, width)
     const mask = widthMask(width)
+    // Clamp shift count to width to avoid runaway BigInt allocations on
+    // pathological inputs (e.g. SHL by 1_000_000).
+    const shift = BigInt(Math.min(Number(b), width))
     let res: bigint
     switch (op) {
       case 'AND':
@@ -176,10 +179,10 @@ export function NumberBasePage() {
         res = a ^ b
         break
       case 'SHL':
-        res = (a << b) & mask
+        res = (a << shift) & mask
         break
       case 'SHR':
-        res = a >> b
+        res = a >> shift
         break
     }
     setValue(toSigned(res, width))

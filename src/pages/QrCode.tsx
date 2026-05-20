@@ -34,6 +34,11 @@ function buildWifi(ssid: string, password: string, auth: string, hidden: boolean
   return s
 }
 
+// vCard 3.0 escapes (RFC 2426 §4): backslash, comma, semicolon and CRLF.
+function escapeVCard(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\r?\n/g, '\\n')
+}
+
 function buildVCard(
   name: string,
   org: string,
@@ -42,15 +47,16 @@ function buildVCard(
   email: string,
   url: string,
 ): string {
+  const e = escapeVCard
   return [
     'BEGIN:VCARD',
     'VERSION:3.0',
-    name && `FN:${name}`,
-    org && `ORG:${org}`,
-    title && `TITLE:${title}`,
-    phone && `TEL;TYPE=CELL:${phone}`,
-    email && `EMAIL:${email}`,
-    url && `URL:${url}`,
+    name && `FN:${e(name)}`,
+    org && `ORG:${e(org)}`,
+    title && `TITLE:${e(title)}`,
+    phone && `TEL;TYPE=CELL:${e(phone)}`,
+    email && `EMAIL:${e(email)}`,
+    url && `URL:${e(url)}`,
     'END:VCARD',
   ]
     .filter(Boolean)
