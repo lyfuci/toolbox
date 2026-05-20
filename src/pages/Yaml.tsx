@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import yaml from 'js-yaml'
 import { ArrowLeftRight, Copy, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
+import { CodeEditor } from '@/components/CodeEditor'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 
@@ -127,11 +127,12 @@ export function YamlPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <div>
           <Label className="mb-1.5 block text-xs text-muted-foreground">{inputLabel}</Label>
-          <Textarea
+          <CodeEditor
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            spellCheck={false}
-            className="min-h-[420px] font-mono text-sm leading-relaxed"
+            onChange={(v) => setInput(v)}
+            language={mode === 'yaml2json' ? 'yaml' : 'json'}
+            className="min-h-[480px]"
+            height="480px"
           />
         </div>
         <div>
@@ -142,11 +143,13 @@ export function YamlPage() {
               {t('common.copy')}
             </Button>
           </div>
-          <Textarea
+          <CodeEditor
             value={outputValue}
-            readOnly
-            spellCheck={false}
-            className="min-h-[420px] font-mono text-sm leading-relaxed"
+            language={mode === 'yaml2json' ? 'json' : 'yaml'}
+            readOnly={true}
+            editable={false}
+            className="min-h-[480px]"
+            height="480px"
           />
         </div>
       </div>
