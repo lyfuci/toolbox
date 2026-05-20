@@ -1046,6 +1046,14 @@
           "patternOverlay": "图案叠加",
           "satin": "光泽",
           "bevelEmboss": "斜面与浮雕"
+        },
+        "gradient": {
+          "mode": "模式",
+          "simple": "双色（简单）",
+          "multi": "多色（自定义）",
+          "stops": "色标",
+          "addStop": "添加色标",
+          "removeStop": "删除色标"
         }
       },
       "project": "项目",
