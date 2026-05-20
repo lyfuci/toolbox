@@ -193,16 +193,25 @@
   },
   "pages": {
     "json": {
-      "description": "格式化、压缩、校验 JSON。所有处理都在浏览器本地完成。",
+      "description": "格式化、压缩、校验 JSON；浏览解析后的树结构，并用 JSONPath 过滤。所有处理本地完成。",
       "placeholder": "在此粘贴 JSON…",
       "indent": "缩进",
-      "stats": "{{chars}} chars · {{minified}} minified"
+      "stats": "{{chars}} chars · {{minified}} minified",
+      "jsonpathLabel": "JSONPath",
+      "jsonpathPlaceholder": "$.tools[*]  ·  $..meta",
+      "matchCount": "{{n}} 个匹配",
+      "clickHint": "点击任意节点可复制其 JSONPath",
+      "copiedPath": "已复制 {{path}}"
     },
     "xml": {
-      "description": "XML 格式化、压缩、校验。基于浏览器原生 DOMParser（无第三方依赖）。",
+      "description": "XML 格式化、压缩、校验；浏览解析后的树结构，并用 XPath 查询。基于浏览器原生 DOMParser（无第三方依赖）。",
       "placeholder": "在此粘贴 XML…",
       "indent": "缩进",
-      "stats": "{{chars}} chars"
+      "stats": "{{chars}} chars",
+      "xpathLabel": "XPath",
+      "xpathPlaceholder": "//item  ·  //*[@id='1']",
+      "matchCount": "{{n}} 个匹配",
+      "treeHint": "输入 XPath 高亮匹配元素"
     },
     "yaml": {
       "description": "YAML 与 JSON 互转。基于 js-yaml，兼容 YAML 1.2 子集。"
@@ -413,14 +422,28 @@
       "invalidOperand": "无效的操作数"
     },
     "csvJson": {
-      "description": "CSV 与 JSON 互转。CSV 第一行作为字段名；JSON 须为对象数组。支持引号字段、字段内逗号 / 换行 / 转义引号。",
+      "description": "CSV 与 JSON 互转，可配置分隔符 / 引号 / 表头 / 类型推断，并带可排序的表格预览。",
       "csvToJson": "CSV → JSON",
       "jsonToCsv": "JSON → CSV",
       "csvLabel": "CSV",
       "jsonLabel": "JSON",
       "jsonArrayLabel": "JSON (array of objects)",
       "errRootArray": "期望根节点是数组（array of objects）",
-      "errRowObject": "数组每个元素必须是对象"
+      "errRowObject": "数组每个元素必须是对象",
+      "delimiter": "分隔符",
+      "delimComma": ", (逗号)",
+      "delimSemicolon": "; (分号)",
+      "delimTab": "\\t (制表符)",
+      "delimPipe": "| (竖线)",
+      "delimCustom": "自定义",
+      "quote": "引号",
+      "quoteDouble": "\" (双引号)",
+      "quoteSingle": "' (单引号)",
+      "parsing": "解析",
+      "firstRowHeader": "首行为表头",
+      "inferTypes": "类型推断（数字 / 布尔）",
+      "activeChar": "当前",
+      "tablePreview": "表格预览（点击表头排序）"
     },
     "uuid": {
       "description": "生成 UUID（v1 / v3 / v4 / v5 / v7），并可解码任意 UUID 的版本、变体与嵌入时间戳。",

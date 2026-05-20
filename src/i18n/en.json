@@ -193,16 +193,25 @@
   },
   "pages": {
     "json": {
-      "description": "Format, minify, validate JSON. All processing runs locally in the browser.",
+      "description": "Format, minify, validate JSON; explore the parsed tree and filter with JSONPath. All processing runs locally.",
       "placeholder": "Paste JSON here…",
       "indent": "Indent",
-      "stats": "{{chars}} chars · {{minified}} minified"
+      "stats": "{{chars}} chars · {{minified}} minified",
+      "jsonpathLabel": "JSONPath",
+      "jsonpathPlaceholder": "$.tools[*]  ·  $..meta",
+      "matchCount": "{{n}} match(es)",
+      "clickHint": "Click any node to copy its JSONPath",
+      "copiedPath": "Copied {{path}}"
     },
     "xml": {
-      "description": "Format, minify, validate XML. Uses the browser's native DOMParser (no third-party dep).",
+      "description": "Format, minify, validate XML; browse the parsed tree and query with XPath. Uses the native DOMParser (no third-party dep).",
       "placeholder": "Paste XML here…",
       "indent": "Indent",
-      "stats": "{{chars}} chars"
+      "stats": "{{chars}} chars",
+      "xpathLabel": "XPath",
+      "xpathPlaceholder": "//item  ·  //*[@id='1']",
+      "matchCount": "{{n}} match(es)",
+      "treeHint": "Type an XPath to highlight matching elements"
     },
     "yaml": {
       "description": "Convert between YAML and JSON. Powered by js-yaml, supporting YAML 1.2 subset."
@@ -413,14 +422,28 @@
       "invalidOperand": "Invalid operand"
     },
     "csvJson": {
-      "description": "Convert between CSV and JSON. First row of CSV becomes keys; JSON must be an array of objects. Handles quoted fields, commas / newlines inside fields, and escaped quotes.",
+      "description": "Convert between CSV and JSON, with configurable delimiter / quote / header / type-inference, plus a sortable table preview.",
       "csvToJson": "CSV → JSON",
       "jsonToCsv": "JSON → CSV",
       "csvLabel": "CSV",
       "jsonLabel": "JSON",
       "jsonArrayLabel": "JSON (array of objects)",
       "errRootArray": "Root must be an array (array of objects)",
-      "errRowObject": "Each array element must be an object"
+      "errRowObject": "Each array element must be an object",
+      "delimiter": "Delimiter",
+      "delimComma": ", (comma)",
+      "delimSemicolon": "; (semicolon)",
+      "delimTab": "\\t (tab)",
+      "delimPipe": "| (pipe)",
+      "delimCustom": "Custom",
+      "quote": "Quote",
+      "quoteDouble": "\" (double)",
+      "quoteSingle": "' (single)",
+      "parsing": "Parsing",
+      "firstRowHeader": "First row is header",
+      "inferTypes": "Infer types (numbers, booleans)",
+      "activeChar": "Active",
+      "tablePreview": "Table preview (click header to sort)"
     },
     "uuid": {
       "description": "Generate UUIDs (v1 / v3 / v4 / v5 / v7) and decode any UUID's version, variant and embedded timestamp.",
