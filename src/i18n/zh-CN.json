@@ -20,7 +20,13 @@
     "output": "输出",
     "noResult": "无结果",
     "parseFailed": "解析失败：{{error}}",
-    "emptyInput": "空输入"
+    "emptyInput": "空输入",
+    "dropFileLabel": "将文件拖到此处",
+    "dropFileHint": "或点击选择文件",
+    "file": "文件",
+    "text": "文本",
+    "verify": "校验",
+    "verifyPlaceholder": "粘贴期望值进行对比…"
   },
   "topbar": {
     "searchPlaceholder": "搜索工具...",
@@ -118,15 +124,15 @@
     },
     "timestamp": {
       "name": "Timestamp",
-      "description": "时间戳 ↔ 日期（Unix / ISO / RFC）"
+      "description": "时间戳 ↔ 日期（Unix / ISO / RFC）+ 多时区时钟、分字段合成、批量"
     },
     "color": {
       "name": "Color",
-      "description": "HEX / RGB / HSL 互转"
+      "description": "HEX / RGB / HSL / OKLCH + WCAG 对比度 + 配色方案"
     },
     "number-base": {
       "name": "Number Base",
-      "description": "整数进制互转（基于 BigInt）"
+      "description": "整数进制互转（BigInt）+ 位网格 + 位运算"
     },
     "csv-json": {
       "name": "CSV ↔ JSON",
@@ -134,19 +140,19 @@
     },
     "uuid": {
       "name": "UUID",
-      "description": "UUID v4 批量生成（crypto.randomUUID）"
+      "description": "UUID v1 / v3 / v4 / v5 / v7 + 解码（版本、变体、时间戳）"
     },
     "password": {
       "name": "Password",
-      "description": "CSPRNG 随机密码生成器"
+      "description": "CSPRNG 密码 + Diceware 密码短语生成器"
     },
     "qr-code": {
       "name": "QR Code",
-      "description": "二维码生成（SVG / PNG，本地）"
+      "description": "二维码生成 URL / WiFi / vCard / Email / SMS / Geo（SVG / PNG，本地）"
     },
     "lorem": {
       "name": "Lorem Ipsum",
-      "description": "占位文本生成（段落 / 句子 / 单词）"
+      "description": "占位文本 — Lorem / Hipster / 海盗 / 培根 主题"
     },
     "diff": {
       "name": "Diff",
@@ -187,30 +193,62 @@
   },
   "pages": {
     "json": {
-      "description": "格式化、压缩、校验 JSON。所有处理都在浏览器本地完成。",
+      "description": "格式化、压缩、校验 JSON；浏览解析后的树结构，并用 JSONPath 过滤。所有处理本地完成。",
       "placeholder": "在此粘贴 JSON…",
       "indent": "缩进",
-      "stats": "{{chars}} chars · {{minified}} minified"
+      "stats": "{{chars}} chars · {{minified}} minified",
+      "jsonpathLabel": "JSONPath",
+      "jsonpathPlaceholder": "$.tools[*]  ·  $..meta",
+      "matchCount": "{{n}} 个匹配",
+      "clickHint": "点击任意节点可复制其 JSONPath",
+      "copiedPath": "已复制 {{path}}"
     },
     "xml": {
-      "description": "XML 格式化、压缩、校验。基于浏览器原生 DOMParser（无第三方依赖）。",
+      "description": "XML 格式化、压缩、校验；浏览解析后的树结构，并用 XPath 查询。基于浏览器原生 DOMParser（无第三方依赖）。",
       "placeholder": "在此粘贴 XML…",
       "indent": "缩进",
-      "stats": "{{chars}} chars"
+      "stats": "{{chars}} chars",
+      "xpathLabel": "XPath",
+      "xpathPlaceholder": "//item  ·  //*[@id='1']",
+      "matchCount": "{{n}} 个匹配",
+      "treeHint": "输入 XPath 高亮匹配元素"
     },
     "yaml": {
       "description": "YAML 与 JSON 互转。基于 js-yaml，兼容 YAML 1.2 子集。"
     },
     "base64": {
       "description": "Base64 编解码，支持 UTF-8 与 URL-safe（-_）变体。所有处理在浏览器本地完成。",
-      "urlSafe": "URL-safe (-_)"
+      "urlSafe": "URL-safe (-_)",
+      "modeText": "文本",
+      "modeFile": "文件",
+      "fileDropEncode": "拖入要编码的文件",
+      "fileDropDecode": "拖入包含 base64 的文件来解码",
+      "fileHintEncode": "任意文件 —— 字节将被直接编码",
+      "fileHintDecode": "或在下方输入 base64 字符串",
+      "fileInfo": "{{name}} —— {{size}}",
+      "encoded": "Base64 编码",
+      "decodedFilename": "下载文件名",
+      "downloadDecoded": "下载为文件",
+      "decodedReady": "已解码 {{size}}（{{mime}}）",
+      "pickFile": "选择文件"
     },
     "url": {
       "description": "URL 编解码。Component 模式（encodeURIComponent）转义所有保留字；URI 模式（encodeURI）保留 :/?&#= 等结构字符。"
     },
     "hex": {
       "description": "文本 ↔ 十六进制字节（UTF-8）。解码时自动忽略空格 / 冒号 / 逗号 / 短横 / 下划线分隔。",
-      "withSpace": "编码时按字节加空格"
+      "withSpace": "编码时按字节加空格",
+      "dumpView": "Dump 视图（xxd 样式）",
+      "modeText": "文本",
+      "modeFile": "文件",
+      "fileDropEncode": "拖入要查看为 hex 的文件",
+      "fileDropDecode": "拖入包含 hex 的文件来解码",
+      "fileInfo": "{{name}} —— {{size}}",
+      "encoded": "Hex 编码",
+      "decodedFilename": "下载文件名",
+      "downloadDecoded": "下载为文件",
+      "decodedReady": "已解码 {{size}}（{{mime}}）",
+      "dumpEmpty": "输入或拖入内容以渲染 dump。"
     },
     "html-entity": {
       "description": "HTML 实体编解码。编码使用最小安全集（& < > &quot; &#39;）；解码支持所有命名实体 + 数字实体（十进制 / 十六进制）。"
@@ -262,7 +300,25 @@
       "claimFailed": "claim 校验失败: {{message}}",
       "badgeIdle": "未验证",
       "badgeVerifying": "验证中…",
-      "badgeValid": "签名有效"
+      "badgeValid": "签名有效",
+      "algLabel": "算法",
+      "secretLabel": "密钥",
+      "privateKeyLabel": "私钥 (PEM / PKCS#8 或 JWK)",
+      "publicKeyLabel": "公钥 (PEM / SPKI 或 JWK)",
+      "secretPlaceholderPrivate": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n\n或 JWK: { \"kty\": \"RSA\", ... }",
+      "secretPlaceholderPublic": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----\n\n或 JWK: { \"kty\": \"RSA\", ... }",
+      "base64Secret": "密钥按 base64 解码",
+      "base64DecodeError": "密钥不是有效的 base64",
+      "jsonError": "JSON 不合法",
+      "placeholderSignature": "<signature>",
+      "signingError": "签名出错：{{message}}",
+      "signing": "重新签名中…",
+      "statusValid": "有效",
+      "statusExpired": "已过期 {{when}}",
+      "statusNotYet": "暂未生效（{{when}}）",
+      "statusNoClaims": "没有 exp / nbf 字段",
+      "statusNoSig": "没有签名密钥 — 使用占位签名",
+      "needPrivateKey": "签名需要私钥"
     },
     "encodeDecode": {
       "encodeBtn": "编码",
@@ -274,7 +330,18 @@
     },
     "hash": {
       "description": "同时输出 MD5 / SHA-1 / SHA-256 / SHA-384 / SHA-512。SHA 系列走 Web Crypto 原生实现；MD5 用 js-md5（仅供校验，**不要用于安全场景**）。",
-      "placeholder": "输入要哈希的文本…"
+      "placeholder": "输入要哈希的文本…",
+      "modeText": "文本",
+      "modeFile": "文件",
+      "fileDrop": "拖入要哈希的文件",
+      "fileHint": "任意大小 —— 整体读入 ArrayBuffer",
+      "fileInfo": "{{name}} —— {{size}}",
+      "outputEncoding": "输出",
+      "verify": "校验",
+      "verifyPlaceholder": "粘贴该算法的期望哈希…",
+      "verifyMatch": "匹配",
+      "verifyMismatch": "不匹配",
+      "computing": "计算中…"
     },
     "hmac": {
       "description": "基于 Web Crypto 的 HMAC（SHA-1 / 256 / 384 / 512）。本地计算，密钥不出浏览器。",
@@ -283,10 +350,21 @@
       "data": "数据",
       "signature": "签名",
       "keyPlaceholder": "HMAC secret…",
-      "dataPlaceholder": "要签名的内容…"
+      "dataPlaceholder": "要签名的内容…",
+      "keyEncoding": "密钥编码",
+      "keyReveal": "显示密钥",
+      "keyHide": "隐藏密钥",
+      "dataModeText": "文本",
+      "dataModeFile": "文件",
+      "fileDrop": "拖入要签名的文件",
+      "fileInfo": "{{name}} —— {{size}}",
+      "verify": "校验",
+      "verifyPlaceholder": "粘贴期望签名…",
+      "verifyMatch": "匹配",
+      "verifyMismatch": "不匹配"
     },
     "timestamp": {
-      "description": "时间戳与日期相互转换。支持 Unix 秒 / 毫秒 / ISO 8601 / RFC 2822 输入。",
+      "description": "时间戳与日期相互转换。支持 Unix 秒 / 毫秒 / ISO 8601 / RFC 2822。内含分字段合成、批量转换以及 Windows FILETIME / Excel 序列数输出。",
       "input": "输入",
       "now": "现在",
       "unixSeconds": "Unix 秒",
@@ -294,38 +372,101 @@
       "iso8601": "ISO 8601 (UTC)",
       "localTime": "本地时间",
       "relativeTime": "相对时间",
-      "cannotParse": "无法解析为日期"
+      "filetime": "Windows FILETIME",
+      "excel": "Excel 序列数",
+      "cannotParse": "无法解析为日期",
+      "tabParse": "解析",
+      "tabCompose": "合成",
+      "tabBatch": "批量",
+      "nowInZones": "当前各时区时间",
+      "zoneLocal": "本地",
+      "zone": "时区",
+      "cannotCompose": "无法从这些字段合成时间戳",
+      "batchInput": "每行一个时间戳",
+      "batchOutput": "对齐输出 ISO 字符串"
     },
     "color": {
-      "description": "颜色格式互转：HEX / RGB / HSL。改任一字段或拖动取色器都会同步更新其他格式。"
+      "description": "颜色格式互转：HEX / RGB / HSL / OKLCH。改任一字段、滑块或取色器都会同步更新。内含 WCAG 对比度检查与配色生成。",
+      "contrast": "WCAG 对比度",
+      "background": "背景",
+      "contrastSample": "示例文字 · 千金散尽还复来",
+      "normalText": "正常字",
+      "largeText": "大字",
+      "pass": "通过",
+      "fail": "未通过",
+      "palettes": "配色方案",
+      "paletteKinds": {
+        "complementary": "互补色",
+        "analogous": "邻近色",
+        "triadic": "三色组",
+        "tints": "提亮",
+        "shades": "压暗"
+      }
     },
     "numberBase": {
-      "description": "整数进制互转。基于 BigInt，支持任意大整数与负数。",
+      "description": "整数进制互转。基于 BigInt — 支持 0x / 0b / 0o 前缀，可在 8/16/32/64 位宽下进行二补码显示与位运算。",
       "base2": "二进制 (2)",
       "base8": "八进制 (8)",
       "base10": "十进制 (10)",
       "base16": "十六进制 (16)",
       "custom": "自定义",
       "customBaseLabel": "进制 (2-36)",
-      "baseN": "Base {{base}}"
+      "baseN": "Base {{base}}",
+      "width": "位宽",
+      "signed": "带符号",
+      "bitGrid": "位网格（点击翻转）",
+      "bitwise": "位运算",
+      "operandPlaceholder": "第二操作数（0x… / 0b… / 十进制）",
+      "apply": "应用",
+      "opsHint": "AND / OR / XOR 需要第二操作数 · SHL / SHR 把它当作位移位数 · NOT 在当前位宽内按位取反",
+      "invalidOperand": "无效的操作数"
     },
     "csvJson": {
-      "description": "CSV 与 JSON 互转。CSV 第一行作为字段名；JSON 须为对象数组。支持引号字段、字段内逗号 / 换行 / 转义引号。",
+      "description": "CSV 与 JSON 互转，可配置分隔符 / 引号 / 表头 / 类型推断，并带可排序的表格预览。",
       "csvToJson": "CSV → JSON",
       "jsonToCsv": "JSON → CSV",
       "csvLabel": "CSV",
       "jsonLabel": "JSON",
       "jsonArrayLabel": "JSON (array of objects)",
       "errRootArray": "期望根节点是数组（array of objects）",
-      "errRowObject": "数组每个元素必须是对象"
+      "errRowObject": "数组每个元素必须是对象",
+      "delimiter": "分隔符",
+      "delimComma": ", (逗号)",
+      "delimSemicolon": "; (分号)",
+      "delimTab": "\\t (制表符)",
+      "delimPipe": "| (竖线)",
+      "delimCustom": "自定义",
+      "quote": "引号",
+      "quoteDouble": "\" (双引号)",
+      "quoteSingle": "' (单引号)",
+      "parsing": "解析",
+      "firstRowHeader": "首行为表头",
+      "inferTypes": "类型推断（数字 / 布尔）",
+      "activeChar": "当前",
+      "tablePreview": "表格预览（点击表头排序）"
     },
     "uuid": {
-      "description": "生成 UUID v4（基于 crypto.randomUUID()，浏览器原生）。",
+      "description": "生成 UUID（v1 / v3 / v4 / v5 / v7），并可解码任意 UUID 的版本、变体与嵌入时间戳。",
       "count": "数量",
-      "copiedMany": "已复制 {{count}} 条"
+      "copiedMany": "已复制 {{count}} 条",
+      "tabGenerate": "生成",
+      "tabDecode": "解码",
+      "version": "版本",
+      "namespace": "命名空间",
+      "name": "Name",
+      "format": "格式",
+      "uppercase": "大写",
+      "noHyphens": "去掉连字符",
+      "braces": "花括号 {…}",
+      "base64": "Base64",
+      "decodeInput": "粘贴一个 UUID",
+      "dVersion": "版本",
+      "dVariant": "变体",
+      "dTimestamp": "嵌入的时间戳",
+      "dCannotParse": "不是合法的 UUID"
     },
     "password": {
-      "description": "基于 crypto.getRandomValues 的密码生成器（CSPRNG，无模偏置）。",
+      "description": "基于 crypto.getRandomValues 的密码生成器（CSPRNG，无模偏置）。包含随机密码与 Diceware 风格密码短语两种模式。",
       "entropy": "熵 ≈",
       "strength": "强度：",
       "strengthVeryStrong": "极强",
@@ -333,24 +474,74 @@
       "strengthMedium": "中等",
       "strengthWeak": "弱",
       "strengthNone": "空",
-      "length": "长度"
+      "length": "长度",
+      "tabRandom": "随机密码",
+      "tabPassphrase": "密码短语",
+      "symbolPool": "符号集",
+      "symbolReset": "重置",
+      "phraseCount": "单词数量",
+      "separator": "分隔符",
+      "separators": {
+        "dash": "短横",
+        "dot": "点",
+        "space": "空格",
+        "underscore": "下划线"
+      },
+      "capitalizeFirst": "首字母大写",
+      "includeNumber": "附加一位数字"
     },
     "qr": {
-      "description": "生成二维码（SVG / PNG）。本地渲染，输入内容不出浏览器。",
+      "description": "生成二维码（SVG / PNG）。本地渲染，输入内容不出浏览器。类型选项卡可组合 URL / WiFi / vCard / Email / SMS / GeoURI 等载荷。",
       "content": "内容",
       "contentPlaceholder": "URL / 文本 / vCard…",
       "size": "尺寸 (px)",
       "level": "纠错等级",
+      "margin": "留白",
+      "fgColor": "前景色",
+      "bgColor": "背景色",
       "downloaded": "已下载 {{format}}",
       "placeholder": "输入内容生成二维码…",
-      "generating": "生成中…"
+      "generating": "生成中…",
+      "tabText": "文本 / URL",
+      "tabWifi": "WiFi",
+      "tabVcard": "vCard",
+      "tabEmail": "邮件",
+      "tabSms": "短信",
+      "tabGeo": "地理位置",
+      "wifiSsid": "SSID",
+      "wifiPassword": "密码",
+      "wifiAuth": "加密方式",
+      "wifiHidden": "隐藏网络",
+      "wifiNone": "无密码",
+      "vcardName": "姓名",
+      "vcardOrg": "组织",
+      "vcardTitle": "职位",
+      "vcardPhone": "电话",
+      "vcardEmail": "邮箱",
+      "vcardUrl": "网址",
+      "emailTo": "收件人",
+      "emailSubject": "主题",
+      "emailBody": "正文",
+      "smsTo": "电话",
+      "smsBody": "短信内容",
+      "geoLat": "纬度",
+      "geoLng": "经度"
     },
     "lorem": {
-      "description": "经典占位文本生成器。可按段落 / 句子 / 单词数量输出。",
+      "description": "占位文本生成器。按段落 / 句子 / 单词数量输出，可选主题以及 HTML 包裹。",
       "paragraphs": "段落",
       "sentences": "句子",
       "words": "单词",
-      "count": "数量"
+      "count": "数量",
+      "source": "主题",
+      "sources": {
+        "lorem": "Lorem（经典）",
+        "hipster": "Hipster",
+        "pirate": "海盗",
+        "bacon": "培根"
+      },
+      "startWithLorem": "以 \"Lorem ipsum dolor sit amet…\" 开头",
+      "asHtml": "包裹为 <p>…</p>"
     },
     "diff": {
       "description": "文本差异对比（行级 / 词级）。本地计算，不上传任何内容。",
@@ -358,7 +549,11 @@
       "byWords": "按词",
       "original": "原始",
       "modified": "修改后",
-      "diff": "差异"
+      "diff": "差异",
+      "inline": "内联",
+      "sideBySide": "左右对照",
+      "ignoreWs": "忽略空白",
+      "ignoreCase": "忽略大小写"
     },
     "case": {
       "description": "常见命名风格互转：camelCase / PascalCase / snake_case / kebab-case / Title Case 等。",
@@ -372,19 +567,37 @@
       "snake": "snake_case",
       "constant": "CONSTANT_CASE",
       "kebab": "kebab-case",
-      "dot": "dot.case"
+      "train": "Train-Case",
+      "httpHeader": "HTTP-Header-Case",
+      "dot": "dot.case",
+      "statWords": "{{n}} 词",
+      "statChars": "{{n}} 字符",
+      "statLines": "{{n}} 行",
+      "transformInPlace": "用此风格覆盖输入",
+      "transformed": "输入已替换为 {{label}}"
     },
     "sortDedupe": {
-      "description": "按行处理：排序、去重、修剪空白、忽略大小写。",
+      "description": "按行处理：排序、去重、修剪空白、忽略大小写。支持多种排序模式与自定义分隔符。",
       "sort": "排序",
       "noSort": "不排序",
       "asc": "A → Z",
       "desc": "Z → A",
       "dedupe": "去重",
+      "withCount": "uniq -c（带计数）",
       "trim": "修剪空白",
       "removeBlank": "删除空行",
       "ignoreCase": "忽略大小写",
-      "lineCount": "{{n}} 行"
+      "lineCount": "{{n}} 行",
+      "modeLabel": "模式",
+      "modeLex": "字典序",
+      "modeNumeric": "数值",
+      "modeNatural": "自然序（img2 < img10）",
+      "modeLength": "按长度",
+      "delimiterLabel": "分隔符",
+      "delimiterPlaceholder": ", ; |",
+      "delimiterNewline": "换行（默认）",
+      "reverse": "反转",
+      "shuffle": "打乱"
     },
     "regex": {
       "description": "基于浏览器原生 RegExp。支持全部 ECMAScript 标志。",
@@ -399,7 +612,53 @@
       "matches": "匹配",
       "noMatch": "无匹配",
       "replacement": "替换字符串（支持 $1 / $<name> 等反向引用）",
-      "replacePreview": "替换后预览"
+      "replacePreview": "替换后预览",
+      "matchNOfM": "第 {{n}} / {{m}} 个匹配",
+      "pcreWarn": "检测到 PCRE 特有语法 — JavaScript 的 RegExp 不支持：",
+      "pcre": {
+        "recursion": "(?R) — 整体递归引用",
+        "recursionNum": "(?N) — 编号子模式递归",
+        "posixClass": "[[:class:]] — POSIX 字符类",
+        "keepOut": "\\K — 截断左侧的匹配锚",
+        "inlineComment": "(?# … ) — 行内注释",
+        "verbs": "(*VERB) — 回溯控制（如 (*FAIL)）",
+        "backrefBraces": "\\g{name} / \\G{name} — 非 JS 的反向引用语法"
+      },
+      "cheatTitle": "速查表 — 常用正则元字符",
+      "cheatSec": {
+        "classes": "字符类",
+        "anchors": "锚点",
+        "quant": "量词",
+        "groups": "分组 & 环视"
+      },
+      "cheat": {
+        "digit": "任意数字 (0-9)",
+        "nonDigit": "非数字",
+        "word": "单词字符 [A-Za-z0-9_]",
+        "nonWord": "非单词字符",
+        "space": "空白字符",
+        "nonSpace": "非空白",
+        "dot": "除换行外的任意字符（带 s 时含换行）",
+        "set": "字符集合中的任意一个",
+        "negSet": "不在集合中的任意字符",
+        "range": "区间字符",
+        "start": "输入起点（m 时为每行起点）",
+        "end": "输入终点（m 时为每行终点）",
+        "boundary": "单词边界",
+        "nonBoundary": "非单词边界",
+        "zeroPlus": "0 或更多（贪婪）",
+        "onePlus": "1 或更多（贪婪）",
+        "zeroOne": "0 或 1（可选）",
+        "exact": "正好 n 次",
+        "range2": "n 到 m 次",
+        "lazy": "懒惰量词（尽量少匹配）",
+        "capture": "捕获组",
+        "nonCapture": "非捕获组",
+        "named": "命名捕获组",
+        "lookahead": "正向先行断言",
+        "negLook": "负向先行断言",
+        "lookbehind": "后行断言（正向）"
+      }
     },
     "ipInfo": {
       "description": "IP 归属查询。点击按钮才会向 ipapi.co 公共服务发起请求（免费档 1k 次/天/IP）。",
@@ -414,16 +673,26 @@
       "rowTimezone": "时区",
       "rowAsn": "ASN",
       "rowOrg": "组织",
-      "empty": "点击 <1>查询</1> 或 <3>查我自己</3> 开始"
+      "rowPtr": "反向 DNS（PTR）",
+      "empty": "点击 <1>查询</1> 或 <3>查我自己</3> 开始",
+      "map": "大致位置",
+      "openInOsm": "在 OpenStreetMap 中打开",
+      "recent": "最近："
     },
     "dns": {
-      "description": "基于 Cloudflare DoH（cloudflare-dns.com）。点击查询才会发起请求。",
+      "description": "基于 DoH 的 DNS 查询。默认解析器为 Cloudflare；勾选「对比解析器」会同时查 Google + Quad9。点击查询才会发起请求。",
       "typeLabel": "类型",
       "status": "Status",
       "answers": "{{n}} answers",
       "noAnswers": "no answers",
       "noDirect": "No direct answer; authority: {{authority}}",
-      "empty": "填入域名 + 选择记录类型，点击 <1>查询</1>"
+      "empty": "填入域名 + 选择记录类型，点击 <1>查询</1>",
+      "compareResolvers": "对比解析器",
+      "txt": {
+        "spfHint": "SPF — 邮件发送方策略（RFC 7208），列出谁可以代表此域名发邮件。",
+        "dkimHint": "DKIM — 域名密钥邮件签名（RFC 6376）。p= 是公钥。",
+        "dmarcHint": "DMARC — 域名邮件认证策略（RFC 7489）。p= 设定策略。"
+      }
     },
     "imageEditor": {
       "description": "本地图片编辑——图层、蒙版、笔刷/橡皮、调色、标注、撤销/重做。可保存 .json 项目文件下次继续编辑。",
@@ -1190,18 +1459,38 @@
       "downloaded": "已下载 {{format}}"
     },
     "cidr": {
-      "description": "IPv4 子网计算：网络 / 广播 / 掩码 / 可用范围 / 主机数。",
+      "description": "IPv4 + IPv6 子网计算：网络 / 广播 / 掩码 / 可用范围 / 主机数，附 VLSM 规划与包含/重叠检查。",
       "cidrLabel": "CIDR",
-      "placeholder": "192.168.1.0/24",
+      "placeholder": "192.168.1.0/24 或 2001:db8::/32",
+      "rowIp": "IP",
       "rowNetwork": "网络地址",
       "rowBroadcast": "广播地址",
       "rowNetmask": "子网掩码",
       "rowWildcard": "通配符掩码",
       "rowFirstUsable": "首个可用",
       "rowLastUsable": "最后可用",
+      "rowFirstAddr": "首个地址",
+      "rowLastAddr": "最后地址",
       "rowHosts": "可用主机数",
       "rowTotal": "地址总数",
-      "rowClass": "类别"
+      "rowClass": "类别",
+      "binaryBreakdown": "二进制分解（网络位用色块标出）",
+      "vlsmTitle": "VLSM / 子网划分规划",
+      "vlsmHint": "粘贴父 CIDR 和所需主机数列表（每行一个）。每次需求向上取整到最小可容纳块；按顺序紧排。",
+      "vlsmParent": "父 CIDR",
+      "vlsmSizes": "所需主机数",
+      "vlsmAllocated": "需求 {{requested}} · 实际 {{total}} 个地址",
+      "overlapTitle": "包含 / 重叠检查",
+      "overlapA": "CIDR A",
+      "overlapB": "CIDR B",
+      "relation": {
+        "equal": "A 和 B 完全相同",
+        "aContainsB": "A 包含 B",
+        "bContainsA": "B 包含 A",
+        "overlap": "A 与 B 部分重叠（互不包含）",
+        "disjoint": "A 与 B 完全不重叠",
+        "familyMismatch": "A 与 B 不在同一协议族（IPv4 vs IPv6）"
+      }
     }
   },
   "fieldMeta": {

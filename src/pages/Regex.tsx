@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Copy } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronLeft, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,8 +9,8 @@ import { toast } from 'sonner'
 import { FieldTooltip } from '@/components/FieldTooltip'
 
 const SAMPLE_PATTERN = String.raw`(\w+)@(\w+)\.com`
-const SAMPLE_TEXT = `联系：alice@example.com 或 bob@toolbox.com
-其他: invalid@nope, another@example.com`
+const SAMPLE_TEXT = `Contact: alice@example.com or bob@toolbox.com
+Other: invalid@nope, another@example.com`
 
 const FLAG_LIST = ['g', 'i', 'm', 's', 'u', 'y'] as const
 type Flag = (typeof FLAG_LIST)[number]
@@ -46,15 +46,83 @@ function evalRegex(pattern: string, flags: string, text: string) {
   return { ok: true as const, regex: re, matches }
 }
 
+// Detect PCRE-only features that JS RegExp does not implement. We try to be
+// conservative: variable-width lookbehind is allowed in modern JS as of
+// ES2018, so we only warn about features the JS engine still rejects.
+function detectPcreOnly(pattern: string): string[] {
+  const issues: string[] = []
+  if (/\(\?R\)/.test(pattern)) issues.push('recursion')
+  if (/\(\?[+-]?\d+\)/.test(pattern)) issues.push('recursionNum')
+  if (/\[\[:[a-z]+:\]\]/.test(pattern)) issues.push('posixClass')
+  if (/\\K\b/.test(pattern)) issues.push('keepOut')
+  if (/\(\?#/.test(pattern)) issues.push('inlineComment')
+  if (/\(\*[A-Z]+/.test(pattern)) issues.push('verbs')
+  if (/\\[gG]\{/.test(pattern)) issues.push('backrefBraces')
+  return issues
+}
+
+// Cheatsheet rows — patterns + plain-English meaning. Rendered statically.
+const CHEATSHEET: { sec: string; rows: [string, string][] }[] = [
+  {
+    sec: 'classes',
+    rows: [
+      ['\\d', 'cheat.digit'],
+      ['\\D', 'cheat.nonDigit'],
+      ['\\w', 'cheat.word'],
+      ['\\W', 'cheat.nonWord'],
+      ['\\s', 'cheat.space'],
+      ['\\S', 'cheat.nonSpace'],
+      ['.', 'cheat.dot'],
+      ['[abc]', 'cheat.set'],
+      ['[^abc]', 'cheat.negSet'],
+      ['[a-z]', 'cheat.range'],
+    ],
+  },
+  {
+    sec: 'anchors',
+    rows: [
+      ['^', 'cheat.start'],
+      ['$', 'cheat.end'],
+      ['\\b', 'cheat.boundary'],
+      ['\\B', 'cheat.nonBoundary'],
+    ],
+  },
+  {
+    sec: 'quant',
+    rows: [
+      ['*', 'cheat.zeroPlus'],
+      ['+', 'cheat.onePlus'],
+      ['?', 'cheat.zeroOne'],
+      ['{n}', 'cheat.exact'],
+      ['{n,m}', 'cheat.range2'],
+      ['*?', 'cheat.lazy'],
+    ],
+  },
+  {
+    sec: 'groups',
+    rows: [
+      ['(...)', 'cheat.capture'],
+      ['(?:...)', 'cheat.nonCapture'],
+      ['(?<name>...)', 'cheat.named'],
+      ['(?=...)', 'cheat.lookahead'],
+      ['(?!...)', 'cheat.negLook'],
+      ['(?<=...)', 'cheat.lookbehind'],
+    ],
+  },
+]
+
 export function RegexPage() {
   const { t } = useTranslation()
   const [pattern, setPattern] = useState(SAMPLE_PATTERN)
   const [flagSet, setFlagSet] = useState<Set<Flag>>(new Set<Flag>(['g']))
   const [text, setText] = useState(SAMPLE_TEXT)
   const [replacement, setReplacement] = useState('<$1@$2.com>')
+  const [activeMatchRaw, setActiveMatch] = useState(0)
+  const [showCheat, setShowCheat] = useState(false)
 
   const flags = Array.from(flagSet).join('')
   const result = useMemo(() => evalRegex(pattern, flags, text), [pattern, flags, text])
+  const pcreIssues = useMemo(() => detectPcreOnly(pattern), [pattern])
 
   const replacePreview = useMemo(() => {
     if (!result.ok || !result.regex) return ''
@@ -65,14 +133,83 @@ export function RegexPage() {
     }
   }, [result, text, replacement])
 
+  // Clamp activeMatch into a valid range derived from current match count.
+  // Doing this during render (rather than in an effect) avoids cascading
+  // renders and keeps render output consistent.
+  const matchCount = result.ok ? result.matches.length : 0
+  const activeMatch = matchCount === 0 ? 0 : Math.min(activeMatchRaw, matchCount - 1)
+
   const handleCopy = async (v: string) => {
     if (!v) return
     await navigator.clipboard.writeText(v)
     toast.success(t('common.copied'))
   }
 
-  const flagLabel = (flag: Flag): string =>
-    t(`pages.regex.flag${flag.toUpperCase()}`)
+  const flagLabel = (flag: Flag): string => t(`pages.regex.flag${flag.toUpperCase()}`)
+
+  // ----- highlight overlay -----
+  const textRef = useRef<HTMLTextAreaElement>(null)
+  const overlayRef = useRef<HTMLDivElement>(null)
+
+  // Sync overlay scroll → textarea scroll.
+  const onTextScroll = () => {
+    if (!textRef.current || !overlayRef.current) return
+    overlayRef.current.scrollTop = textRef.current.scrollTop
+    overlayRef.current.scrollLeft = textRef.current.scrollLeft
+  }
+
+  // When the user clicks prev/next, select the corresponding match in the
+  // textarea so they jump to it.
+  const jumpTo = (i: number) => {
+    if (!result.ok || result.matches.length === 0) return
+    const idx = ((i % matchCount) + matchCount) % matchCount
+    setActiveMatch(idx)
+    const m = result.matches[idx]
+    const ta = textRef.current
+    if (!ta) return
+    ta.focus()
+    ta.setSelectionRange(m.index, m.index + m.match.length)
+    // Approximate scroll: textarea has no native "scroll into selection"
+    // method, but setting selectionRange brings cursor into view on focus in
+    // most engines. Belt-and-braces: jump scrollTop to the line.
+    const before = text.slice(0, m.index)
+    const lineNo = before.split('\n').length - 1
+    const lineHeight = parseFloat(getComputedStyle(ta).lineHeight || '20') || 20
+    ta.scrollTop = Math.max(0, lineNo * lineHeight - ta.clientHeight / 2)
+  }
+
+  // Build the overlay content: a sequence of plain spans interleaved with
+  // highlighted match spans.
+  const overlayChildren = useMemo<ReactNode[]>(() => {
+    if (!result.ok || result.matches.length === 0) {
+      return [text]
+    }
+    const out: ReactNode[] = []
+    let cursor = 0
+    result.matches.forEach((m, i) => {
+      if (m.index > cursor) out.push(text.slice(cursor, m.index))
+      // Empty matches shouldn't render a highlight chunk (would collapse).
+      const display = m.match.length === 0 ? '​' : m.match
+      out.push(
+        <mark
+          key={i}
+          className={
+            i === activeMatch
+              ? 'rounded bg-amber-400/50 text-foreground'
+              : 'rounded bg-emerald-400/30 text-foreground'
+          }
+        >
+          {display}
+        </mark>,
+      )
+      cursor = m.index + m.match.length
+    })
+    if (cursor < text.length) out.push(text.slice(cursor))
+    // Append a trailing newline if the input has one, so the overlay's
+    // height matches the textarea's scroll height exactly.
+    if (text.endsWith('\n')) out.push('\n')
+    return out
+  }, [result, text, activeMatch])
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
@@ -120,63 +257,129 @@ export function RegexPage() {
         ))}
       </div>
 
+      {pcreIssues.length > 0 ? (
+        <div className="mb-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+          <div className="mb-1 font-medium">{t('pages.regex.pcreWarn')}</div>
+          <ul className="ml-4 list-disc">
+            {pcreIssues.map((k) => (
+              <li key={k}>{t(`pages.regex.pcre.${k}`)}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="mb-4">
         <Label className="mb-1.5 block text-xs text-muted-foreground">
           {t('pages.regex.testText')}
         </Label>
-        <Textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          spellCheck={false}
-          className="min-h-[160px] font-mono text-sm leading-relaxed"
-        />
+        {/*
+          Overlay highlighting: the absolute-positioned div sits directly
+          behind the (transparent-background) textarea. They share the same
+          font, padding, line-height, white-space, and word-break so chars
+          align 1:1. Textarea is transparent so the highlights show through;
+          its caret remains visible because we only zero out the background.
+        */}
+        <div className="relative">
+          <div
+            ref={overlayRef}
+            aria-hidden
+            className="pointer-events-none absolute inset-0 overflow-hidden rounded-md border border-transparent px-3 py-2 font-mono text-sm leading-relaxed whitespace-pre-wrap break-words text-transparent"
+          >
+            {overlayChildren}
+          </div>
+          <Textarea
+            ref={textRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onScroll={onTextScroll}
+            spellCheck={false}
+            className="relative min-h-[160px] resize-y bg-transparent font-mono text-sm leading-relaxed"
+          />
+        </div>
       </div>
 
       {!result.ok ? (
         <div className="text-xs text-destructive">⚠ {result.error}</div>
       ) : (
         <>
-          <div className="mb-4">
-            <Label className="mb-2 block text-xs text-muted-foreground">
+          <div className="mb-4 flex items-center gap-3">
+            <Label className="text-xs text-muted-foreground">
               {t('pages.regex.matches')} ({result.matches.length})
             </Label>
-            {result.matches.length === 0 ? (
-              <div className="text-xs text-muted-foreground">{t('pages.regex.noMatch')}</div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {result.matches.map((m, i) => (
-                  <div
-                    key={i}
-                    className="rounded-md border border-border bg-card/40 px-3 py-2 font-mono text-xs"
-                  >
-                    <div>
-                      <span className="text-muted-foreground">[{m.index}]</span>{' '}
-                      <span className="text-emerald-700 dark:text-emerald-300">{m.match}</span>
-                    </div>
-                    {m.groups.length > 0 ? (
-                      <div className="mt-1 text-muted-foreground">
-                        groups: [
-                        {m.groups.map((g, j) => (
-                          <span key={j}>
-                            {j > 0 ? ', ' : ''}
-                            <span className="text-foreground">{JSON.stringify(g)}</span>
-                          </span>
-                        ))}
-                        ]
-                      </div>
-                    ) : null}
-                    {m.named ? (
-                      <div className="mt-1 text-muted-foreground">
-                        named: {JSON.stringify(m.named)}
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
+            {result.matches.length > 0 ? (
+              <div className="flex items-center gap-1.5 text-xs">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => jumpTo(activeMatch - 1)}
+                  disabled={result.matches.length === 0}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </Button>
+                <span className="font-mono text-muted-foreground">
+                  {t('pages.regex.matchNOfM', {
+                    n: activeMatch + 1,
+                    m: result.matches.length,
+                  })}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => jumpTo(activeMatch + 1)}
+                  disabled={result.matches.length === 0}
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
               </div>
-            )}
+            ) : null}
           </div>
 
-          <div className="mb-2">
+          {result.matches.length === 0 ? (
+            <div className="text-xs text-muted-foreground">{t('pages.regex.noMatch')}</div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {result.matches.map((m, i) => (
+                <div
+                  key={i}
+                  className={`rounded-md border px-3 py-2 font-mono text-xs ${
+                    i === activeMatch
+                      ? 'border-amber-500/60 bg-amber-500/10'
+                      : 'border-border bg-card/40'
+                  }`}
+                  onClick={() => jumpTo(i)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') jumpTo(i)
+                  }}
+                >
+                  <div>
+                    <span className="text-muted-foreground">[{m.index}]</span>{' '}
+                    <span className="text-emerald-700 dark:text-emerald-300">{m.match}</span>
+                  </div>
+                  {m.groups.length > 0 ? (
+                    <div className="mt-1 text-muted-foreground">
+                      groups: [
+                      {m.groups.map((g, j) => (
+                        <span key={j}>
+                          {j > 0 ? ', ' : ''}
+                          <span className="text-foreground">{JSON.stringify(g)}</span>
+                        </span>
+                      ))}
+                      ]
+                    </div>
+                  ) : null}
+                  {m.named ? (
+                    <div className="mt-1 text-muted-foreground">
+                      named: {JSON.stringify(m.named)}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 mb-2">
             <Label className="mb-1.5 block text-xs text-muted-foreground">
               {t('pages.regex.replacement')}
             </Label>
@@ -206,6 +409,43 @@ export function RegexPage() {
           </div>
         </>
       )}
+
+      <section className="mt-8 rounded-md border border-border bg-card/30">
+        <button
+          type="button"
+          onClick={() => setShowCheat((v) => !v)}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-muted-foreground hover:text-foreground"
+        >
+          {showCheat ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
+          {t('pages.regex.cheatTitle')}
+        </button>
+        {showCheat ? (
+          <div className="grid gap-3 px-3 pb-3 sm:grid-cols-2">
+            {CHEATSHEET.map((sec) => (
+              <div key={sec.sec}>
+                <div className="mb-1.5 text-xs font-medium text-muted-foreground">
+                  {t(`pages.regex.cheatSec.${sec.sec}`)}
+                </div>
+                <div className="flex flex-col gap-1">
+                  {sec.rows.map(([pat, key]) => (
+                    <div
+                      key={pat}
+                      className="flex items-center gap-3 rounded border border-border/50 bg-background/40 px-2 py-1 font-mono text-xs"
+                    >
+                      <code className="w-24 shrink-0 text-emerald-500">{pat}</code>
+                      <span className="text-muted-foreground">{t(`pages.regex.${key}`)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </section>
     </div>
   )
 }

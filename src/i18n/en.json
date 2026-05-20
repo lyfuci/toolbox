@@ -20,7 +20,13 @@
     "output": "Output",
     "noResult": "No result",
     "parseFailed": "Parse failed: {{error}}",
-    "emptyInput": "Empty input"
+    "emptyInput": "Empty input",
+    "dropFileLabel": "Drop a file here",
+    "dropFileHint": "or click to choose",
+    "file": "File",
+    "text": "Text",
+    "verify": "Verify",
+    "verifyPlaceholder": "Paste expected value to compare…"
   },
   "topbar": {
     "searchPlaceholder": "Search tools...",
@@ -118,15 +124,15 @@
     },
     "timestamp": {
       "name": "Timestamp",
-      "description": "Timestamp ↔ date (Unix / ISO / RFC)"
+      "description": "Timestamp ↔ date (Unix / ISO / RFC) + multi-zone clock, compose, batch"
     },
     "color": {
       "name": "Color",
-      "description": "HEX / RGB / HSL conversion"
+      "description": "HEX / RGB / HSL / OKLCH + WCAG contrast + palettes"
     },
     "number-base": {
       "name": "Number Base",
-      "description": "Integer base conversion (BigInt)"
+      "description": "Integer base conversion (BigInt) + bit grid + bitwise ops"
     },
     "csv-json": {
       "name": "CSV ↔ JSON",
@@ -134,19 +140,19 @@
     },
     "uuid": {
       "name": "UUID",
-      "description": "UUID v4 batch (crypto.randomUUID)"
+      "description": "UUID v1 / v3 / v4 / v5 / v7 + decode (version, variant, timestamp)"
     },
     "password": {
       "name": "Password",
-      "description": "CSPRNG password generator"
+      "description": "CSPRNG password + Diceware passphrase generator"
     },
     "qr-code": {
       "name": "QR Code",
-      "description": "QR generation (SVG / PNG, local)"
+      "description": "QR for URL / WiFi / vCard / Email / SMS / Geo (SVG / PNG, local)"
     },
     "lorem": {
       "name": "Lorem Ipsum",
-      "description": "Placeholder text (paragraphs / sentences / words)"
+      "description": "Placeholder text — Lorem / Hipster / Pirate / Bacon themes"
     },
     "diff": {
       "name": "Diff",
@@ -187,30 +193,62 @@
   },
   "pages": {
     "json": {
-      "description": "Format, minify, validate JSON. All processing runs locally in the browser.",
+      "description": "Format, minify, validate JSON; explore the parsed tree and filter with JSONPath. All processing runs locally.",
       "placeholder": "Paste JSON here…",
       "indent": "Indent",
-      "stats": "{{chars}} chars · {{minified}} minified"
+      "stats": "{{chars}} chars · {{minified}} minified",
+      "jsonpathLabel": "JSONPath",
+      "jsonpathPlaceholder": "$.tools[*]  ·  $..meta",
+      "matchCount": "{{n}} match(es)",
+      "clickHint": "Click any node to copy its JSONPath",
+      "copiedPath": "Copied {{path}}"
     },
     "xml": {
-      "description": "Format, minify, validate XML. Uses the browser's native DOMParser (no third-party dep).",
+      "description": "Format, minify, validate XML; browse the parsed tree and query with XPath. Uses the native DOMParser (no third-party dep).",
       "placeholder": "Paste XML here…",
       "indent": "Indent",
-      "stats": "{{chars}} chars"
+      "stats": "{{chars}} chars",
+      "xpathLabel": "XPath",
+      "xpathPlaceholder": "//item  ·  //*[@id='1']",
+      "matchCount": "{{n}} match(es)",
+      "treeHint": "Type an XPath to highlight matching elements"
     },
     "yaml": {
       "description": "Convert between YAML and JSON. Powered by js-yaml, supporting YAML 1.2 subset."
     },
     "base64": {
       "description": "Base64 encode/decode with UTF-8 and URL-safe (-_) variants. All processing runs locally.",
-      "urlSafe": "URL-safe (-_)"
+      "urlSafe": "URL-safe (-_)",
+      "modeText": "Text",
+      "modeFile": "File",
+      "fileDropEncode": "Drop a file to encode",
+      "fileDropDecode": "Drop a file containing base64 to decode",
+      "fileHintEncode": "Any file — the bytes get encoded directly",
+      "fileHintDecode": "Or paste the base64 string in the textarea below",
+      "fileInfo": "{{name}} — {{size}}",
+      "encoded": "Encoded base64",
+      "decodedFilename": "Decoded filename",
+      "downloadDecoded": "Download as file",
+      "decodedReady": "Decoded {{size}} ({{mime}})",
+      "pickFile": "Pick a file"
     },
     "url": {
       "description": "URL encode/decode. Component mode (encodeURIComponent) escapes all reserved characters; URI mode (encodeURI) preserves :/?&#= etc."
     },
     "hex": {
       "description": "Text ↔ hexadecimal bytes (UTF-8). Decode tolerates space / colon / comma / dash / underscore separators.",
-      "withSpace": "Space-separated bytes on encode"
+      "withSpace": "Space-separated bytes on encode",
+      "dumpView": "Dump view (xxd-style)",
+      "modeText": "Text",
+      "modeFile": "File",
+      "fileDropEncode": "Drop a file to view as hex",
+      "fileDropDecode": "Drop a file containing hex to decode",
+      "fileInfo": "{{name}} — {{size}}",
+      "encoded": "Encoded hex",
+      "decodedFilename": "Decoded filename",
+      "downloadDecoded": "Download as file",
+      "decodedReady": "Decoded {{size}} ({{mime}})",
+      "dumpEmpty": "Type or drop content to render a dump."
     },
     "html-entity": {
       "description": "HTML entity encode/decode. Encode uses the minimal safe set (& < > \" '); decode supports all named + numeric entities (decimal / hex)."
@@ -262,7 +300,25 @@
       "claimFailed": "Claim validation failed: {{message}}",
       "badgeIdle": "Not verified",
       "badgeVerifying": "Verifying…",
-      "badgeValid": "Signature valid"
+      "badgeValid": "Signature valid",
+      "algLabel": "Algorithm",
+      "secretLabel": "Secret",
+      "privateKeyLabel": "Private key (PEM / PKCS#8 or JWK)",
+      "publicKeyLabel": "Public key (PEM / SPKI or JWK)",
+      "secretPlaceholderPrivate": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n\nor JWK: { \"kty\": \"RSA\", ... }",
+      "secretPlaceholderPublic": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----\n\nor JWK: { \"kty\": \"RSA\", ... }",
+      "base64Secret": "Secret base64 encoded",
+      "base64DecodeError": "Secret is not valid base64",
+      "jsonError": "Invalid JSON",
+      "placeholderSignature": "<signature>",
+      "signingError": "Sign error: {{message}}",
+      "signing": "Re-signing…",
+      "statusValid": "Valid",
+      "statusExpired": "Expired {{when}}",
+      "statusNotYet": "Not yet valid ({{when}})",
+      "statusNoClaims": "No exp/nbf claims",
+      "statusNoSig": "No signature key — token uses placeholder",
+      "needPrivateKey": "A private key is required to sign"
     },
     "encodeDecode": {
       "encodeBtn": "Encode",
@@ -274,7 +330,18 @@
     },
     "hash": {
       "description": "Produce MD5 / SHA-1 / SHA-256 / SHA-384 / SHA-512 simultaneously. SHA uses native Web Crypto; MD5 uses js-md5 (**do not use for security**).",
-      "placeholder": "Text to hash…"
+      "placeholder": "Text to hash…",
+      "modeText": "Text",
+      "modeFile": "File",
+      "fileDrop": "Drop a file to hash",
+      "fileHint": "Any size — read in one shot into an ArrayBuffer",
+      "fileInfo": "{{name}} — {{size}}",
+      "outputEncoding": "Output",
+      "verify": "Verify",
+      "verifyPlaceholder": "Paste expected hash for this algo…",
+      "verifyMatch": "Matches",
+      "verifyMismatch": "Does not match",
+      "computing": "Computing…"
     },
     "hmac": {
       "description": "HMAC based on Web Crypto (SHA-1 / 256 / 384 / 512). Key stays in the browser.",
@@ -283,10 +350,21 @@
       "data": "Data",
       "signature": "Signature",
       "keyPlaceholder": "HMAC secret…",
-      "dataPlaceholder": "Content to sign…"
+      "dataPlaceholder": "Content to sign…",
+      "keyEncoding": "Key as",
+      "keyReveal": "Reveal key",
+      "keyHide": "Hide key",
+      "dataModeText": "Text",
+      "dataModeFile": "File",
+      "fileDrop": "Drop the file to sign",
+      "fileInfo": "{{name}} — {{size}}",
+      "verify": "Verify",
+      "verifyPlaceholder": "Paste expected signature…",
+      "verifyMatch": "Matches",
+      "verifyMismatch": "Does not match"
     },
     "timestamp": {
-      "description": "Convert between timestamps and dates. Supports Unix seconds / milliseconds / ISO 8601 / RFC 2822.",
+      "description": "Convert between timestamps and dates. Supports Unix seconds / milliseconds / ISO 8601 / RFC 2822. Includes a discrete-fields composer, batch conversion, and Windows FILETIME / Excel-serial outputs.",
       "input": "Input",
       "now": "Now",
       "unixSeconds": "Unix seconds",
@@ -294,38 +372,101 @@
       "iso8601": "ISO 8601 (UTC)",
       "localTime": "Local time",
       "relativeTime": "Relative",
-      "cannotParse": "Cannot parse as date"
+      "filetime": "Windows FILETIME",
+      "excel": "Excel serial",
+      "cannotParse": "Cannot parse as date",
+      "tabParse": "Parse",
+      "tabCompose": "Compose",
+      "tabBatch": "Batch",
+      "nowInZones": "Now in zones",
+      "zoneLocal": "Local",
+      "zone": "Time zone",
+      "cannotCompose": "Cannot compose timestamp from these fields",
+      "batchInput": "Lines to convert",
+      "batchOutput": "Aligned ISO output"
     },
     "color": {
-      "description": "Color formats: HEX / RGB / HSL. Edit any field or drag the picker to sync all three."
+      "description": "Color formats: HEX / RGB / HSL / OKLCH. Edit any field, slider or the picker to sync everything. Includes WCAG contrast check and palette generators.",
+      "contrast": "WCAG contrast",
+      "background": "Background",
+      "contrastSample": "Sample text · The quick brown fox jumps over the lazy dog",
+      "normalText": "normal",
+      "largeText": "large",
+      "pass": "PASS",
+      "fail": "FAIL",
+      "palettes": "Palettes",
+      "paletteKinds": {
+        "complementary": "Complementary",
+        "analogous": "Analogous",
+        "triadic": "Triadic",
+        "tints": "Tints",
+        "shades": "Shades"
+      }
     },
     "numberBase": {
-      "description": "Integer base conversion. Backed by BigInt — arbitrarily large and negative numbers OK.",
+      "description": "Integer base conversion. Backed by BigInt — accepts 0x / 0b / 0o prefixes, supports two's-complement display and bitwise ops at 8/16/32/64-bit widths.",
       "base2": "Binary (2)",
       "base8": "Octal (8)",
       "base10": "Decimal (10)",
       "base16": "Hex (16)",
       "custom": "Custom",
       "customBaseLabel": "Base (2-36)",
-      "baseN": "Base {{base}}"
+      "baseN": "Base {{base}}",
+      "width": "Width",
+      "signed": "Signed",
+      "bitGrid": "Bit grid (click to flip)",
+      "bitwise": "Bitwise ops",
+      "operandPlaceholder": "Operand (0x… / 0b… / dec)",
+      "apply": "Apply",
+      "opsHint": "AND / OR / XOR take a 2nd operand · SHL / SHR use it as shift amount · NOT inverts within width",
+      "invalidOperand": "Invalid operand"
     },
     "csvJson": {
-      "description": "Convert between CSV and JSON. First row of CSV becomes keys; JSON must be an array of objects. Handles quoted fields, commas / newlines inside fields, and escaped quotes.",
+      "description": "Convert between CSV and JSON, with configurable delimiter / quote / header / type-inference, plus a sortable table preview.",
       "csvToJson": "CSV → JSON",
       "jsonToCsv": "JSON → CSV",
       "csvLabel": "CSV",
       "jsonLabel": "JSON",
       "jsonArrayLabel": "JSON (array of objects)",
       "errRootArray": "Root must be an array (array of objects)",
-      "errRowObject": "Each array element must be an object"
+      "errRowObject": "Each array element must be an object",
+      "delimiter": "Delimiter",
+      "delimComma": ", (comma)",
+      "delimSemicolon": "; (semicolon)",
+      "delimTab": "\\t (tab)",
+      "delimPipe": "| (pipe)",
+      "delimCustom": "Custom",
+      "quote": "Quote",
+      "quoteDouble": "\" (double)",
+      "quoteSingle": "' (single)",
+      "parsing": "Parsing",
+      "firstRowHeader": "First row is header",
+      "inferTypes": "Infer types (numbers, booleans)",
+      "activeChar": "Active",
+      "tablePreview": "Table preview (click header to sort)"
     },
     "uuid": {
-      "description": "Generate UUID v4 (backed by native crypto.randomUUID).",
+      "description": "Generate UUIDs (v1 / v3 / v4 / v5 / v7) and decode any UUID's version, variant and embedded timestamp.",
       "count": "Count",
-      "copiedMany": "Copied {{count}}"
+      "copiedMany": "Copied {{count}}",
+      "tabGenerate": "Generate",
+      "tabDecode": "Decode",
+      "version": "Version",
+      "namespace": "Namespace",
+      "name": "Name",
+      "format": "Format",
+      "uppercase": "Uppercase",
+      "noHyphens": "No hyphens",
+      "braces": "Braces {…}",
+      "base64": "Base64",
+      "decodeInput": "Paste a UUID",
+      "dVersion": "Version",
+      "dVariant": "Variant",
+      "dTimestamp": "Embedded timestamp",
+      "dCannotParse": "Not a valid UUID"
     },
     "password": {
-      "description": "Password generator backed by crypto.getRandomValues (CSPRNG, no modulo bias).",
+      "description": "Password generator backed by crypto.getRandomValues (CSPRNG, no modulo bias). Tabs for a random string or a Diceware-style passphrase.",
       "entropy": "Entropy ≈",
       "strength": "Strength:",
       "strengthVeryStrong": "Very strong",
@@ -333,24 +474,74 @@
       "strengthMedium": "Medium",
       "strengthWeak": "Weak",
       "strengthNone": "Empty",
-      "length": "Length"
+      "length": "Length",
+      "tabRandom": "Random",
+      "tabPassphrase": "Passphrase",
+      "symbolPool": "Symbol pool",
+      "symbolReset": "Reset",
+      "phraseCount": "Word count",
+      "separator": "Separator",
+      "separators": {
+        "dash": "dash",
+        "dot": "dot",
+        "space": "space",
+        "underscore": "underscore"
+      },
+      "capitalizeFirst": "Capitalize first letter",
+      "includeNumber": "Append a number"
     },
     "qr": {
-      "description": "Generate a QR code (SVG / PNG). Rendered locally; content never leaves your browser.",
+      "description": "Generate a QR code (SVG / PNG). Rendered locally; content never leaves your browser. Type tabs compose URL / WiFi / vCard / Email / SMS / GeoURI payloads.",
       "content": "Content",
       "contentPlaceholder": "URL / text / vCard…",
       "size": "Size (px)",
       "level": "Error correction",
+      "margin": "Quiet zone",
+      "fgColor": "Foreground",
+      "bgColor": "Background",
       "downloaded": "Downloaded {{format}}",
       "placeholder": "Type content to generate a QR code…",
-      "generating": "Generating…"
+      "generating": "Generating…",
+      "tabText": "Text / URL",
+      "tabWifi": "WiFi",
+      "tabVcard": "vCard",
+      "tabEmail": "Email",
+      "tabSms": "SMS",
+      "tabGeo": "Geo",
+      "wifiSsid": "SSID",
+      "wifiPassword": "Password",
+      "wifiAuth": "Security",
+      "wifiHidden": "Hidden network",
+      "wifiNone": "None",
+      "vcardName": "Full name",
+      "vcardOrg": "Organization",
+      "vcardTitle": "Title",
+      "vcardPhone": "Phone",
+      "vcardEmail": "Email",
+      "vcardUrl": "URL",
+      "emailTo": "To",
+      "emailSubject": "Subject",
+      "emailBody": "Body",
+      "smsTo": "Phone",
+      "smsBody": "Message",
+      "geoLat": "Latitude",
+      "geoLng": "Longitude"
     },
     "lorem": {
-      "description": "Classic placeholder text generator. Output by paragraph / sentence / word count.",
+      "description": "Placeholder text generator. Output by paragraph / sentence / word count; pick a theme and optionally wrap as HTML.",
       "paragraphs": "Paragraphs",
       "sentences": "Sentences",
       "words": "Words",
-      "count": "Count"
+      "count": "Count",
+      "source": "Theme",
+      "sources": {
+        "lorem": "Lorem (classic)",
+        "hipster": "Hipster",
+        "pirate": "Pirate",
+        "bacon": "Bacon"
+      },
+      "startWithLorem": "Start with \"Lorem ipsum dolor sit amet…\"",
+      "asHtml": "Wrap as <p>…</p>"
     },
     "diff": {
       "description": "Text diff (line or word granularity). All computation is local.",
@@ -358,7 +549,11 @@
       "byWords": "Words",
       "original": "Original",
       "modified": "Modified",
-      "diff": "Diff"
+      "diff": "Diff",
+      "inline": "Inline",
+      "sideBySide": "Side by side",
+      "ignoreWs": "Ignore whitespace",
+      "ignoreCase": "Ignore case"
     },
     "case": {
       "description": "Convert between common naming styles: camelCase / PascalCase / snake_case / kebab-case / Title Case etc.",
@@ -372,19 +567,37 @@
       "snake": "snake_case",
       "constant": "CONSTANT_CASE",
       "kebab": "kebab-case",
-      "dot": "dot.case"
+      "train": "Train-Case",
+      "httpHeader": "HTTP-Header-Case",
+      "dot": "dot.case",
+      "statWords": "{{n}} words",
+      "statChars": "{{n}} chars",
+      "statLines": "{{n}} lines",
+      "transformInPlace": "Transform input in place",
+      "transformed": "Input replaced with {{label}}"
     },
     "sortDedupe": {
-      "description": "Per-line processing: sort, dedupe, trim, ignore case.",
+      "description": "Per-line processing: sort, dedupe, trim, ignore case. Sort mode and custom delimiter included.",
       "sort": "Sort",
       "noSort": "No sort",
       "asc": "A → Z",
       "desc": "Z → A",
       "dedupe": "Dedupe",
+      "withCount": "uniq -c (with count)",
       "trim": "Trim",
       "removeBlank": "Remove blank",
       "ignoreCase": "Ignore case",
-      "lineCount": "{{n}} lines"
+      "lineCount": "{{n}} lines",
+      "modeLabel": "Mode",
+      "modeLex": "Lexicographic",
+      "modeNumeric": "Numeric",
+      "modeNatural": "Natural (img2 < img10)",
+      "modeLength": "Length",
+      "delimiterLabel": "Delimiter",
+      "delimiterPlaceholder": ", ; |",
+      "delimiterNewline": "newline (default)",
+      "reverse": "Reverse",
+      "shuffle": "Shuffle"
     },
     "regex": {
       "description": "Based on the browser's native RegExp. Supports every ECMAScript flag.",
@@ -399,7 +612,53 @@
       "matches": "Matches",
       "noMatch": "No matches",
       "replacement": "Replacement (supports $1 / $<name> back-references)",
-      "replacePreview": "Replace preview"
+      "replacePreview": "Replace preview",
+      "matchNOfM": "Match {{n}} of {{m}}",
+      "pcreWarn": "Looks like PCRE-only syntax — JavaScript RegExp does NOT support:",
+      "pcre": {
+        "recursion": "(?R) — recursive pattern reference",
+        "recursionNum": "(?N) — numeric subpattern recursion",
+        "posixClass": "[[:class:]] — POSIX character class",
+        "keepOut": "\\K — keep-out anchor (cut left side of match)",
+        "inlineComment": "(?# … ) — inline comment",
+        "verbs": "(*VERB) — backtracking-control verbs (e.g. (*FAIL))",
+        "backrefBraces": "\\g{name} / \\G{name} — non-JS back-reference syntax"
+      },
+      "cheatTitle": "Cheat sheet — common patterns",
+      "cheatSec": {
+        "classes": "Character classes",
+        "anchors": "Anchors",
+        "quant": "Quantifiers",
+        "groups": "Groups & lookaround"
+      },
+      "cheat": {
+        "digit": "Any digit (0-9)",
+        "nonDigit": "Any non-digit",
+        "word": "Word char [A-Za-z0-9_]",
+        "nonWord": "Non-word char",
+        "space": "Whitespace",
+        "nonSpace": "Non-whitespace",
+        "dot": "Any char except newline (with s: any char)",
+        "set": "Any char in the set",
+        "negSet": "Any char NOT in the set",
+        "range": "Char in range",
+        "start": "Start of input (m: each line)",
+        "end": "End of input (m: each line)",
+        "boundary": "Word boundary",
+        "nonBoundary": "Non-boundary",
+        "zeroPlus": "0 or more (greedy)",
+        "onePlus": "1 or more (greedy)",
+        "zeroOne": "0 or 1 (optional)",
+        "exact": "Exactly n",
+        "range2": "n to m repetitions",
+        "lazy": "Lazy quantifier (match as few as possible)",
+        "capture": "Capturing group",
+        "nonCapture": "Non-capturing group",
+        "named": "Named capture group",
+        "lookahead": "Positive lookahead",
+        "negLook": "Negative lookahead",
+        "lookbehind": "Lookbehind (positive)"
+      }
     },
     "ipInfo": {
       "description": "IP lookup. Only makes a request to ipapi.co on click (free tier 1k/day/IP).",
@@ -414,16 +673,26 @@
       "rowTimezone": "Timezone",
       "rowAsn": "ASN",
       "rowOrg": "Organization",
-      "empty": "Click <1>Lookup</1> or <3>Look up my IP</3> to start"
+      "rowPtr": "Reverse DNS (PTR)",
+      "empty": "Click <1>Lookup</1> or <3>Look up my IP</3> to start",
+      "map": "Approximate location",
+      "openInOsm": "Open in OpenStreetMap",
+      "recent": "Recent:"
     },
     "dns": {
-      "description": "Based on Cloudflare DoH (cloudflare-dns.com). Only queries on click.",
+      "description": "DoH-based DNS lookup. Default resolver is Cloudflare; enable Compare resolvers to fan out to Google + Quad9. Queries only fire on click.",
       "typeLabel": "Type",
       "status": "Status",
       "answers": "{{n}} answers",
       "noAnswers": "no answers",
       "noDirect": "No direct answer; authority: {{authority}}",
-      "empty": "Enter a domain + record type, then click <1>Lookup</1>"
+      "empty": "Enter a domain + record type, then click <1>Lookup</1>",
+      "compareResolvers": "Compare resolvers",
+      "txt": {
+        "spfHint": "SPF — Sender Policy Framework (RFC 7208). Mechanisms list who may send mail for this domain.",
+        "dkimHint": "DKIM — DomainKeys Identified Mail (RFC 6376). p= holds the public key.",
+        "dmarcHint": "DMARC — Domain-based Message Authentication (RFC 7489). p= sets the policy."
+      }
     },
     "imageEditor": {
       "description": "Local image editor — layers, masks, brush/eraser, adjustments, annotations, undo/redo. Save a project file (.json) to resume editing later.",
@@ -1190,18 +1459,38 @@
       "downloaded": "Downloaded {{format}}"
     },
     "cidr": {
-      "description": "IPv4 subnet math: network / broadcast / mask / usable range / host count.",
+      "description": "IPv4 + IPv6 subnet math: network / broadcast / mask / usable range / host count, with VLSM planner and overlap checker.",
       "cidrLabel": "CIDR",
-      "placeholder": "192.168.1.0/24",
+      "placeholder": "192.168.1.0/24 or 2001:db8::/32",
+      "rowIp": "IP",
       "rowNetwork": "Network",
       "rowBroadcast": "Broadcast",
       "rowNetmask": "Netmask",
       "rowWildcard": "Wildcard",
       "rowFirstUsable": "First usable",
       "rowLastUsable": "Last usable",
+      "rowFirstAddr": "First address",
+      "rowLastAddr": "Last address",
       "rowHosts": "Usable hosts",
       "rowTotal": "Total addresses",
-      "rowClass": "Class"
+      "rowClass": "Class",
+      "binaryBreakdown": "Binary breakdown (network portion highlighted)",
+      "vlsmTitle": "VLSM / Subnet Split Planner",
+      "vlsmHint": "Paste a parent CIDR and list of required host counts (one per line). Each request is rounded up to the smallest fitting block; allocations are packed in order.",
+      "vlsmParent": "Parent CIDR",
+      "vlsmSizes": "Required host counts",
+      "vlsmAllocated": "{{requested}} requested · {{total}} addresses",
+      "overlapTitle": "Containment / overlap",
+      "overlapA": "CIDR A",
+      "overlapB": "CIDR B",
+      "relation": {
+        "equal": "A and B are equal",
+        "aContainsB": "A contains B",
+        "bContainsA": "B contains A",
+        "overlap": "A and B overlap (neither contains the other)",
+        "disjoint": "A and B are disjoint",
+        "familyMismatch": "A and B are in different families (IPv4 vs IPv6)"
+      }
     }
   },
   "fieldMeta": {
