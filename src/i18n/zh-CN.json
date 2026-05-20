@@ -20,7 +20,13 @@
     "output": "输出",
     "noResult": "无结果",
     "parseFailed": "解析失败：{{error}}",
-    "emptyInput": "空输入"
+    "emptyInput": "空输入",
+    "dropFileLabel": "将文件拖到此处",
+    "dropFileHint": "或点击选择文件",
+    "file": "文件",
+    "text": "文本",
+    "verify": "校验",
+    "verifyPlaceholder": "粘贴期望值进行对比…"
   },
   "topbar": {
     "searchPlaceholder": "搜索工具...",
@@ -203,14 +209,37 @@
     },
     "base64": {
       "description": "Base64 编解码，支持 UTF-8 与 URL-safe（-_）变体。所有处理在浏览器本地完成。",
-      "urlSafe": "URL-safe (-_)"
+      "urlSafe": "URL-safe (-_)",
+      "modeText": "文本",
+      "modeFile": "文件",
+      "fileDropEncode": "拖入要编码的文件",
+      "fileDropDecode": "拖入包含 base64 的文件来解码",
+      "fileHintEncode": "任意文件 —— 字节将被直接编码",
+      "fileHintDecode": "或在下方输入 base64 字符串",
+      "fileInfo": "{{name}} —— {{size}}",
+      "encoded": "Base64 编码",
+      "decodedFilename": "下载文件名",
+      "downloadDecoded": "下载为文件",
+      "decodedReady": "已解码 {{size}}（{{mime}}）",
+      "pickFile": "选择文件"
     },
     "url": {
       "description": "URL 编解码。Component 模式（encodeURIComponent）转义所有保留字；URI 模式（encodeURI）保留 :/?&#= 等结构字符。"
     },
     "hex": {
       "description": "文本 ↔ 十六进制字节（UTF-8）。解码时自动忽略空格 / 冒号 / 逗号 / 短横 / 下划线分隔。",
-      "withSpace": "编码时按字节加空格"
+      "withSpace": "编码时按字节加空格",
+      "dumpView": "Dump 视图（xxd 样式）",
+      "modeText": "文本",
+      "modeFile": "文件",
+      "fileDropEncode": "拖入要查看为 hex 的文件",
+      "fileDropDecode": "拖入包含 hex 的文件来解码",
+      "fileInfo": "{{name}} —— {{size}}",
+      "encoded": "Hex 编码",
+      "decodedFilename": "下载文件名",
+      "downloadDecoded": "下载为文件",
+      "decodedReady": "已解码 {{size}}（{{mime}}）",
+      "dumpEmpty": "输入或拖入内容以渲染 dump。"
     },
     "html-entity": {
       "description": "HTML 实体编解码。编码使用最小安全集（& < > &quot; &#39;）；解码支持所有命名实体 + 数字实体（十进制 / 十六进制）。"
@@ -292,7 +321,18 @@
     },
     "hash": {
       "description": "同时输出 MD5 / SHA-1 / SHA-256 / SHA-384 / SHA-512。SHA 系列走 Web Crypto 原生实现；MD5 用 js-md5（仅供校验，**不要用于安全场景**）。",
-      "placeholder": "输入要哈希的文本…"
+      "placeholder": "输入要哈希的文本…",
+      "modeText": "文本",
+      "modeFile": "文件",
+      "fileDrop": "拖入要哈希的文件",
+      "fileHint": "任意大小 —— 整体读入 ArrayBuffer",
+      "fileInfo": "{{name}} —— {{size}}",
+      "outputEncoding": "输出",
+      "verify": "校验",
+      "verifyPlaceholder": "粘贴该算法的期望哈希…",
+      "verifyMatch": "匹配",
+      "verifyMismatch": "不匹配",
+      "computing": "计算中…"
     },
     "hmac": {
       "description": "基于 Web Crypto 的 HMAC（SHA-1 / 256 / 384 / 512）。本地计算，密钥不出浏览器。",
@@ -301,7 +341,18 @@
       "data": "数据",
       "signature": "签名",
       "keyPlaceholder": "HMAC secret…",
-      "dataPlaceholder": "要签名的内容…"
+      "dataPlaceholder": "要签名的内容…",
+      "keyEncoding": "密钥编码",
+      "keyReveal": "显示密钥",
+      "keyHide": "隐藏密钥",
+      "dataModeText": "文本",
+      "dataModeFile": "文件",
+      "fileDrop": "拖入要签名的文件",
+      "fileInfo": "{{name}} —— {{size}}",
+      "verify": "校验",
+      "verifyPlaceholder": "粘贴期望签名…",
+      "verifyMatch": "匹配",
+      "verifyMismatch": "不匹配"
     },
     "timestamp": {
       "description": "时间戳与日期相互转换。支持 Unix 秒 / 毫秒 / ISO 8601 / RFC 2822。内含分字段合成、批量转换以及 Windows FILETIME / Excel 序列数输出。",

@@ -20,7 +20,13 @@
     "output": "Output",
     "noResult": "No result",
     "parseFailed": "Parse failed: {{error}}",
-    "emptyInput": "Empty input"
+    "emptyInput": "Empty input",
+    "dropFileLabel": "Drop a file here",
+    "dropFileHint": "or click to choose",
+    "file": "File",
+    "text": "Text",
+    "verify": "Verify",
+    "verifyPlaceholder": "Paste expected value to compare…"
   },
   "topbar": {
     "searchPlaceholder": "Search tools...",
@@ -203,14 +209,37 @@
     },
     "base64": {
       "description": "Base64 encode/decode with UTF-8 and URL-safe (-_) variants. All processing runs locally.",
-      "urlSafe": "URL-safe (-_)"
+      "urlSafe": "URL-safe (-_)",
+      "modeText": "Text",
+      "modeFile": "File",
+      "fileDropEncode": "Drop a file to encode",
+      "fileDropDecode": "Drop a file containing base64 to decode",
+      "fileHintEncode": "Any file — the bytes get encoded directly",
+      "fileHintDecode": "Or paste the base64 string in the textarea below",
+      "fileInfo": "{{name}} — {{size}}",
+      "encoded": "Encoded base64",
+      "decodedFilename": "Decoded filename",
+      "downloadDecoded": "Download as file",
+      "decodedReady": "Decoded {{size}} ({{mime}})",
+      "pickFile": "Pick a file"
     },
     "url": {
       "description": "URL encode/decode. Component mode (encodeURIComponent) escapes all reserved characters; URI mode (encodeURI) preserves :/?&#= etc."
     },
     "hex": {
       "description": "Text ↔ hexadecimal bytes (UTF-8). Decode tolerates space / colon / comma / dash / underscore separators.",
-      "withSpace": "Space-separated bytes on encode"
+      "withSpace": "Space-separated bytes on encode",
+      "dumpView": "Dump view (xxd-style)",
+      "modeText": "Text",
+      "modeFile": "File",
+      "fileDropEncode": "Drop a file to view as hex",
+      "fileDropDecode": "Drop a file containing hex to decode",
+      "fileInfo": "{{name}} — {{size}}",
+      "encoded": "Encoded hex",
+      "decodedFilename": "Decoded filename",
+      "downloadDecoded": "Download as file",
+      "decodedReady": "Decoded {{size}} ({{mime}})",
+      "dumpEmpty": "Type or drop content to render a dump."
     },
     "html-entity": {
       "description": "HTML entity encode/decode. Encode uses the minimal safe set (& < > \" '); decode supports all named + numeric entities (decimal / hex)."
@@ -292,7 +321,18 @@
     },
     "hash": {
       "description": "Produce MD5 / SHA-1 / SHA-256 / SHA-384 / SHA-512 simultaneously. SHA uses native Web Crypto; MD5 uses js-md5 (**do not use for security**).",
-      "placeholder": "Text to hash…"
+      "placeholder": "Text to hash…",
+      "modeText": "Text",
+      "modeFile": "File",
+      "fileDrop": "Drop a file to hash",
+      "fileHint": "Any size — read in one shot into an ArrayBuffer",
+      "fileInfo": "{{name}} — {{size}}",
+      "outputEncoding": "Output",
+      "verify": "Verify",
+      "verifyPlaceholder": "Paste expected hash for this algo…",
+      "verifyMatch": "Matches",
+      "verifyMismatch": "Does not match",
+      "computing": "Computing…"
     },
     "hmac": {
       "description": "HMAC based on Web Crypto (SHA-1 / 256 / 384 / 512). Key stays in the browser.",
@@ -301,7 +341,18 @@
       "data": "Data",
       "signature": "Signature",
       "keyPlaceholder": "HMAC secret…",
-      "dataPlaceholder": "Content to sign…"
+      "dataPlaceholder": "Content to sign…",
+      "keyEncoding": "Key as",
+      "keyReveal": "Reveal key",
+      "keyHide": "Hide key",
+      "dataModeText": "Text",
+      "dataModeFile": "File",
+      "fileDrop": "Drop the file to sign",
+      "fileInfo": "{{name}} — {{size}}",
+      "verify": "Verify",
+      "verifyPlaceholder": "Paste expected signature…",
+      "verifyMatch": "Matches",
+      "verifyMismatch": "Does not match"
     },
     "timestamp": {
       "description": "Convert between timestamps and dates. Supports Unix seconds / milliseconds / ISO 8601 / RFC 2822. Includes a discrete-fields composer, batch conversion, and Windows FILETIME / Excel-serial outputs.",
