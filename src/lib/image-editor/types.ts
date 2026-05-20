@@ -408,14 +408,36 @@ export type ColorOverlayEffect = {
   blend: BlendMode
 }
 
-/** Linear gradient overlay across the layer's alpha. */
+/** A single gradient stop in the multi-stop form. `pos` is normalised
+ *  to 0..1 (clamped at render time); `color` is any CSS colour string
+ *  the canvas 2D context understands (hex, rgba(), etc). */
+export type GradientStop = {
+  pos: number
+  color: string
+}
+
+/** Linear gradient overlay across the layer's alpha.
+ *
+ *  Two storage forms are supported, both ship in the same effect object:
+ *  - **Legacy 2-stop:** `color` + `endColor` describe the start (pos=0)
+ *    and end (pos=1) colours. This is the original wire format and the
+ *    default for newly added effects, so old projects round-trip exactly.
+ *  - **Multi-stop:** when `stops` is set with at least 2 entries, the
+ *    renderer uses it verbatim and ignores `color`/`endColor`. Stops are
+ *    sorted by `pos` before being applied to the canvas gradient.
+ *
+ *  `color` + `endColor` are kept populated even in multi-stop mode so
+ *  toggling back to "simple" doesn't drop the user's previous values. */
 export type GradientOverlayEffect = {
   kind: 'gradientOverlay'
   enabled: boolean
-  /** Start colour at gradient position 0. */
+  /** Start colour at gradient position 0. Used when `stops` is unset. */
   color: string
-  /** End colour at gradient position 1. */
+  /** End colour at gradient position 1. Used when `stops` is unset. */
   endColor: string
+  /** Optional multi-stop gradient definition. Take precedence over
+   *  `color`/`endColor` when set with >= 2 entries. */
+  stops?: GradientStop[]
   opacity: number
   blend: BlendMode
   /** Gradient sweep angle, degrees. 0 = left→right. */

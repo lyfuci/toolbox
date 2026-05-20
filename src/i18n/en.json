@@ -1140,6 +1140,14 @@
           "patternOverlay": "Pattern Overlay",
           "satin": "Satin",
           "bevelEmboss": "Bevel & Emboss"
+        },
+        "gradient": {
+          "mode": "Mode",
+          "simple": "2-stop (simple)",
+          "multi": "Multi-stop (custom)",
+          "stops": "Stops",
+          "addStop": "Add stop",
+          "removeStop": "Remove stop"
         }
       },
       "project": "Project",

@@ -436,9 +436,14 @@ function makeErodedSilhouette(
 }
 
 /**
- * Gradient overlay — linear two-stop gradient swept across the layer's
+ * Gradient overlay — linear N-stop gradient swept across the layer's
  * bbox at `effect.angle`, scaled by `effect.scale`. Then masked to the
  * layer's alpha via destination-in. Computed in target pixels.
+ *
+ * Two storage forms are supported:
+ *  - `fx.stops` set with >= 2 entries → multi-stop (each `pos` is clamped
+ *    to 0..1 and the list is sorted before being applied).
+ *  - otherwise → legacy 2-stop using `fx.color` → `fx.endColor`.
  */
 function drawGradientOverlay(
   dims: { w: number; h: number },
@@ -463,8 +468,17 @@ function drawGradientOverlay(
   const dx = Math.cos(r) * halfLen
   const dy = Math.sin(r) * halfLen
   const grad = ctx.createLinearGradient(cx - dx, cy - dy, cx + dx, cy + dy)
-  grad.addColorStop(0, fx.color)
-  grad.addColorStop(1, fx.endColor)
+  if (fx.stops && fx.stops.length >= 2) {
+    // Sort + clamp defensively: the dialog already guarantees these
+    // invariants, but persisted projects can carry anything.
+    const sorted = [...fx.stops]
+      .map((s) => ({ pos: Math.min(1, Math.max(0, s.pos)), color: s.color }))
+      .sort((a, b) => a.pos - b.pos)
+    for (const s of sorted) grad.addColorStop(s.pos, s.color)
+  } else {
+    grad.addColorStop(0, fx.color)
+    grad.addColorStop(1, fx.endColor)
+  }
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, dims.w, dims.h)
   ctx.globalCompositeOperation = 'destination-in'
