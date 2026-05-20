@@ -723,20 +723,8 @@ function drawBevelEmboss(
 }
 
 function blendModeToOp(b: LayerEffect['blend']): GlobalCompositeOperation {
-  switch (b) {
-    case 'normal':
-      return 'source-over'
-    case 'multiply':
-      return 'multiply'
-    case 'screen':
-      return 'screen'
-    case 'overlay':
-      return 'overlay'
-    case 'darken':
-      return 'darken'
-    case 'lighten':
-      return 'lighten'
-  }
+  if (b === 'normal') return 'source-over'
+  return b
 }
 
 function makeCanvas(dims: { w: number; h: number }): HTMLCanvasElement {

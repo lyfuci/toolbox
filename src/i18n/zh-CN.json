@@ -476,6 +476,13 @@
           "blue": "蓝",
           "custom": "自定义"
         },
+        "curvesChannel": "通道",
+        "curvesChannels": {
+          "rgb": "RGB",
+          "r": "红",
+          "g": "绿",
+          "b": "蓝"
+        },
         "channelMixer": {
           "title": "通道混合器",
           "outR": "输出：红",
@@ -526,6 +533,7 @@
         "mosaic": "马赛克",
         "findEdges": "查找边缘",
         "emboss": "浮雕效果",
+        "localContrast": "局部对比度（清晰度 / 去雾）",
         "radius": "半径",
         "amount": "数量",
         "threshold": "阈值",
@@ -533,6 +541,8 @@
         "cellSize": "单元格大小",
         "angle": "角度",
         "height": "高度",
+        "clarity": "清晰度",
+        "dehaze": "去雾",
         "despeckleHint": "通过逐通道 3×3 中值滤波减少斑点噪点。无参数 — 点击应用以提交为图层。",
         "findEdgesHint": "使用 Sobel 算子突出边缘（白色背景，深色边缘）。无参数 — 点击应用以提交为图层。"
       },
@@ -959,11 +969,21 @@
       "shadowColor": "颜色",
       "blendMode": {
         "normal": "正常",
-        "multiply": "正片叠底",
-        "screen": "滤色",
-        "overlay": "叠加",
         "darken": "变暗",
-        "lighten": "变亮"
+        "multiply": "正片叠底",
+        "color-burn": "颜色加深",
+        "lighten": "变亮",
+        "screen": "滤色",
+        "color-dodge": "颜色减淡",
+        "overlay": "叠加",
+        "soft-light": "柔光",
+        "hard-light": "强光",
+        "difference": "差值",
+        "exclusion": "排除",
+        "hue": "色相",
+        "saturation": "饱和度",
+        "color": "颜色",
+        "luminosity": "明度"
       },
       "annoLabel": {
         "rect": "矩形",

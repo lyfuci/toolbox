@@ -476,6 +476,11 @@ export function MenuBar({ handlers }: Props) {
             label: t('pages.imageEditor.filters.emboss') + '…',
             onClick: () => handlers.openFilter?.('emboss'),
           },
+          {
+            id: 'flt-localContrast',
+            label: t('pages.imageEditor.filters.localContrast') + '…',
+            onClick: () => handlers.openFilter?.('localContrast'),
+          },
         ],
       ],
     },

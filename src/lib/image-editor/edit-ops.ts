@@ -1,5 +1,5 @@
 import { buildImageShapeLayer, previewDimsOf, regionFromSelection } from './composite-ops'
-import type { AnnotationLayer, EditorState } from './types'
+import type { AnnotationLayer, BlendMode, EditorState } from './types'
 
 /**
  * Edit-menu primitives that produce a new annotation image-shape layer.
@@ -22,7 +22,7 @@ export function fillSelection(args: {
   state: EditorState
   color: string
   opacity: number // 0..1
-  blend?: 'normal' | 'multiply' | 'screen' | 'overlay' | 'darken' | 'lighten'
+  blend?: BlendMode
   name: string
 }): AnnotationLayer | null {
   const { image, state, color, opacity, blend, name } = args

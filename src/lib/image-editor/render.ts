@@ -703,20 +703,11 @@ function drawSelectionChrome(
 }
 
 function blendModeToOp(b: BlendMode): GlobalCompositeOperation {
-  switch (b) {
-    case 'normal':
-      return 'source-over'
-    case 'multiply':
-      return 'multiply'
-    case 'screen':
-      return 'screen'
-    case 'overlay':
-      return 'overlay'
-    case 'darken':
-      return 'darken'
-    case 'lighten':
-      return 'lighten'
-  }
+  // Every BlendMode here has a native Canvas-2D composite op of the same
+  // name (except 'normal' which is 'source-over'). Match returns the
+  // browser value directly — no per-pixel fallback needed.
+  if (b === 'normal') return 'source-over'
+  return b
 }
 
 /** Mosaic helper: copy current canvas pixels to a detached canvas to sample from. */

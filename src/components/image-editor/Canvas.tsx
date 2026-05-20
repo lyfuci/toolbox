@@ -111,13 +111,16 @@ type Props = {
    * crop origin to land in original-image preview-pixel space (matching how
    * shape coords are stored).
    */
-  onCommitSelection?: (rect: { x: number; y: number; w: number; h: number }) => void
+  onCommitSelection?: (
+    rect: { x: number; y: number; w: number; h: number },
+    mod: SelectionModifier,
+  ) => void
   /**
    * Called by Lasso / Polygonal Lasso when the user closes a non-trivial
    * polygon. Points are in canvas-pixel space; the parent shifts by the
    * crop origin and stores both the bbox and the polygon.
    */
-  onCommitPolygonSelection?: (points: Point[]) => void
+  onCommitPolygonSelection?: (points: Point[], mod: SelectionModifier) => void
   /**
    * Called by the Magic Wand on click. Point is in canvas-pixel space; the
    * parent runs the flood fill and stores the bbox of the matching region
@@ -156,6 +159,13 @@ type Props = {
   /** Called on Quick Mask brush stroke commit with the new dataUrl. */
   onUpdateQuickMaskDataUrl?: (dataUrl: string) => void
 }
+
+/**
+ * PS-style boolean combination of a fresh selection drag with the active
+ * selection. Captured at mousedown so the modifier doesn't flip mid-drag
+ * if the user releases Shift / Alt. 'replace' is the default (no modifier).
+ */
+export type SelectionModifier = 'replace' | 'add' | 'subtract' | 'intersect'
 
 type Interaction =
   | { kind: 'idle' }
@@ -200,16 +210,17 @@ type Interaction =
     }
   /** Gradient drag in progress — start + current end point in canvas pixels. */
   | { kind: 'gradient-drawing'; start: Point; end: Point }
-  /** Marquee selection drag — rect in canvas-pixel space. */
-  | { kind: 'marquee-drawing'; rect: { x: number; y: number; w: number; h: number } }
+  /** Marquee selection drag — rect in canvas-pixel space. `mod` is captured
+   *  at mousedown so the boolean op is stable across the drag. */
+  | { kind: 'marquee-drawing'; rect: { x: number; y: number; w: number; h: number }; mod: SelectionModifier }
   /** Lasso freeform drag — accumulating points in canvas-pixel space. */
-  | { kind: 'lasso-drawing'; points: Point[] }
+  | { kind: 'lasso-drawing'; points: Point[]; mod: SelectionModifier }
   /**
    * Polygonal Lasso click-by-click. `points` are committed; `cursor` is the
    * current mouse position so the live preview can show the next pending
    * segment from the last committed point to the cursor.
    */
-  | { kind: 'polylasso-drawing'; points: Point[]; cursor: Point }
+  | { kind: 'polylasso-drawing'; points: Point[]; cursor: Point; mod: SelectionModifier }
   /**
    * Pen tool — click adds a corner anchor; click-and-drag turns it into a
    * smooth anchor with symmetric handles. `pressed` is true between mousedown
@@ -675,15 +686,20 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     }
 
     // Marquee: drag a rectangular selection. Commit on mouseup if non-trivial.
+    // PS modifier keys: Shift = add, Alt = subtract, Shift+Alt = intersect.
     if (tool === 'marquee') {
-      setInteraction({ kind: 'marquee-drawing', rect: { x: p.x, y: p.y, w: 0, h: 0 } })
+      setInteraction({
+        kind: 'marquee-drawing',
+        rect: { x: p.x, y: p.y, w: 0, h: 0 },
+        mod: selectionModFromEvent(e),
+      })
       return
     }
 
     // Lasso: drag-to-trace a freeform polygon. mousedown starts; mousemove
     // appends points; mouseup closes + commits.
     if (tool === 'lasso') {
-      setInteraction({ kind: 'lasso-drawing', points: [p] })
+      setInteraction({ kind: 'lasso-drawing', points: [p], mod: selectionModFromEvent(e) })
       return
     }
 
@@ -699,17 +715,23 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
           Math.abs(p.x - first.x) < 8 &&
           Math.abs(p.y - first.y) < 8
         if (closeToFirst) {
-          onCommitPolygonSelection?.(interaction.points)
+          onCommitPolygonSelection?.(interaction.points, interaction.mod)
           setInteraction({ kind: 'idle' })
         } else {
           setInteraction({
             kind: 'polylasso-drawing',
             points: [...interaction.points, p],
             cursor: p,
+            mod: interaction.mod,
           })
         }
       } else {
-        setInteraction({ kind: 'polylasso-drawing', points: [p], cursor: p })
+        setInteraction({
+          kind: 'polylasso-drawing',
+          points: [p],
+          cursor: p,
+          mod: selectionModFromEvent(e),
+        })
       }
       return
     }
@@ -966,6 +988,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       setInteraction({
         kind: 'marquee-drawing',
         rect: { x: r.x, y: r.y, w: p.x - r.x, h: p.y - r.y },
+        mod: interaction.mod,
       })
       return
     }
@@ -975,7 +998,11 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       // path doesn't bloat at slow drags.
       const last = interaction.points[interaction.points.length - 1]
       if (Math.abs(p.x - last.x) >= 2 || Math.abs(p.y - last.y) >= 2) {
-        setInteraction({ kind: 'lasso-drawing', points: [...interaction.points, p] })
+        setInteraction({
+          kind: 'lasso-drawing',
+          points: [...interaction.points, p],
+          mod: interaction.mod,
+        })
       }
       return
     }
@@ -1075,7 +1102,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     if (interaction.kind === 'marquee-drawing') {
       const r = interaction.rect
       if (Math.abs(r.w) >= 4 && Math.abs(r.h) >= 4) {
-        onCommitSelection?.(r)
+        onCommitSelection?.(r, interaction.mod)
       }
       setInteraction({ kind: 'idle' })
       return
@@ -1083,7 +1110,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     if (interaction.kind === 'lasso-drawing') {
       // Need ≥3 distinct points to make a polygon. Otherwise drop.
       if (interaction.points.length >= 3) {
-        onCommitPolygonSelection?.(interaction.points)
+        onCommitPolygonSelection?.(interaction.points, interaction.mod)
       }
       setInteraction({ kind: 'idle' })
       return
@@ -1958,6 +1985,17 @@ function drawCropOverlay(
     ctx.stroke()
   }
   ctx.restore()
+}
+
+/**
+ * Resolve Shift/Alt modifier state into a PS-style selection combination
+ * mode. Captured at mousedown so the modifier is stable across the drag.
+ */
+function selectionModFromEvent(e: ReactMouseEvent<HTMLCanvasElement>): SelectionModifier {
+  if (e.shiftKey && e.altKey) return 'intersect'
+  if (e.shiftKey) return 'add'
+  if (e.altKey) return 'subtract'
+  return 'replace'
 }
 
 type CropHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'

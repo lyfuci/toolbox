@@ -7,6 +7,7 @@ import type {
   FindEdgesParams,
   GaussianBlurParams,
   HighPassParams,
+  LocalContrastParams,
   MosaicParams,
   SharpenParams,
   UnsharpMaskParams,
@@ -64,6 +65,12 @@ export const DEFAULT_EMBOSS: EmbossParams = {
   height: 3,
   amount: 100,
 }
+export const DEFAULT_LOCAL_CONTRAST: LocalContrastParams = {
+  kind: 'localContrast',
+  clarity: 30,
+  dehaze: 0,
+  radius: 30,
+}
 
 export const DEFAULT_FOR_FILTER_KIND: Record<FilterParams['kind'], FilterParams> = {
   gaussianBlur: DEFAULT_GAUSSIAN_BLUR,
@@ -76,6 +83,7 @@ export const DEFAULT_FOR_FILTER_KIND: Record<FilterParams['kind'], FilterParams>
   mosaic: DEFAULT_MOSAIC,
   findEdges: DEFAULT_FIND_EDGES,
   emboss: DEFAULT_EMBOSS,
+  localContrast: DEFAULT_LOCAL_CONTRAST,
 }
 
 /**
@@ -104,6 +112,8 @@ export function scaleFilterParams(
       return { ...params, cellSize: params.cellSize * scale }
     case 'emboss':
       return { ...params, height: params.height * scale }
+    case 'localContrast':
+      return { ...params, radius: params.radius * scale }
     default:
       return params
   }
@@ -145,6 +155,9 @@ export function applyFilter(
       return
     case 'emboss':
       emboss(data, width, height, params)
+      return
+    case 'localContrast':
+      localContrast(data, width, height, params)
       return
   }
 }
@@ -513,5 +526,59 @@ function emboss(
         data[i + c] = v < 0 ? 0 : v > 255 ? 255 : v
       }
     }
+  }
+}
+
+/**
+ * Local Contrast — neighbourhood-based clarity + dehaze. Lifts midtone
+ * micro-contrast via unsharp-mask-style high-pass against a wide gaussian,
+ * weighted by midtone proximity so highlights and shadows don't blow out.
+ *
+ * Clarity (signed): boost = (orig - blur) * clarity * midWeight
+ *   - midWeight is 1 at L=128 and 0 at L=0/255, so the effect is strongest
+ *     in the middle band where local contrast actually carries detail.
+ * Dehaze (signed): adds a global contrast stretch + saturation lift on top.
+ *   - Hazy regions = low contrast + low saturation; stretching both is the
+ *     classic way to recover them. Per-pixel because we don't have a haze
+ *     mask, but the result still looks plausible.
+ */
+function localContrast(
+  data: Uint8ClampedArray,
+  w: number,
+  h: number,
+  p: import('./types').LocalContrastParams,
+): void {
+  // 1) Local mean via gaussian blur on a copy.
+  const blurBuf = new Uint8ClampedArray(data)
+  gaussianBlur(blurBuf, w, h, Math.max(1, p.radius))
+
+  const clarity = p.clarity / 100
+  const dehaze = p.dehaze / 100
+  const contrast = 1 + dehaze * 0.6
+  // 2) Per-pixel blend.
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i]
+    let g = data[i + 1]
+    let b = data[i + 2]
+    // Local-contrast lift, weighted by midtone proximity (parabolic).
+    const lum = (r * 299 + g * 587 + b * 114) / 1000
+    const midWeight = 1 - Math.abs(lum - 128) / 128
+    const c = clarity * midWeight * 1.5
+    r = r + (r - blurBuf[i]) * c
+    g = g + (g - blurBuf[i + 1]) * c
+    b = b + (b - blurBuf[i + 2]) * c
+    // Global contrast stretch (dehaze contrast component).
+    r = (r - 128) * contrast + 128
+    g = (g - 128) * contrast + 128
+    b = (b - 128) * contrast + 128
+    // Dehaze saturation: pull/push toward / away from the per-pixel mean.
+    const mean = (r + g + b) / 3
+    const satGain = 1 + dehaze * 0.4
+    r = mean + (r - mean) * satGain
+    g = mean + (g - mean) * satGain
+    b = mean + (b - mean) * satGain
+    data[i] = r < 0 ? 0 : r > 255 ? 255 : r
+    data[i + 1] = g < 0 ? 0 : g > 255 ? 255 : g
+    data[i + 2] = b < 0 ? 0 : b > 255 ? 255 : b
   }
 }
