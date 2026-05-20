@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { ChevronRight, Copy, Minimize2, Sparkles, Trash2 } from 'lucide-react'
 import { JSONPath } from 'jsonpath-plus'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
+import { CodeEditor } from '@/components/CodeEditor'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
@@ -327,12 +327,13 @@ export function JsonPage() {
           <Label className="mb-1.5 block text-xs text-muted-foreground">
             {t('common.input')}
           </Label>
-          <Textarea
+          <CodeEditor
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            spellCheck={false}
-            className="min-h-[480px] font-mono text-sm leading-relaxed"
+            onChange={(v) => setInput(v)}
+            language="json"
             placeholder={t('pages.json.placeholder')}
+            className="min-h-[480px]"
+            height="480px"
           />
           <div className="mt-2 flex items-center justify-between text-xs">
             {state.ok ? (

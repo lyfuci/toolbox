@@ -1,10 +1,12 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight, ChevronLeft, Copy } from 'lucide-react'
+import { EditorSelection, StateEffect, StateField } from '@codemirror/state'
+import { Decoration, type DecorationSet, EditorView } from '@codemirror/view'
 import { Button } from '@/components/ui/button'
+import { CodeEditor } from '@/components/CodeEditor'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { FieldTooltip } from '@/components/FieldTooltip'
 
@@ -111,6 +113,50 @@ const CHEATSHEET: { sec: string; rows: [string, string][] }[] = [
   },
 ]
 
+// ── CodeMirror match-highlight machinery ─────────────────────────────────
+//
+// State-driven decorations: the host component dispatches a `setMatchRanges`
+// effect whenever the matches / active index change, and the state field
+// rebuilds its DecorationSet. Separated into a state field (vs. a view
+// plugin) so the same decoration survives editor blur / state shuffling.
+type MatchRange = { from: number; to: number; active: boolean }
+const setMatchRanges = StateEffect.define<MatchRange[]>()
+
+const matchField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(deco, tr) {
+    deco = deco.map(tr.changes)
+    for (const e of tr.effects) {
+      if (e.is(setMatchRanges)) {
+        const ranges = e.value
+          .filter((r) => r.to > r.from)
+          .sort((a, b) => a.from - b.from)
+        deco = Decoration.set(
+          ranges.map((r) =>
+            Decoration.mark({
+              class: r.active ? 'cm-regex-match-active' : 'cm-regex-match',
+            }).range(r.from, r.to),
+          ),
+        )
+      }
+    }
+    return deco
+  },
+  provide: (f) => EditorView.decorations.from(f),
+})
+
+const matchTheme = EditorView.theme({
+  '.cm-regex-match': {
+    backgroundColor: 'color-mix(in oklab, oklch(0.7 0.18 145) 35%, transparent)',
+    borderRadius: '2px',
+  },
+  '.cm-regex-match-active': {
+    backgroundColor: 'color-mix(in oklab, oklch(0.85 0.18 80) 60%, transparent)',
+    borderRadius: '2px',
+    outline: '1px solid oklch(0.85 0.18 80)',
+  },
+})
+
 export function RegexPage() {
   const { t } = useTranslation()
   const [pattern, setPattern] = useState(SAMPLE_PATTERN)
@@ -147,69 +193,40 @@ export function RegexPage() {
 
   const flagLabel = (flag: Flag): string => t(`pages.regex.flag${flag.toUpperCase()}`)
 
-  // ----- highlight overlay -----
-  const textRef = useRef<HTMLTextAreaElement>(null)
-  const overlayRef = useRef<HTMLDivElement>(null)
+  // ----- CodeMirror view ref + match decoration sync -----
+  const viewRef = useRef<EditorView | null>(null)
 
-  // Sync overlay scroll → textarea scroll.
-  const onTextScroll = () => {
-    if (!textRef.current || !overlayRef.current) return
-    overlayRef.current.scrollTop = textRef.current.scrollTop
-    overlayRef.current.scrollLeft = textRef.current.scrollLeft
-  }
+  // Dispatch updated match ranges to the editor's StateField whenever the
+  // computed matches or active-index changes. Effect-driven (vs. controlled
+  // by render) so we can target the imperative EditorView.dispatch API.
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    const ranges: MatchRange[] = result.ok
+      ? result.matches.map((m, i) => ({
+          from: m.index,
+          to: m.index + m.match.length,
+          active: i === activeMatch,
+        }))
+      : []
+    view.dispatch({ effects: setMatchRanges.of(ranges) })
+  }, [result, activeMatch])
 
-  // When the user clicks prev/next, select the corresponding match in the
-  // textarea so they jump to it.
+  // Prev/next jump — programmatically set the editor's selection to the
+  // active match's range so the user is scrolled to + sees the highlight.
   const jumpTo = (i: number) => {
     if (!result.ok || result.matches.length === 0) return
     const idx = ((i % matchCount) + matchCount) % matchCount
     setActiveMatch(idx)
     const m = result.matches[idx]
-    const ta = textRef.current
-    if (!ta) return
-    ta.focus()
-    ta.setSelectionRange(m.index, m.index + m.match.length)
-    // Approximate scroll: textarea has no native "scroll into selection"
-    // method, but setting selectionRange brings cursor into view on focus in
-    // most engines. Belt-and-braces: jump scrollTop to the line.
-    const before = text.slice(0, m.index)
-    const lineNo = before.split('\n').length - 1
-    const lineHeight = parseFloat(getComputedStyle(ta).lineHeight || '20') || 20
-    ta.scrollTop = Math.max(0, lineNo * lineHeight - ta.clientHeight / 2)
-  }
-
-  // Build the overlay content: a sequence of plain spans interleaved with
-  // highlighted match spans.
-  const overlayChildren = useMemo<ReactNode[]>(() => {
-    if (!result.ok || result.matches.length === 0) {
-      return [text]
-    }
-    const out: ReactNode[] = []
-    let cursor = 0
-    result.matches.forEach((m, i) => {
-      if (m.index > cursor) out.push(text.slice(cursor, m.index))
-      // Empty matches shouldn't render a highlight chunk (would collapse).
-      const display = m.match.length === 0 ? '​' : m.match
-      out.push(
-        <mark
-          key={i}
-          className={
-            i === activeMatch
-              ? 'rounded bg-amber-400/50 text-foreground'
-              : 'rounded bg-emerald-400/30 text-foreground'
-          }
-        >
-          {display}
-        </mark>,
-      )
-      cursor = m.index + m.match.length
+    const view = viewRef.current
+    if (!view) return
+    view.focus()
+    view.dispatch({
+      selection: EditorSelection.single(m.index, m.index + m.match.length),
+      scrollIntoView: true,
     })
-    if (cursor < text.length) out.push(text.slice(cursor))
-    // Append a trailing newline if the input has one, so the overlay's
-    // height matches the textarea's scroll height exactly.
-    if (text.endsWith('\n')) out.push('\n')
-    return out
-  }, [result, text, activeMatch])
+  }
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
@@ -272,30 +289,20 @@ export function RegexPage() {
         <Label className="mb-1.5 block text-xs text-muted-foreground">
           {t('pages.regex.testText')}
         </Label>
-        {/*
-          Overlay highlighting: the absolute-positioned div sits directly
-          behind the (transparent-background) textarea. They share the same
-          font, padding, line-height, white-space, and word-break so chars
-          align 1:1. Textarea is transparent so the highlights show through;
-          its caret remains visible because we only zero out the background.
-        */}
-        <div className="relative">
-          <div
-            ref={overlayRef}
-            aria-hidden
-            className="pointer-events-none absolute inset-0 overflow-hidden rounded-md border border-transparent px-3 py-2 font-mono text-sm leading-relaxed whitespace-pre-wrap break-words text-transparent"
-          >
-            {overlayChildren}
-          </div>
-          <Textarea
-            ref={textRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onScroll={onTextScroll}
-            spellCheck={false}
-            className="relative min-h-[160px] resize-y bg-transparent font-mono text-sm leading-relaxed"
-          />
-        </div>
+        {/* CodeMirror replaces the textarea+overlay pair. Match highlight
+            lives in a StateField (see matchField above) driven by a useEffect
+            that fires `setMatchRanges` whenever the regex result changes. */}
+        <CodeEditor
+          value={text}
+          onChange={(v) => setText(v)}
+          language="plain"
+          onCreateEditor={(view) => {
+            viewRef.current = view
+          }}
+          extraExtensions={[matchField, matchTheme]}
+          height="200px"
+          className="min-h-[200px]"
+        />
       </div>
 
       {!result.ok ? (
@@ -400,11 +407,13 @@ export function RegexPage() {
                 {t('common.copy')}
               </Button>
             </div>
-            <Textarea
+            <CodeEditor
               value={replacePreview}
+              language="plain"
               readOnly
-              spellCheck={false}
-              className="min-h-[120px] font-mono text-sm leading-relaxed"
+              editable={false}
+              height="140px"
+              className="min-h-[140px]"
             />
           </div>
         </>
