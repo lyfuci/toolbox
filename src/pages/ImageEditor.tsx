@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { AdjustmentDialog } from '@/components/image-editor/AdjustmentDialog'
 import { Canvas, type CanvasHandle } from '@/components/image-editor/Canvas'
 import { DropZone } from '@/components/image-editor/DropZone'
+import { ShortcutsDialog } from '@/components/image-editor/ShortcutsDialog'
 import { FillDialog } from '@/components/image-editor/FillDialog'
 import { FilterDialog } from '@/components/image-editor/FilterDialog'
 import { CanvasSizeDialog, type Anchor9 } from '@/components/image-editor/CanvasSizeDialog'
@@ -48,9 +49,24 @@ import { DEFAULT_BRUSH_OPTIONS, DEFAULT_TEXT_OPTIONS, initialState, PREVIEW_MAX 
 import { fillSelection, strokeSelection, type StrokePosition } from '@/lib/image-editor/edit-ops'
 import { floodFillMask, maskToDataUrl } from '@/lib/image-editor/flood-fill'
 import { useHistoryState } from '@/lib/image-editor/history'
+import {
+  addRecentFile,
+  loadRecentFiles,
+  makeThumbnail,
+  type RecentFile,
+} from '@/lib/image-editor/recent-files'
+import {
+  clearAutosave,
+  loadAutosave,
+  saveAutosave,
+} from '@/lib/image-editor/autosave'
 import { useActionHandlers } from '@/lib/image-editor/hooks/useActionHandlers'
 import { useBrushTipImport } from '@/lib/image-editor/hooks/useBrushTipImport'
 import { extractMaskContour } from '@/lib/image-editor/mask-contour'
+import {
+  makeWorkPathLayer,
+  selectionFromPath,
+} from '@/lib/image-editor/path-selection-ops'
 import {
   combineRectSelection,
   combinePathSelection,
@@ -107,6 +123,37 @@ import type {
   Tool,
   Transforms,
 } from '@/lib/image-editor/types'
+
+/**
+ * Compact relative-time formatter ("5m ago", "2h ago", "3d ago"). Used by
+ * the autosave-restore banner so the user sees how stale the snapshot is.
+ * Falls back to a date string for entries older than a week.
+ */
+function timeAgo(iso: string): string {
+  const ms = Date.now() - Date.parse(iso)
+  if (!Number.isFinite(ms) || ms < 0) return iso
+  const m = Math.floor(ms / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  const d = Math.floor(h / 24)
+  if (d < 7) return `${d}d ago`
+  return new Date(iso).toLocaleDateString()
+}
+
+/**
+ * Recursive layer counter — includes group children. Used by the status
+ * bar's "layers: N" readout so groups don't undercount.
+ */
+function countAllLayers(layers: Layer[]): number {
+  let n = 0
+  for (const l of layers) {
+    n++
+    if (l.kind === 'group') n += countAllLayers(l.children)
+  }
+  return n
+}
 
 /**
  * Image editor page (PixelForge shell).
@@ -173,6 +220,22 @@ export function ImageEditorPage() {
   const [outQuality, setOutQuality] = useState<number>(92)
 
   const [focused, setFocused] = useState(false)
+  // Cursor coords in preview-pixel space, mirrored from Canvas's onCursorMove.
+  // Used for the status bar's live readout; cleared on canvas leave.
+  const [cursor, setCursor] = useState<Point | null>(null)
+  // Mirrored from Canvas to drive the OptionsBar's Apply / Cancel buttons
+  // (so users don't need to know about Enter / Esc).
+  const [cropPending, setCropPending] = useState(false)
+  // Recent files — File > Open Recent submenu. Persisted via localStorage.
+  const [recentFiles, setRecentFiles] = useState<RecentFile[]>(() => loadRecentFiles())
+  // Autosave-recovery banner shows when an unsaved snapshot exists on mount.
+  // Cleared once the user accepts or dismisses; null = no offer pending.
+  // Initialized lazily from localStorage so the banner renders on first paint
+  // without a follow-up setState (which the lint rule against setState-in-
+  // effect would flag).
+  const [autosaveRestore, setAutosaveRestore] = useState<ReturnType<typeof loadAutosave>>(() => loadAutosave())
+  // `?` key opens the shortcut cheat sheet modal.
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const canvasRef = useRef<CanvasHandle | null>(null)
   const workspaceRef = useRef<WorkspaceHandle | null>(null)
 
@@ -215,6 +278,37 @@ export function ImageEditorPage() {
   useEffect(() => {
     if (brushTipDataUrl) ensureImage(brushTipDataUrl).catch(() => {})
   }, [brushTipDataUrl, ensureImage])
+
+  // On mount, surface any autosave snapshot via lazy useState init so the
+  // initial render already reflects the offer — avoids the lint rule
+  // against setState-in-effect and removes a needless re-render.
+  // (Performed in the useState initializer above.)
+
+  // Periodic autosave (every 30s) while a document is open. The snapshot
+  // captures the bound image's dataUrl + the full EditorState — same
+  // shape Save Project produces, so it can be loaded back via the
+  // existing parseProject helper.
+  useEffect(() => {
+    if (!image) return
+    const tick = async () => {
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const c = document.createElement('canvas')
+          c.width = image.naturalWidth
+          c.height = image.naturalHeight
+          const ctx = c.getContext('2d')
+          if (!ctx) return reject(new Error('no ctx'))
+          ctx.drawImage(image, 0, 0)
+          resolve(c.toDataURL('image/png'))
+        })
+        saveAutosave({ source: { name: filename, dataUrl }, state })
+      } catch {
+        // Silent — autosave is best-effort.
+      }
+    }
+    const id = window.setInterval(tick, 30000)
+    return () => window.clearInterval(id)
+  }, [image, filename, state])
 
   // Actions panel state + handlers — bundled into a custom hook to keep
   // this top-level component focused on orchestration.
@@ -353,6 +447,14 @@ export function ImageEditorPage() {
       if (e.code === 'Space' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
         e.preventDefault()
         setPanMode(true)
+        return
+      }
+
+      // `?` (Shift+/) opens the cheat sheet. We rely on `e.key === '?'`
+      // which already includes the Shift modifier resolution.
+      if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault()
+        setShortcutsOpen((v) => !v)
         return
       }
 
@@ -2315,6 +2417,21 @@ export function ImageEditorPage() {
         setFilename(file.name.replace(/\.[^./]+$/, ''))
         history.reset(initialState())
         setSelectedLayerId('image')
+        // Record in recent files. Build a small thumbnail + persist the
+        // full dataUrl so re-opening doesn't need another file pick.
+        try {
+          const dataUrl = await fileToDataUrl(file)
+          const thumb = makeThumbnail(img) ?? undefined
+          const next = addRecentFile({
+            name: file.name,
+            dataUrl,
+            thumbnail: thumb,
+          })
+          setRecentFiles(next)
+        } catch {
+          // Quota or read error — recent-files is non-essential, don't
+          // surface to user.
+        }
       } catch {
         toast.error(t('pages.imageEditor.errLoadFailed'))
       } finally {
@@ -2356,6 +2473,7 @@ export function ImageEditorPage() {
           shape: { kind: 'image', x, y, w, h, dataUrl },
         }
         commitLayer(layer)
+        toast.success(t('pages.imageEditor.droppedAsLayer', { name: layer.name }))
       } catch {
         toast.error(t('pages.imageEditor.errLoadFailed'))
       }
@@ -2571,8 +2689,12 @@ export function ImageEditorPage() {
   const handleSaveProject = useCallback(() => {
     if (!image) return
     const blob = serializeProject({ image, filename, state })
-    triggerDownload(blob, `${filename}.toolbox-image.json`)
-    toast.success(t('pages.imageEditor.projectSaved'))
+    const downloadName = `${filename}.toolbox-image.json`
+    triggerDownload(blob, downloadName)
+    // Explicit save invalidates the autosave snapshot — the user now has
+    // a real file. If they re-edit and crash again we'll rebuild it.
+    clearAutosave()
+    toast.success(t('pages.imageEditor.projectSavedAs', { name: downloadName }))
   }, [image, filename, state, t])
   useEffect(() => {
     // Ref-update for the Ctrl+S keyboard shortcut. Lives here (after the
@@ -2600,6 +2722,45 @@ export function ImageEditorPage() {
             {t('pages.imageEditor.description')}
           </p>
         </header>
+        {autosaveRestore && (
+          <div className="mb-4 flex items-center justify-between rounded border border-primary/40 bg-accent/30 p-3 text-sm">
+            <span>
+              {t('pages.imageEditor.autosaveAvailable', {
+                name: autosaveRestore.source.name,
+                ago: timeAgo(autosaveRestore.autosavedAt),
+              })}
+            </span>
+            <span className="flex gap-2">
+              <button
+                className="rounded border border-input bg-background px-2 py-1 text-xs hover:bg-accent/40"
+                onClick={async () => {
+                  try {
+                    const img = await loadImageFromUrl(autosaveRestore.source.dataUrl)
+                    setImage(img)
+                    setFilename(autosaveRestore.source.name.replace(/\.[^./]+$/, ''))
+                    history.reset(autosaveRestore.state)
+                    setSelectedLayerId('image')
+                    setAutosaveRestore(null)
+                    toast.success(t('pages.imageEditor.autosaveRestored'))
+                  } catch {
+                    toast.error(t('pages.imageEditor.errLoadFailed'))
+                  }
+                }}
+              >
+                {t('pages.imageEditor.autosaveRestore')}
+              </button>
+              <button
+                className="rounded border border-input bg-background px-2 py-1 text-xs hover:bg-accent/40"
+                onClick={() => {
+                  clearAutosave()
+                  setAutosaveRestore(null)
+                }}
+              >
+                {t('pages.imageEditor.autosaveDismiss')}
+              </button>
+            </span>
+          </div>
+        )}
         <DropZone onFile={acceptFile} />
       </div>
     )
@@ -2630,6 +2791,27 @@ export function ImageEditorPage() {
           handlers={{
             open: () => replaceInputRef.current?.click(),
             newDocument: () => setNewDocOpen(true),
+            recentFiles: recentFiles.map((r) => ({ name: r.name })),
+            onOpenRecent: async (i) => {
+              const entry = recentFiles[i]
+              if (!entry) return
+              try {
+                const img = await loadImageFromUrl(entry.dataUrl)
+                setImage(img)
+                setFilename(entry.name.replace(/\.[^./]+$/, ''))
+                history.reset(initialState())
+                setSelectedLayerId('image')
+                // Bump the entry to the top of the list (LRU).
+                setRecentFiles(addRecentFile({
+                  name: entry.name,
+                  dataUrl: entry.dataUrl,
+                  thumbnail: entry.thumbnail,
+                }))
+                toast.success(t('pages.imageEditor.recentReopened', { name: entry.name }))
+              } catch {
+                toast.error(t('pages.imageEditor.errLoadFailed'))
+              }
+            },
             save: handleSaveProject,
             download: handleDownload,
             exportPng: () => exportImage('png'),
@@ -2639,8 +2821,16 @@ export function ImageEditorPage() {
               setSaveForWebOpenSeq((n) => n + 1)
               setSaveForWebOpen(true)
             },
-            undo: history.undo,
-            redo: history.redo,
+            undo: () => {
+              if (!history.canUndo) return
+              history.undo()
+              toast.message(t('pages.imageEditor.undid'))
+            },
+            redo: () => {
+              if (!history.canRedo) return
+              history.redo()
+              toast.message(t('pages.imageEditor.redid'))
+            },
             canUndo: history.canUndo,
             canRedo: history.canRedo,
             rotate90: () =>
@@ -2756,6 +2946,9 @@ export function ImageEditorPage() {
           setWandTolerance={setWandTolerance}
           isStubTool={STUB_TOOLS.has(tool)}
           hasActiveCrop={!!state.cropRect}
+          cropPending={cropPending}
+          onCropApply={() => canvasRef.current?.commitPendingCrop()}
+          onCropCancel={() => canvasRef.current?.cancelPendingCrop()}
           onClearCrop={handleClearCrop}
           cropAspectId={cropAspectId}
           setCropAspectId={setCropAspectId}
@@ -2854,6 +3047,8 @@ export function ImageEditorPage() {
               gridStep={gridStep}
               quickMaskDataUrl={state.quickMask?.dataUrl}
               cropAspect={CROP_ASPECTS.find((a) => a.id === cropAspectId)?.ratio ?? undefined}
+              onCursorMove={setCursor}
+              onCropPendingChange={setCropPending}
               onUpdateQuickMaskDataUrl={async (dataUrl) => {
                 if (!state.quickMask) return
                 // Await load so the renderer's next pass sees the new
@@ -2891,6 +3086,49 @@ export function ImageEditorPage() {
           }}
           onReplaceSmartObjectContents={handleReplaceContents}
           onLayerContextMenu={openLayerContextMenu}
+          onMakeWorkPath={() => {
+            const layer = makeWorkPathLayer(state, t('pages.imageEditor.annoLabel.workPath'))
+            if (!layer) {
+              toast.message(t('pages.imageEditor.paths.noSelection'))
+              return
+            }
+            commitLayer(layer)
+            toast.success(t('pages.imageEditor.paths.workPathCreated'))
+          }}
+          onMakeSelectionFromPath={() => {
+            if (!selectedLayerId || selectedLayerId === 'image') return
+            const layer = findLayerById(state.layers, selectedLayerId)
+            if (!layer || layer.kind !== 'annotation' || layer.shape.kind !== 'path') {
+              toast.message(t('pages.imageEditor.paths.notAPath'))
+              return
+            }
+            const result = selectionFromPath(layer.shape)
+            if (!result) {
+              toast.message(t('pages.imageEditor.paths.emptyPath'))
+              return
+            }
+            history.set({
+              ...state,
+              selection: result.bbox,
+              selectionPath: result.path,
+              selectionInverse: false,
+            })
+            toast.success(t('pages.imageEditor.paths.selectionFromPathCreated'))
+          }}
+          onAddMaskToLayer={(id) => {
+            // Inline +Mask from a row. Select first so the existing
+            // handlers operate on the right layer; then dispatch the
+            // appropriate variant by kind (adjustment / filter → embed
+            // maskDataUrl; everything else → new MaskLayer above).
+            setSelectedLayerId(id)
+            const target = findLayerById(state.layers, id)
+            if (!target) return
+            if (target.kind === 'adjustment' || target.kind === 'filter') {
+              void handleAddAdjustmentMask()
+            } else {
+              void handleNewRasterMask()
+            }
+          }}
           image={image}
           imageCache={imageCache}
           history={{
@@ -2944,9 +3182,13 @@ export function ImageEditorPage() {
           onZoomOut={zoomOut}
           onZoomReset={zoomReset}
           tool={panMode ? 'none' : tool}
+          cursor={cursor}
+          selection={state.selection ?? null}
+          layerCount={countAllLayers(state.layers)}
         />
       </div>
 
+      <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <AdjustmentDialog
         open={openAdjustment}
         onPreview={handleAdjustmentPreview}

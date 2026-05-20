@@ -158,6 +158,14 @@ type Props = {
   cropAspect?: number
   /** Called on Quick Mask brush stroke commit with the new dataUrl. */
   onUpdateQuickMaskDataUrl?: (dataUrl: string) => void
+  /** Cursor moved over the canvas — preview-pixel coords, or null on leave.
+   *  Throttled to ~30Hz internally so the parent can mirror it to the status
+   *  bar without flooding renders. */
+  onCursorMove?: (p: Point | null) => void
+  /** Fired whenever the crop tool's pending state flips on/off. Lets the
+   *  parent surface visible Apply / Cancel buttons (vs requiring Enter / Esc
+   *  knowledge from the user). */
+  onCropPendingChange?: (pending: boolean) => void
 }
 
 /**
@@ -322,6 +330,8 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     quickMaskDataUrl,
     onUpdateQuickMaskDataUrl,
     cropAspect,
+    onCursorMove,
+    onCropPendingChange,
   },
   ref,
 ) {
@@ -375,6 +385,18 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       )
     }
   }, [tool])
+
+  // Mirror pending-crop state out to the parent so it can show Apply / Cancel
+  // buttons in the OptionsBar instead of requiring the user to know about
+  // Enter / Esc keys.
+  useEffect(() => {
+    if (!onCropPendingChange) return
+    const pending =
+      interaction.kind === 'crop-pending' ||
+      interaction.kind === 'crop-resizing' ||
+      interaction.kind === 'crop-moving'
+    onCropPendingChange(pending)
+  }, [interaction.kind, onCropPendingChange])
 
   // Live preview render whenever any pixel-affecting input changes.
   useEffect(() => {
@@ -1745,9 +1767,14 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
         onMouseMove={(e) => {
           handleMouseMove(e)
           handleHover(e)
+          if (onCursorMove) onCursorMove(eventToCanvasXY(e))
         }}
         onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onMouseLeave={(e) => {
+          handleMouseUp()
+          if (onCursorMove) onCursorMove(null)
+          void e
+        }}
         style={
           {
             cursor:

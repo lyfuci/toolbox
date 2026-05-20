@@ -959,6 +959,66 @@ export type LocalContrastParams = {
    *  Smaller = finer detail boost; larger = broader micro-contrast. */
   radius: number // 1..100
 }
+/** Motion Blur — directional blur along (angle, distance). */
+export type MotionBlurParams = {
+  kind: 'motionBlur'
+  angle: number // degrees, -180..180
+  distance: number // preview-px, 1..200
+}
+/**
+ * Radial Blur — `zoom` (radial streaks from centre) or `spin` (rotational
+ * smear). `amount` controls strength.
+ */
+export type RadialBlurParams = {
+  kind: 'radialBlur'
+  mode: 'zoom' | 'spin'
+  amount: number // 1..100
+}
+/** Pinch — pull pixels toward or push away from centre. Positive = pinch in. */
+export type PinchParams = {
+  kind: 'pinch'
+  amount: number // -100..100
+}
+/** Twirl — rotate pixels around centre, strength falls with radius. */
+export type TwirlParams = {
+  kind: 'twirl'
+  angle: number // degrees, -360..360
+}
+/** Spherize — fish-eye distortion; positive = bulge, negative = pinch. */
+export type SpherizeParams = {
+  kind: 'spherize'
+  amount: number // -100..100
+}
+/**
+ * Polar Coordinates — convert between rectangular ↔ polar. `mode: 'polar'`
+ * wraps the image into a disc (rectangular → polar); `mode: 'rect'`
+ * unwraps a disc into a strip (polar → rectangular).
+ */
+export type PolarCoordinatesParams = {
+  kind: 'polarCoordinates'
+  mode: 'polar' | 'rect'
+}
+/**
+ * Lens Flare — a bright sun + halo + chromatic streaks centred at
+ * (x, y) (preview-pixels). Brightness controls overall intensity.
+ */
+export type LensFlareParams = {
+  kind: 'lensFlare'
+  x: number // 0..1, fraction of canvas width
+  y: number // 0..1, fraction of canvas height
+  brightness: number // 0..200
+}
+/**
+ * Smart Sharpen — sharper than Unsharp Mask via a deconvolution-style
+ * pass: builds a gaussian blur, subtracts to get high-frequency, then
+ * re-adds * amount with a noise-floor threshold so flat areas stay quiet.
+ */
+export type SmartSharpenParams = {
+  kind: 'smartSharpen'
+  amount: number // %, 0..500
+  radius: number // preview-px, 0.5..50
+  threshold: number // 0..255
+}
 
 export type FilterParams =
   | GaussianBlurParams
@@ -972,6 +1032,14 @@ export type FilterParams =
   | FindEdgesParams
   | EmbossParams
   | LocalContrastParams
+  | MotionBlurParams
+  | RadialBlurParams
+  | PinchParams
+  | TwirlParams
+  | SpherizeParams
+  | PolarCoordinatesParams
+  | LensFlareParams
+  | SmartSharpenParams
 
 export type FilterKind = FilterParams['kind']
 

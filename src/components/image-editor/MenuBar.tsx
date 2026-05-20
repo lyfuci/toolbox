@@ -18,6 +18,9 @@ export type MenuAction = {
   shortcut?: string
   onClick?: () => void
   disabled?: boolean
+  /** Optional submenu — when set, the item renders with a "›" hint and a
+   *  nested flyout opens on hover instead of firing onClick. */
+  submenu?: MenuAction[]
 }
 export type MenuSection = MenuAction[] | { sep: true }
 
@@ -32,6 +35,9 @@ type Props = {
   handlers: {
     newDocument?: () => void
     open?: () => void
+    /** Recent files list — `onOpenRecent(index)` re-loads the chosen entry. */
+    recentFiles?: Array<{ name: string }>
+    onOpenRecent?: (index: number) => void
     save?: () => void
     saveAs?: () => void
     download?: () => void
@@ -146,6 +152,21 @@ export function MenuBar({ handlers }: Props) {
             onClick: handlers.newDocument,
           },
           { id: 'open', label: t('pages.imageEditor.menu.open'), shortcut: '⌘O', onClick: handlers.open },
+          handlers.recentFiles && handlers.recentFiles.length > 0
+            ? {
+                id: 'openRecent',
+                label: t('pages.imageEditor.menu.openRecent'),
+                submenu: handlers.recentFiles.map((r, i) => ({
+                  id: `recent-${i}`,
+                  label: r.name,
+                  onClick: () => handlers.onOpenRecent?.(i),
+                })),
+              }
+            : {
+                id: 'openRecentDisabled',
+                label: t('pages.imageEditor.menu.openRecent'),
+                disabled: true,
+              },
           {
             id: 'save',
             label: t('pages.imageEditor.menu.saveProject'),
@@ -481,6 +502,46 @@ export function MenuBar({ handlers }: Props) {
             label: t('pages.imageEditor.filters.localContrast') + '…',
             onClick: () => handlers.openFilter?.('localContrast'),
           },
+          {
+            id: 'flt-smartSharpen',
+            label: t('pages.imageEditor.filters.smartSharpen') + '…',
+            onClick: () => handlers.openFilter?.('smartSharpen'),
+          },
+          {
+            id: 'flt-motionBlur',
+            label: t('pages.imageEditor.filters.motionBlur') + '…',
+            onClick: () => handlers.openFilter?.('motionBlur'),
+          },
+          {
+            id: 'flt-radialBlur',
+            label: t('pages.imageEditor.filters.radialBlur') + '…',
+            onClick: () => handlers.openFilter?.('radialBlur'),
+          },
+          {
+            id: 'flt-pinch',
+            label: t('pages.imageEditor.filters.pinch') + '…',
+            onClick: () => handlers.openFilter?.('pinch'),
+          },
+          {
+            id: 'flt-twirl',
+            label: t('pages.imageEditor.filters.twirl') + '…',
+            onClick: () => handlers.openFilter?.('twirl'),
+          },
+          {
+            id: 'flt-spherize',
+            label: t('pages.imageEditor.filters.spherize') + '…',
+            onClick: () => handlers.openFilter?.('spherize'),
+          },
+          {
+            id: 'flt-polarCoordinates',
+            label: t('pages.imageEditor.filters.polarCoordinates') + '…',
+            onClick: () => handlers.openFilter?.('polarCoordinates'),
+          },
+          {
+            id: 'flt-lensFlare',
+            label: t('pages.imageEditor.filters.lensFlare') + '…',
+            onClick: () => handlers.openFilter?.('lensFlare'),
+          },
         ],
       ],
     },
@@ -791,22 +852,58 @@ function MenuDropdown({
       {sections.flatMap((sec, i) => {
         if ('sep' in sec) return [<div key={`s${i}`} className="pf-mi pf-sep" />]
         return sec.map((it) => (
-          <div
-            key={`${i}-${it.id}`}
-            className={`pf-mi ${it.disabled ? 'pf-disabled' : ''}`}
-            onClick={(e) => {
-              e.stopPropagation()
-              if (it.disabled) return
-              it.onClick?.()
-              onClose()
-            }}
-          >
-            <span />
-            <span>{it.label}</span>
-            {it.shortcut ? <span className="pf-kbd">{it.shortcut}</span> : <span />}
-          </div>
+          <MenuItem key={`${i}-${it.id}`} item={it} onClose={onClose} />
         ))
       })}
+    </div>
+  )
+}
+
+/**
+ * Individual menu item. Handles its own hover-flyout when `submenu` is set,
+ * positioned to the right of the parent dropdown. Keeps the existing
+ * "click → action → close" flow for leaf items.
+ */
+function MenuItem({ item, onClose }: { item: MenuAction; onClose: () => void }) {
+  const [hover, setHover] = useState(false)
+  const hasSub = !!item.submenu && item.submenu.length > 0
+  return (
+    <div
+      style={{ position: 'relative' }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <div
+        className={`pf-mi ${item.disabled ? 'pf-disabled' : ''}`}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (item.disabled) return
+          if (hasSub) return // hover-only — don't close on click
+          item.onClick?.()
+          onClose()
+        }}
+      >
+        <span />
+        <span>{item.label}</span>
+        {hasSub ? (
+          <span className="pf-kbd" style={{ opacity: 0.7 }}>›</span>
+        ) : item.shortcut ? (
+          <span className="pf-kbd">{item.shortcut}</span>
+        ) : (
+          <span />
+        )}
+      </div>
+      {hasSub && hover && (
+        <div
+          className="pf-menu-dd"
+          style={{ position: 'absolute', top: 0, left: '100%', marginLeft: 2, zIndex: 60 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {item.submenu!.map((sub) => (
+            <MenuItem key={sub.id} item={sub} onClose={onClose} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
