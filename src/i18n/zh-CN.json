@@ -286,7 +286,7 @@
       "dataPlaceholder": "要签名的内容…"
     },
     "timestamp": {
-      "description": "时间戳与日期相互转换。支持 Unix 秒 / 毫秒 / ISO 8601 / RFC 2822 输入。",
+      "description": "时间戳与日期相互转换。支持 Unix 秒 / 毫秒 / ISO 8601 / RFC 2822。内含分字段合成、批量转换以及 Windows FILETIME / Excel 序列数输出。",
       "input": "输入",
       "now": "现在",
       "unixSeconds": "Unix 秒",
@@ -294,20 +294,54 @@
       "iso8601": "ISO 8601 (UTC)",
       "localTime": "本地时间",
       "relativeTime": "相对时间",
-      "cannotParse": "无法解析为日期"
+      "filetime": "Windows FILETIME",
+      "excel": "Excel 序列数",
+      "cannotParse": "无法解析为日期",
+      "tabParse": "解析",
+      "tabCompose": "合成",
+      "tabBatch": "批量",
+      "nowInZones": "当前各时区时间",
+      "zoneLocal": "本地",
+      "zone": "时区",
+      "cannotCompose": "无法从这些字段合成时间戳",
+      "batchInput": "每行一个时间戳",
+      "batchOutput": "对齐输出 ISO 字符串"
     },
     "color": {
-      "description": "颜色格式互转：HEX / RGB / HSL。改任一字段或拖动取色器都会同步更新其他格式。"
+      "description": "颜色格式互转：HEX / RGB / HSL / OKLCH。改任一字段、滑块或取色器都会同步更新。内含 WCAG 对比度检查与配色生成。",
+      "contrast": "WCAG 对比度",
+      "background": "背景",
+      "contrastSample": "示例文字 · 千金散尽还复来",
+      "normalText": "正常字",
+      "largeText": "大字",
+      "pass": "通过",
+      "fail": "未通过",
+      "palettes": "配色方案",
+      "paletteKinds": {
+        "complementary": "互补色",
+        "analogous": "邻近色",
+        "triadic": "三色组",
+        "tints": "提亮",
+        "shades": "压暗"
+      }
     },
     "numberBase": {
-      "description": "整数进制互转。基于 BigInt，支持任意大整数与负数。",
+      "description": "整数进制互转。基于 BigInt — 支持 0x / 0b / 0o 前缀，可在 8/16/32/64 位宽下进行二补码显示与位运算。",
       "base2": "二进制 (2)",
       "base8": "八进制 (8)",
       "base10": "十进制 (10)",
       "base16": "十六进制 (16)",
       "custom": "自定义",
       "customBaseLabel": "进制 (2-36)",
-      "baseN": "Base {{base}}"
+      "baseN": "Base {{base}}",
+      "width": "位宽",
+      "signed": "带符号",
+      "bitGrid": "位网格（点击翻转）",
+      "bitwise": "位运算",
+      "operandPlaceholder": "第二操作数（0x… / 0b… / 十进制）",
+      "apply": "应用",
+      "opsHint": "AND / OR / XOR 需要第二操作数 · SHL / SHR 把它当作位移位数 · NOT 在当前位宽内按位取反",
+      "invalidOperand": "无效的操作数"
     },
     "csvJson": {
       "description": "CSV 与 JSON 互转。CSV 第一行作为字段名；JSON 须为对象数组。支持引号字段、字段内逗号 / 换行 / 转义引号。",
@@ -320,12 +354,27 @@
       "errRowObject": "数组每个元素必须是对象"
     },
     "uuid": {
-      "description": "生成 UUID v4（基于 crypto.randomUUID()，浏览器原生）。",
+      "description": "生成 UUID（v1 / v3 / v4 / v5 / v7），并可解码任意 UUID 的版本、变体与嵌入时间戳。",
       "count": "数量",
-      "copiedMany": "已复制 {{count}} 条"
+      "copiedMany": "已复制 {{count}} 条",
+      "tabGenerate": "生成",
+      "tabDecode": "解码",
+      "version": "版本",
+      "namespace": "命名空间",
+      "name": "Name",
+      "format": "格式",
+      "uppercase": "大写",
+      "noHyphens": "去掉连字符",
+      "braces": "花括号 {…}",
+      "base64": "Base64",
+      "decodeInput": "粘贴一个 UUID",
+      "dVersion": "版本",
+      "dVariant": "变体",
+      "dTimestamp": "嵌入的时间戳",
+      "dCannotParse": "不是合法的 UUID"
     },
     "password": {
-      "description": "基于 crypto.getRandomValues 的密码生成器（CSPRNG，无模偏置）。",
+      "description": "基于 crypto.getRandomValues 的密码生成器（CSPRNG，无模偏置）。包含随机密码与 Diceware 风格密码短语两种模式。",
       "entropy": "熵 ≈",
       "strength": "强度：",
       "strengthVeryStrong": "极强",
@@ -333,24 +382,74 @@
       "strengthMedium": "中等",
       "strengthWeak": "弱",
       "strengthNone": "空",
-      "length": "长度"
+      "length": "长度",
+      "tabRandom": "随机密码",
+      "tabPassphrase": "密码短语",
+      "symbolPool": "符号集",
+      "symbolReset": "重置",
+      "phraseCount": "单词数量",
+      "separator": "分隔符",
+      "separators": {
+        "dash": "短横",
+        "dot": "点",
+        "space": "空格",
+        "underscore": "下划线"
+      },
+      "capitalizeFirst": "首字母大写",
+      "includeNumber": "附加一位数字"
     },
     "qr": {
-      "description": "生成二维码（SVG / PNG）。本地渲染，输入内容不出浏览器。",
+      "description": "生成二维码（SVG / PNG）。本地渲染，输入内容不出浏览器。类型选项卡可组合 URL / WiFi / vCard / Email / SMS / GeoURI 等载荷。",
       "content": "内容",
       "contentPlaceholder": "URL / 文本 / vCard…",
       "size": "尺寸 (px)",
       "level": "纠错等级",
+      "margin": "留白",
+      "fgColor": "前景色",
+      "bgColor": "背景色",
       "downloaded": "已下载 {{format}}",
       "placeholder": "输入内容生成二维码…",
-      "generating": "生成中…"
+      "generating": "生成中…",
+      "tabText": "文本 / URL",
+      "tabWifi": "WiFi",
+      "tabVcard": "vCard",
+      "tabEmail": "邮件",
+      "tabSms": "短信",
+      "tabGeo": "地理位置",
+      "wifiSsid": "SSID",
+      "wifiPassword": "密码",
+      "wifiAuth": "加密方式",
+      "wifiHidden": "隐藏网络",
+      "wifiNone": "无密码",
+      "vcardName": "姓名",
+      "vcardOrg": "组织",
+      "vcardTitle": "职位",
+      "vcardPhone": "电话",
+      "vcardEmail": "邮箱",
+      "vcardUrl": "网址",
+      "emailTo": "收件人",
+      "emailSubject": "主题",
+      "emailBody": "正文",
+      "smsTo": "电话",
+      "smsBody": "短信内容",
+      "geoLat": "纬度",
+      "geoLng": "经度"
     },
     "lorem": {
-      "description": "经典占位文本生成器。可按段落 / 句子 / 单词数量输出。",
+      "description": "占位文本生成器。按段落 / 句子 / 单词数量输出，可选主题以及 HTML 包裹。",
       "paragraphs": "段落",
       "sentences": "句子",
       "words": "单词",
-      "count": "数量"
+      "count": "数量",
+      "source": "主题",
+      "sources": {
+        "lorem": "Lorem（经典）",
+        "hipster": "Hipster",
+        "pirate": "海盗",
+        "bacon": "培根"
+      },
+      "startWithLorem": "以 \"Lorem ipsum dolor sit amet…\" 开头",
+      "asHtml": "包裹为 <p>…</p>"
     },
     "diff": {
       "description": "文本差异对比（行级 / 词级）。本地计算，不上传任何内容。",

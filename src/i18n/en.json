@@ -286,7 +286,7 @@
       "dataPlaceholder": "Content to sign…"
     },
     "timestamp": {
-      "description": "Convert between timestamps and dates. Supports Unix seconds / milliseconds / ISO 8601 / RFC 2822.",
+      "description": "Convert between timestamps and dates. Supports Unix seconds / milliseconds / ISO 8601 / RFC 2822. Includes a discrete-fields composer, batch conversion, and Windows FILETIME / Excel-serial outputs.",
       "input": "Input",
       "now": "Now",
       "unixSeconds": "Unix seconds",
@@ -294,20 +294,54 @@
       "iso8601": "ISO 8601 (UTC)",
       "localTime": "Local time",
       "relativeTime": "Relative",
-      "cannotParse": "Cannot parse as date"
+      "filetime": "Windows FILETIME",
+      "excel": "Excel serial",
+      "cannotParse": "Cannot parse as date",
+      "tabParse": "Parse",
+      "tabCompose": "Compose",
+      "tabBatch": "Batch",
+      "nowInZones": "Now in zones",
+      "zoneLocal": "Local",
+      "zone": "Time zone",
+      "cannotCompose": "Cannot compose timestamp from these fields",
+      "batchInput": "Lines to convert",
+      "batchOutput": "Aligned ISO output"
     },
     "color": {
-      "description": "Color formats: HEX / RGB / HSL. Edit any field or drag the picker to sync all three."
+      "description": "Color formats: HEX / RGB / HSL / OKLCH. Edit any field, slider or the picker to sync everything. Includes WCAG contrast check and palette generators.",
+      "contrast": "WCAG contrast",
+      "background": "Background",
+      "contrastSample": "Sample text · The quick brown fox jumps over the lazy dog",
+      "normalText": "normal",
+      "largeText": "large",
+      "pass": "PASS",
+      "fail": "FAIL",
+      "palettes": "Palettes",
+      "paletteKinds": {
+        "complementary": "Complementary",
+        "analogous": "Analogous",
+        "triadic": "Triadic",
+        "tints": "Tints",
+        "shades": "Shades"
+      }
     },
     "numberBase": {
-      "description": "Integer base conversion. Backed by BigInt — arbitrarily large and negative numbers OK.",
+      "description": "Integer base conversion. Backed by BigInt — accepts 0x / 0b / 0o prefixes, supports two's-complement display and bitwise ops at 8/16/32/64-bit widths.",
       "base2": "Binary (2)",
       "base8": "Octal (8)",
       "base10": "Decimal (10)",
       "base16": "Hex (16)",
       "custom": "Custom",
       "customBaseLabel": "Base (2-36)",
-      "baseN": "Base {{base}}"
+      "baseN": "Base {{base}}",
+      "width": "Width",
+      "signed": "Signed",
+      "bitGrid": "Bit grid (click to flip)",
+      "bitwise": "Bitwise ops",
+      "operandPlaceholder": "Operand (0x… / 0b… / dec)",
+      "apply": "Apply",
+      "opsHint": "AND / OR / XOR take a 2nd operand · SHL / SHR use it as shift amount · NOT inverts within width",
+      "invalidOperand": "Invalid operand"
     },
     "csvJson": {
       "description": "Convert between CSV and JSON. First row of CSV becomes keys; JSON must be an array of objects. Handles quoted fields, commas / newlines inside fields, and escaped quotes.",
@@ -320,12 +354,27 @@
       "errRowObject": "Each array element must be an object"
     },
     "uuid": {
-      "description": "Generate UUID v4 (backed by native crypto.randomUUID).",
+      "description": "Generate UUIDs (v1 / v3 / v4 / v5 / v7) and decode any UUID's version, variant and embedded timestamp.",
       "count": "Count",
-      "copiedMany": "Copied {{count}}"
+      "copiedMany": "Copied {{count}}",
+      "tabGenerate": "Generate",
+      "tabDecode": "Decode",
+      "version": "Version",
+      "namespace": "Namespace",
+      "name": "Name",
+      "format": "Format",
+      "uppercase": "Uppercase",
+      "noHyphens": "No hyphens",
+      "braces": "Braces {…}",
+      "base64": "Base64",
+      "decodeInput": "Paste a UUID",
+      "dVersion": "Version",
+      "dVariant": "Variant",
+      "dTimestamp": "Embedded timestamp",
+      "dCannotParse": "Not a valid UUID"
     },
     "password": {
-      "description": "Password generator backed by crypto.getRandomValues (CSPRNG, no modulo bias).",
+      "description": "Password generator backed by crypto.getRandomValues (CSPRNG, no modulo bias). Tabs for a random string or a Diceware-style passphrase.",
       "entropy": "Entropy ≈",
       "strength": "Strength:",
       "strengthVeryStrong": "Very strong",
@@ -333,24 +382,74 @@
       "strengthMedium": "Medium",
       "strengthWeak": "Weak",
       "strengthNone": "Empty",
-      "length": "Length"
+      "length": "Length",
+      "tabRandom": "Random",
+      "tabPassphrase": "Passphrase",
+      "symbolPool": "Symbol pool",
+      "symbolReset": "Reset",
+      "phraseCount": "Word count",
+      "separator": "Separator",
+      "separators": {
+        "dash": "dash",
+        "dot": "dot",
+        "space": "space",
+        "underscore": "underscore"
+      },
+      "capitalizeFirst": "Capitalize first letter",
+      "includeNumber": "Append a number"
     },
     "qr": {
-      "description": "Generate a QR code (SVG / PNG). Rendered locally; content never leaves your browser.",
+      "description": "Generate a QR code (SVG / PNG). Rendered locally; content never leaves your browser. Type tabs compose URL / WiFi / vCard / Email / SMS / GeoURI payloads.",
       "content": "Content",
       "contentPlaceholder": "URL / text / vCard…",
       "size": "Size (px)",
       "level": "Error correction",
+      "margin": "Quiet zone",
+      "fgColor": "Foreground",
+      "bgColor": "Background",
       "downloaded": "Downloaded {{format}}",
       "placeholder": "Type content to generate a QR code…",
-      "generating": "Generating…"
+      "generating": "Generating…",
+      "tabText": "Text / URL",
+      "tabWifi": "WiFi",
+      "tabVcard": "vCard",
+      "tabEmail": "Email",
+      "tabSms": "SMS",
+      "tabGeo": "Geo",
+      "wifiSsid": "SSID",
+      "wifiPassword": "Password",
+      "wifiAuth": "Security",
+      "wifiHidden": "Hidden network",
+      "wifiNone": "None",
+      "vcardName": "Full name",
+      "vcardOrg": "Organization",
+      "vcardTitle": "Title",
+      "vcardPhone": "Phone",
+      "vcardEmail": "Email",
+      "vcardUrl": "URL",
+      "emailTo": "To",
+      "emailSubject": "Subject",
+      "emailBody": "Body",
+      "smsTo": "Phone",
+      "smsBody": "Message",
+      "geoLat": "Latitude",
+      "geoLng": "Longitude"
     },
     "lorem": {
-      "description": "Classic placeholder text generator. Output by paragraph / sentence / word count.",
+      "description": "Placeholder text generator. Output by paragraph / sentence / word count; pick a theme and optionally wrap as HTML.",
       "paragraphs": "Paragraphs",
       "sentences": "Sentences",
       "words": "Words",
-      "count": "Count"
+      "count": "Count",
+      "source": "Theme",
+      "sources": {
+        "lorem": "Lorem (classic)",
+        "hipster": "Hipster",
+        "pirate": "Pirate",
+        "bacon": "Bacon"
+      },
+      "startWithLorem": "Start with \"Lorem ipsum dolor sit amet…\"",
+      "asHtml": "Wrap as <p>…</p>"
     },
     "diff": {
       "description": "Text diff (line or word granularity). All computation is local.",
