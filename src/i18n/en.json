@@ -476,6 +476,13 @@
           "blue": "Blue",
           "custom": "Custom"
         },
+        "curvesChannel": "Channel",
+        "curvesChannels": {
+          "rgb": "RGB",
+          "r": "Red",
+          "g": "Green",
+          "b": "Blue"
+        },
         "channelMixer": {
           "title": "Channel Mixer",
           "outR": "Output: Red",
@@ -526,6 +533,7 @@
         "mosaic": "Mosaic",
         "findEdges": "Find Edges",
         "emboss": "Emboss",
+        "localContrast": "Local Contrast (Clarity / Dehaze)",
         "radius": "Radius",
         "amount": "Amount",
         "threshold": "Threshold",
@@ -533,6 +541,8 @@
         "cellSize": "Cell size",
         "angle": "Angle",
         "height": "Height",
+        "clarity": "Clarity",
+        "dehaze": "Dehaze",
         "despeckleHint": "Reduces speckle noise via a 3×3 median per channel. No parameters — Apply to commit as a layer.",
         "findEdgesHint": "Highlights edges via the Sobel operator (white background, dark edges). No parameters — Apply to commit as a layer."
       },
@@ -959,11 +969,21 @@
       "shadowColor": "Color",
       "blendMode": {
         "normal": "Normal",
-        "multiply": "Multiply",
-        "screen": "Screen",
-        "overlay": "Overlay",
         "darken": "Darken",
-        "lighten": "Lighten"
+        "multiply": "Multiply",
+        "color-burn": "Color Burn",
+        "lighten": "Lighten",
+        "screen": "Screen",
+        "color-dodge": "Color Dodge",
+        "overlay": "Overlay",
+        "soft-light": "Soft Light",
+        "hard-light": "Hard Light",
+        "difference": "Difference",
+        "exclusion": "Exclusion",
+        "hue": "Hue",
+        "saturation": "Saturation",
+        "color": "Color",
+        "luminosity": "Luminosity"
       },
       "annoLabel": {
         "rect": "Rectangle",
