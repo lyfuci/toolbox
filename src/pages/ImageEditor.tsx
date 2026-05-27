@@ -53,6 +53,7 @@ import {
 } from '@/lib/image-editor/export-presets'
 import { DEFAULT_BRUSH_OPTIONS, DEFAULT_TEXT_OPTIONS, initialState, PREVIEW_MAX } from '@/lib/image-editor/defaults'
 import { fillSelection, strokeSelection, type StrokePosition } from '@/lib/image-editor/edit-ops'
+import { buildSelectionMaskCanvas } from '@/lib/image-editor/selection-mask'
 import { floodFillMask, maskToDataUrl } from '@/lib/image-editor/flood-fill'
 import { useHistoryState } from '@/lib/image-editor/history'
 import {
@@ -1608,23 +1609,17 @@ export function ImageEditorPage() {
       if (!ctx) return
       ctx.fillStyle = '#000000'
       ctx.fillRect(0, 0, w, h)
-      ctx.fillStyle = '#ffffff'
-      if (state.selectionPath && state.selectionPath.length >= 3) {
-        ctx.beginPath()
-        const p0 = state.selectionPath[0]
-        ctx.moveTo(p0.x, p0.y)
-        for (let i = 1; i < state.selectionPath.length; i++) {
-          const p = state.selectionPath[i]
-          ctx.lineTo(p.x, p.y)
-        }
-        ctx.closePath()
-        ctx.fill()
-      } else if (state.selection) {
-        const r = state.selection
-        const nx = r.w >= 0 ? r.x : r.x + r.w
-        const ny = r.h >= 0 ? r.y : r.y + r.h
-        ctx.fillRect(nx, ny, Math.abs(r.w), Math.abs(r.h))
-      }
+      // White = selected. Route through the shared mask builder so a feathered
+      // selection carries its soft edge (and inversion) into Quick Mask.
+      const mask = buildSelectionMaskCanvas({
+        w,
+        h,
+        path: state.selectionPath,
+        rect: state.selection,
+        feather: state.selectionFeather ?? 0,
+        inverse: state.selectionInverse,
+      })
+      if (mask) ctx.drawImage(mask, 0, 0)
       const dataUrl = c.toDataURL('image/png')
       try {
         await ensureImage(dataUrl)
