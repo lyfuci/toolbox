@@ -3,6 +3,7 @@ import { drawShape, type ImageCache } from './drawing'
 import { applyFilter, scaleFilterParams } from './filter-ops'
 import { filterString } from './filters'
 import { getHandles, getLayerBBox, normalizeRect } from './hit'
+import { buildSelectionMaskCanvas } from './selection-mask'
 import {
   buildEffectContribution,
   effectIsBehindContent,
@@ -912,6 +913,8 @@ function applyPixelTransformLayer(
   layer: {
     clipRect?: Rect
     clipPath?: Point[]
+    clipInverse?: boolean
+    clipFeather?: number
     opacity: number
     maskDataUrl?: string
     maskW?: number
@@ -950,10 +953,41 @@ function applyPixelTransformLayer(
       actx.restore()
     }
   }
+  // Feathered selection clip: instead of a hard polygon clip, multiply the
+  // transformed pixels by a Gaussian-blurred selection mask (built at this
+  // buffer's resolution, feather scaled to match). The crisp `applyLayerClip`
+  // path stays for clipFeather === 0 so non-feathered behaviour is unchanged.
+  const feather = layer.clipFeather ?? 0
+  const feathered = feather > 0 && (layer.clipPath || layer.clipRect)
+  if (feathered) {
+    const mask = buildSelectionMaskCanvas({
+      w: adjusted.width,
+      h: adjusted.height,
+      path: layer.clipPath?.map((p) => ({ x: p.x * scale, y: p.y * scale })),
+      rect: layer.clipRect
+        ? {
+            x: layer.clipRect.x * scale,
+            y: layer.clipRect.y * scale,
+            w: layer.clipRect.w * scale,
+            h: layer.clipRect.h * scale,
+          }
+        : undefined,
+      feather: feather * scale,
+      inverse: layer.clipInverse,
+    })
+    if (mask) {
+      actx.save()
+      actx.setTransform(1, 0, 0, 1, 0, 0)
+      actx.globalCompositeOperation = 'destination-in'
+      actx.drawImage(mask, 0, 0)
+      actx.restore()
+    }
+  }
+
   ctx.save()
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.globalAlpha = layer.opacity / 100
-  applyLayerClip(ctx, layer, scale)
+  if (!feathered) applyLayerClip(ctx, layer, scale)
   ctx.drawImage(adjusted, 0, 0)
   ctx.restore()
 }

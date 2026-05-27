@@ -85,17 +85,38 @@ function translatedClipFields(
  */
 export function withSelectionClip(layer: Layer, state: EditorState): Layer {
   const inverse = !!state.selectionInverse
+  const feather = state.selectionFeather ?? 0
+  // Feathered selections: annotation (pixel-emitting) layers bake the soft
+  // edge into their own pixels at commit time, so a hard geometric clip would
+  // re-cut that edge — return them un-clipped. Only adjustment / filter layers
+  // (which transform existing pixels rather than emit their own) carry the
+  // clip + `clipFeather`; the render pass turns that into a blurred mask
+  // multiply. With no feather we keep the original hard-clip behaviour exactly.
+  const featherForLayer =
+    feather > 0 && (layer.kind === 'adjustment' || layer.kind === 'filter')
+      ? feather
+      : 0
+  const skipClip =
+    feather > 0 && layer.kind !== 'adjustment' && layer.kind !== 'filter'
+  if (skipClip) return layer
+
   const path = state.selectionPath
   if (path && path.length >= 3) {
     return {
       ...layer,
       clipPath: path.map((p) => ({ x: p.x, y: p.y })),
       clipInverse: inverse || undefined,
+      clipFeather: featherForLayer || undefined,
     }
   }
   const sel = state.selection
   if (sel && sel.w !== 0 && sel.h !== 0) {
-    return { ...layer, clipRect: { ...sel }, clipInverse: inverse || undefined }
+    return {
+      ...layer,
+      clipRect: { ...sel },
+      clipInverse: inverse || undefined,
+      clipFeather: featherForLayer || undefined,
+    }
   }
   return layer
 }

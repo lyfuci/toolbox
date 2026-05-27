@@ -652,6 +652,15 @@ type LayerCommon = {
    */
   clipInverse?: boolean
   /**
+   * Feather radius (preview-canvas pixels) baked onto the clip when the layer
+   * was committed inside a feathered selection. Only honored for pixel-
+   * transform layers (adjustment / filter): the render pass multiplies their
+   * output by a blurred selection mask instead of a hard clip. Annotation
+   * layers bake the soft edge into their pixels at commit time and carry no
+   * geometric clip, so they never set this. Scaled by the bake scale at render.
+   */
+  clipFeather?: number
+  /**
    * PS "Create Clipping Mask" (⌥⌘G). When true, the layer's rendered
    * output is masked to the alpha of the *underlying* layer in the same
    * parent (group or top-level). Multiple stacked clipping layers chain to
@@ -1205,6 +1214,15 @@ export type EditorState = {
    * subsequent paint stroke lands outside the original region.
    */
   selectionInverse?: boolean
+  /**
+   * Selection feather radius in preview-canvas pixels (PS Select > Modify >
+   * Feather, and the marquee/lasso Options Bar field). 0 / undefined = crisp.
+   * The polygon stays authoritative — feather is reapplied at *consume* time
+   * (Fill / Stroke / Adjustment) by blurring the rasterized selection mask, so
+   * boolean Add/Subtract/Intersect always operate on the un-feathered shape.
+   * Scaled by the bake scale at export, like filter radii.
+   */
+  selectionFeather?: number
   /**
    * Snapshot of the previous selection state, captured each time `selection`
    * transitions from set→cleared (PS Select > Deselect). The Reselect action
