@@ -1,3 +1,4 @@
+import type { SolarizeParams } from './types'
 /**
  * Solarize (PS Filter > Stylize > Solarize) — inverts the channels of any pixel
  * brighter than a threshold, producing the classic "blend of negative and
@@ -6,7 +7,6 @@
  * it rides the `applyAdjustment(data, params)` shape.
  */
 
-export type SolarizeParams = { kind: 'solarize'; threshold: number } // 0..255
 export const DEFAULT_SOLARIZE: SolarizeParams = { kind: 'solarize', threshold: 128 }
 
 export function applySolarize(data: Uint8ClampedArray, params: SolarizeParams): void {

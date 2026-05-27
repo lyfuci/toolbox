@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import {
-  applySelectiveColor,
-  DEFAULT_SELECTIVE_COLOR,
-  type SelectiveColorParams,
-  type SelectiveColorRange,
-} from '../adj-selective-color'
+import { applySelectiveColor, DEFAULT_SELECTIVE_COLOR } from '../adj-selective-color'
+import type { SelectiveColorParams, SelectiveColorRange } from '../types'
 
 /**
  * Selective Color edits CMYK components grouped by color range. We assert on

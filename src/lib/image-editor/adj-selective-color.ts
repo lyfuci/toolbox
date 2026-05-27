@@ -1,3 +1,4 @@
+import type { SelectiveColorParams, SelectiveColorRange } from './types'
 /**
  * Selective Color adjustment (Photoshop Image > Adjustments > Selective
  * Color).
@@ -43,30 +44,6 @@
  * pixel entirely so the default (all-zero) params are an exact identity and
  * don't accumulate RGB↔CMYK rounding error.
  */
-
-export type SelectiveColorRange = {
-  /** Each delta is a percentage in [-100, 100]. */
-  c: number
-  m: number
-  y: number
-  k: number
-}
-
-export type SelectiveColorParams = {
-  kind: 'selectiveColor'
-  mode: 'relative' | 'absolute'
-  ranges: {
-    reds: SelectiveColorRange
-    yellows: SelectiveColorRange
-    greens: SelectiveColorRange
-    cyans: SelectiveColorRange
-    blues: SelectiveColorRange
-    magentas: SelectiveColorRange
-    whites: SelectiveColorRange
-    neutrals: SelectiveColorRange
-    blacks: SelectiveColorRange
-  }
-}
 
 const ZERO_RANGE: SelectiveColorRange = { c: 0, m: 0, y: 0, k: 0 }
 

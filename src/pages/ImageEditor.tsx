@@ -2912,6 +2912,9 @@ export function ImageEditorPage() {
             revealAll: handleRevealAll,
             openAdjustment: (kind: AdjustmentKind) => setOpenAdjustment(kind),
             openFilter: (kind: FilterKind) => setOpenFilter(kind),
+            // Parameter-free adjustments commit immediately (no dialog).
+            applyEqualize: () => handleAdjustmentApply({ kind: 'equalize' }),
+            applySolarize: () => handleAdjustmentApply({ kind: 'solarize', threshold: 128 }),
             duplicateLayer: () => duplicateRef.current(),
             deleteLayer: () => deleteLayerRef.current(),
             newGroup,

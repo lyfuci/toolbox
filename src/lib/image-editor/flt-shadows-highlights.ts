@@ -1,3 +1,4 @@
+import type { ShadowsHighlightsParams } from './types'
 /**
  * Shadows/Highlights — Photoshop's Image > Adjustments > Shadows/Highlights.
  *
@@ -35,16 +36,6 @@
  * intentionally omitted — the smoothstep band width and per-channel gain stand
  * in for them.
  */
-
-export type ShadowsHighlightsParams = {
-  kind: 'shadowsHighlights'
-  /** 0..100 — how much to lift shadows. */
-  shadowsAmount: number
-  /** 0..100 — how much to recover (darken) highlights. */
-  highlightsAmount: number
-  /** Preview-canvas px — blur radius of the tonal mask. Bake-scaled. */
-  radius: number
-}
 
 export const DEFAULT_SHADOWS_HIGHLIGHTS: ShadowsHighlightsParams = {
   kind: 'shadowsHighlights',

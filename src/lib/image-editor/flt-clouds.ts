@@ -1,3 +1,4 @@
+import type { CloudsParams } from './types'
 /**
  * Clouds — render a fractal "value noise" cloud field and blend two colors by
  * it, replacing the entire buffer (like Photoshop's Filter → Render → Clouds,
@@ -24,18 +25,6 @@
  *     gives clouds their soft-large + crisp-small detail.
  *   • The summed value is normalized to 0..1 and used to lerp bg → fg.
  */
-
-export type CloudsParams = {
-  kind: 'clouds'
-  /** Integer seed; identical seeds produce identical clouds. */
-  seed: number
-  /** ~1..10. Base feature size: number of lattice cells across the image's min side. */
-  scale: number
-  /** Foreground hex color, mapped to noise = 1. */
-  fg: string
-  /** Background hex color, mapped to noise = 0. */
-  bg: string
-}
 
 export const DEFAULT_CLOUDS: CloudsParams = {
   kind: 'clouds',

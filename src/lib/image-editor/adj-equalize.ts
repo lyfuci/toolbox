@@ -1,3 +1,4 @@
+import type { EqualizeParams } from './types'
 /**
  * Equalize (PS Image > Adjustments > Equalize) — redistributes pixel
  * luminance so the brightness histogram is as flat as possible, stretching
@@ -10,13 +11,12 @@
  * histogram passes, so it stays in the `applyAdjustment(data, params)` shape.
  */
 
-export type EqualizeParams = { kind: 'equalize' }
 export const DEFAULT_EQUALIZE: EqualizeParams = { kind: 'equalize' }
 
 const lum = (r: number, g: number, b: number): number =>
   0.299 * r + 0.587 * g + 0.114 * b
 
-export function applyEqualize(data: Uint8ClampedArray, _params: EqualizeParams): void {
+export function applyEqualize(data: Uint8ClampedArray): void {
   const n = data.length
   if (n === 0) return
 

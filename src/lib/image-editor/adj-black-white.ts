@@ -1,3 +1,4 @@
+import type { BlackWhiteParams } from './types'
 /**
  * Black & White adjustment (Photoshop Image > Adjustments > Black & White).
  *
@@ -24,23 +25,6 @@
  * This is a per-pixel transform — no neighborhood sampling, no radius — so it
  * mutates the RGBA buffer in place and leaves alpha untouched.
  */
-
-export type BlackWhiteParams = {
-  kind: 'blackWhite'
-  /** Per-family lightness weights, each a percentage in [-200, 300]; 100 = neutral. */
-  reds: number
-  yellows: number
-  greens: number
-  cyans: number
-  blues: number
-  magentas: number
-  /** Apply a color tint to the gray (sepia / duotone). */
-  tint: boolean
-  /** Tint hue in degrees [0, 360]; only used when `tint`. */
-  tintHue: number
-  /** Tint saturation in percent [0, 100]; only used when `tint`. */
-  tintSat: number
-}
 
 export const DEFAULT_BLACK_WHITE: BlackWhiteParams = {
   kind: 'blackWhite',

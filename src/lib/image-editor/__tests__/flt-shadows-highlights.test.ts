@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import {
-  applyShadowsHighlights,
-  DEFAULT_SHADOWS_HIGHLIGHTS,
-  type ShadowsHighlightsParams,
-} from '../flt-shadows-highlights'
+import { applyShadowsHighlights, DEFAULT_SHADOWS_HIGHLIGHTS } from '../flt-shadows-highlights'
+import type { ShadowsHighlightsParams } from '../types'
 
 /**
  * Node-only (no DOM): we hand-build a horizontal greyscale gradient buffer

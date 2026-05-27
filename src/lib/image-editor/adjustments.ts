@@ -15,6 +15,10 @@ import type {
   ThresholdParams,
   VibranceParams,
 } from './types'
+import { applyBlackWhite, DEFAULT_BLACK_WHITE } from './adj-black-white'
+import { applySelectiveColor, DEFAULT_SELECTIVE_COLOR } from './adj-selective-color'
+import { applyEqualize, DEFAULT_EQUALIZE } from './adj-equalize'
+import { applySolarize, DEFAULT_SOLARIZE } from './adj-solarize'
 
 /**
  * In-place pixel transforms backing each AdjustmentLayer kind. All operate on
@@ -134,6 +138,10 @@ export const DEFAULT_FOR_KIND: Record<
   gradientMap: DEFAULT_GRADIENT_MAP,
   photoFilter: DEFAULT_PHOTO_FILTER,
   cameraRaw: DEFAULT_CAMERA_RAW,
+  blackWhite: DEFAULT_BLACK_WHITE,
+  selectiveColor: DEFAULT_SELECTIVE_COLOR,
+  equalize: DEFAULT_EQUALIZE,
+  solarize: DEFAULT_SOLARIZE,
 }
 
 export function applyAdjustment(
@@ -182,6 +190,18 @@ export function applyAdjustment(
       return
     case 'cameraRaw':
       applyCameraRaw(data, params)
+      return
+    case 'blackWhite':
+      applyBlackWhite(data, params)
+      return
+    case 'selectiveColor':
+      applySelectiveColor(data, params)
+      return
+    case 'equalize':
+      applyEqualize(data)
+      return
+    case 'solarize':
+      applySolarize(data, params)
       return
   }
 }

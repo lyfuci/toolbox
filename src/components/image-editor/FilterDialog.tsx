@@ -30,6 +30,10 @@ import type {
   SpherizeParams,
   TwirlParams,
   UnsharpMaskParams,
+  ShadowsHighlightsParams,
+  VignetteParams,
+  CloudsParams,
+  MedianParams,
 } from '@/lib/image-editor/types'
 
 type Props = {
@@ -154,6 +158,12 @@ function FilterDialogInner({
         {draft.kind === 'smartSharpen' && (
           <SmartSharpenForm value={draft} onChange={update} />
         )}
+        {draft.kind === 'shadowsHighlights' && (
+          <ShadowsHighlightsForm value={draft} onChange={update} />
+        )}
+        {draft.kind === 'vignette' && <VignetteForm value={draft} onChange={update} />}
+        {draft.kind === 'clouds' && <CloudsForm value={draft} onChange={update} />}
+        {draft.kind === 'median' && <MedianForm value={draft} onChange={update} />}
       </div>
       <DialogFooter>
         <Button variant="ghost" onClick={reset}>
@@ -176,6 +186,9 @@ function cloneDefaults(kind: FilterKind): FilterParams {
   // what gets committed on Apply (rather than re-rolling at apply time and
   // surprising them with a different pattern).
   if (base.kind === 'addNoise') return { ...base, seed: freshNoiseSeed() }
+  // Clouds also reseeds per open so each invocation rolls a fresh pattern the
+  // user can keep tweaking; the seed stays fixed for the rest of the session.
+  if (base.kind === 'clouds') return { ...base, seed: freshNoiseSeed() }
   return base
 }
 
@@ -648,5 +661,165 @@ function SmartSharpenForm({
         onChange={(v) => onChange({ threshold: Math.round(v) })}
       />
     </>
+  )
+}
+
+function ShadowsHighlightsForm({
+  value,
+  onChange,
+}: {
+  value: ShadowsHighlightsParams
+  onChange: (patch: Partial<ShadowsHighlightsParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <Slider
+        label={t('pages.imageEditor.filters.shadowsAmount')}
+        value={value.shadowsAmount}
+        min={0}
+        max={100}
+        unit="%"
+        onChange={(v) => onChange({ shadowsAmount: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.highlightsAmount')}
+        value={value.highlightsAmount}
+        min={0}
+        max={100}
+        unit="%"
+        onChange={(v) => onChange({ highlightsAmount: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.radius')}
+        value={value.radius}
+        min={0}
+        max={200}
+        unit=" px"
+        onChange={(v) => onChange({ radius: Math.round(v) })}
+      />
+    </>
+  )
+}
+
+function VignetteForm({
+  value,
+  onChange,
+}: {
+  value: VignetteParams
+  onChange: (patch: Partial<VignetteParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <Slider
+        label={t('pages.imageEditor.filters.amount')}
+        value={value.amount}
+        min={-100}
+        max={100}
+        onChange={(v) => onChange({ amount: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.midpoint')}
+        value={value.midpoint}
+        min={0}
+        max={100}
+        unit="%"
+        onChange={(v) => onChange({ midpoint: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.roundness')}
+        value={value.roundness}
+        min={-100}
+        max={100}
+        onChange={(v) => onChange({ roundness: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.feather')}
+        value={value.feather}
+        min={0}
+        max={100}
+        unit="%"
+        onChange={(v) => onChange({ feather: Math.round(v) })}
+      />
+    </>
+  )
+}
+
+function CloudsForm({
+  value,
+  onChange,
+}: {
+  value: CloudsParams
+  onChange: (patch: Partial<CloudsParams>) => void
+}) {
+  const { t } = useTranslation()
+  const swatch = {
+    width: 26,
+    height: 22,
+    padding: 0,
+    border: '1px solid var(--pf-line)',
+    background: 'transparent',
+    borderRadius: 3,
+    cursor: 'pointer',
+  } as const
+  return (
+    <>
+      <Slider
+        label={t('pages.imageEditor.filters.scale')}
+        value={value.scale}
+        min={1}
+        max={12}
+        onChange={(v) => onChange({ scale: Math.round(v) })}
+      />
+      <div className="flex items-center gap-4 py-1">
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          {t('pages.imageEditor.filters.foreground')}
+          <input
+            type="color"
+            value={value.fg}
+            style={swatch}
+            onChange={(e) => onChange({ fg: e.target.value })}
+          />
+        </label>
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          {t('pages.imageEditor.filters.background')}
+          <input
+            type="color"
+            value={value.bg}
+            style={swatch}
+            onChange={(e) => onChange({ bg: e.target.value })}
+          />
+        </label>
+        <button
+          type="button"
+          className="pf-opt-btn"
+          style={{ width: 'auto', padding: '0 8px' }}
+          onClick={() => onChange({ seed: Math.floor(Math.random() * 1e9) })}
+        >
+          {t('pages.imageEditor.filters.reroll')}
+        </button>
+      </div>
+    </>
+  )
+}
+
+function MedianForm({
+  value,
+  onChange,
+}: {
+  value: MedianParams
+  onChange: (patch: Partial<MedianParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <Slider
+      label={t('pages.imageEditor.filters.radius')}
+      value={value.radius}
+      min={1}
+      max={10}
+      unit=" px"
+      onChange={(v) => onChange({ radius: Math.round(v) })}
+    />
   )
 }

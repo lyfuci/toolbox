@@ -1,3 +1,4 @@
+import type { VignetteParams } from './types'
 /**
  * Vignette — darken (or lighten) the frame toward the edges, the way a real
  * lens falls off at its corners. This is a *spatial* filter (the result at a
@@ -13,18 +14,6 @@
  * scaling — a 50%-midpoint vignette lands at the same visual spot on every
  * buffer size. (Contrast with a pixel-radius blur, which must be scaled.)
  */
-
-export type VignetteParams = {
-  kind: 'vignette'
-  /** -100..100. Negative darkens the edges (multiply), positive lightens (screen). */
-  amount: number
-  /** 0..100. Percent of the half-diagonal radius where the falloff *starts*. */
-  midpoint: number
-  /** -100..100. Biases the distance metric between circular (0) and rectangular. */
-  roundness: number
-  /** 0..100. Width of the soft transition band, as a percent of the half-diagonal. */
-  feather: number
-}
 
 export const DEFAULT_VIGNETTE: VignetteParams = {
   kind: 'vignette',

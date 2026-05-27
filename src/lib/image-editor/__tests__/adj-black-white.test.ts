@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import {
-  applyBlackWhite,
-  DEFAULT_BLACK_WHITE,
-  type BlackWhiteParams,
-} from '../adj-black-white'
+import { applyBlackWhite, DEFAULT_BLACK_WHITE } from '../adj-black-white'
+import type { BlackWhiteParams } from '../types'
 
 /**
  * Black & White converts color to gray with per-hue-family lightness control.

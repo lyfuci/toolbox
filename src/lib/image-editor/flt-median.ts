@@ -1,3 +1,4 @@
+import type { MedianParams } from './types'
 /**
  * Median — replace each pixel channel with the median of its (2r+1)² square
  * neighbourhood, per channel (R, G, B independently; alpha left untouched).
@@ -22,12 +23,6 @@
  * window into a scratch array and insertion-sort it per channel — simple,
  * branch-light, and plenty fast for these radii. No histogram needed.
  */
-
-export type MedianParams = {
-  kind: 'median'
-  /** 1..10 px. Window half-width; window is (2·radius+1)² pixels. */
-  radius: number
-}
 
 export const DEFAULT_MEDIAN: MedianParams = { kind: 'median', radius: 2 }
 

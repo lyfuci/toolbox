@@ -22,7 +22,7 @@ describe('applyEqualize', () => {
       const v = 100 + (i % 41)
       return [v, v, v, 255]
     })
-    applyEqualize(d, { kind: 'equalize' })
+    applyEqualize(d)
     let min = 255
     let max = 0
     for (let i = 0; i < 256; i++) {
@@ -36,11 +36,11 @@ describe('applyEqualize', () => {
 
   it('leaves a uniform image essentially unchanged and skips transparent pixels', () => {
     const d = buf(16, () => [128, 128, 128, 255])
-    applyEqualize(d, { kind: 'equalize' })
+    applyEqualize(d)
     for (let i = 0; i < 16; i++) expect(d[i * 4]).toBeGreaterThanOrEqual(0)
     const t = buf(4, () => [200, 50, 50, 0])
     const before = t.slice()
-    applyEqualize(t, { kind: 'equalize' })
+    applyEqualize(t)
     expect(Array.from(t)).toEqual(Array.from(before))
   })
 })
