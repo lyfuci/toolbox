@@ -217,6 +217,13 @@ export function ImageEditorPage() {
   const [newDocOpen, setNewDocOpen] = useState(false)
   const [bucketTolerance, setBucketTolerance] = useState(32)
   const [wandTolerance, setWandTolerance] = useState(32)
+  // Selection tool options (transient UI state, not document history). PS-style
+  // boolean mode (新建/加/减/交) is the *base* combine mode; Shift/Alt held at
+  // draw time still override it. `featherOption` is the feather radius (preview
+  // px) baked onto newly-drawn selections — Select > Modify > Feather edits the
+  // current selection's `state.selectionFeather` instead.
+  const [selectionMode, setSelectionMode] = useState<SelectionModifier>('replace')
+  const [featherOption, setFeatherOption] = useState(0)
   // Clone Stamp source point — set by Alt+click while the Stamp tool is
   // active, cleared whenever the user switches away from Stamp (handled in
   // trySetTool). Lives outside EditorState because it's transient UI state.
@@ -2005,13 +2012,19 @@ export function ImageEditorPage() {
       // Replace mode (default, no modifier) or no existing selection: just
       // overwrite. Modifier flows need a previous selection to combine with.
       if (mod === 'replace' || !state.selection) {
-        history.set({ ...state, selection: fresh, selectionPath: undefined, selectionInverse: false })
+        history.set({
+          ...state,
+          selection: fresh,
+          selectionPath: undefined,
+          selectionInverse: false,
+          selectionFeather: featherOption || undefined,
+        })
         return
       }
       const combined = combineRectSelection(state, fresh, mod, image)
-      history.set({ ...state, ...combined })
+      history.set({ ...state, ...combined, selectionFeather: featherOption || undefined })
     },
-    [history, state, image],
+    [history, state, image, featherOption],
   )
 
   /**
@@ -2047,13 +2060,14 @@ export function ImageEditorPage() {
           selection: fresh,
           selectionPath: shifted,
           selectionInverse: false,
+          selectionFeather: featherOption || undefined,
         })
         return
       }
       const combined = combinePathSelection(state, shifted, fresh, mod, image)
-      history.set({ ...state, ...combined })
+      history.set({ ...state, ...combined, selectionFeather: featherOption || undefined })
     },
-    [history, state, image],
+    [history, state, image, featherOption],
   )
 
   /**
@@ -3004,6 +3018,10 @@ export function ImageEditorPage() {
           setBucketTolerance={setBucketTolerance}
           wandTolerance={wandTolerance}
           setWandTolerance={setWandTolerance}
+          selectionMode={selectionMode}
+          setSelectionMode={setSelectionMode}
+          feather={featherOption}
+          setFeather={setFeatherOption}
           isStubTool={STUB_TOOLS.has(tool)}
           hasActiveCrop={!!state.cropRect}
           cropPending={cropPending}
@@ -3097,6 +3115,7 @@ export function ImageEditorPage() {
               onCommitGradient={handleCommitGradient}
               onCommitSelection={handleCommitSelection}
               onCommitPolygonSelection={handleCommitPolygonSelection}
+              selectionMode={selectionMode}
               onWandClick={handleWandClick}
               wandTolerance={wandTolerance}
               onCloneSetSource={handleSetCloneSource}

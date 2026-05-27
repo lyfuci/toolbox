@@ -945,7 +945,22 @@
         "inverse": "Inverse",
         "expand": "Expand Selection",
         "contract": "Contract Selection",
-        "amountPx": "Amount (px)"
+        "feather": "Feather…",
+        "smooth": "Smooth…",
+        "grow": "Grow",
+        "colorRange": "Color Range…",
+        "subject": "Select Subject",
+        "removeBackground": "Remove Background",
+        "amountPx": "Amount (px)",
+        "featherTitle": "Feather Selection",
+        "featherRadius": "Feather Radius (px)",
+        "smoothTitle": "Smooth Selection",
+        "smoothRadius": "Sample Radius (px)",
+        "noSelection": "Make a selection first",
+        "subjectNotFound": "Couldn't detect a clear subject — try Color Range or the Lasso instead",
+        "subjectDetecting": "Detecting subject…",
+        "growEmpty": "Nothing to grow into",
+        "multiRegion": "Selected the largest of {{count}} matching regions"
       },
       "editMenu": {
         "copied": "Copied to clipboard",
@@ -1240,6 +1255,22 @@
       "wandTolerance": "Tolerance",
       "wandEmpty": "No matching region at that point — try a higher tolerance.",
       "deselect": "Deselect",
+      "feather": "Feather",
+      "featherHint": "Soften the selection edge by this many pixels (applied to selections you draw next).",
+      "selectionMode": {
+        "label": "Mode",
+        "new": "New selection",
+        "add": "Add to selection (Shift)",
+        "subtract": "Subtract from selection (Alt)",
+        "intersect": "Intersect with selection (Shift+Alt)"
+      },
+      "colorRange": {
+        "title": "Color Range",
+        "fuzziness": "Fuzziness",
+        "pickHint": "Click the image to sample a color",
+        "sampledColor": "Sampled",
+        "noSample": "Click the preview to pick a color first"
+      },
       "rotateViewHint": "Rotate View (R): each click rotates the workspace 90°. Pixels are not modified — purely a viewing aid.",
       "textToolHint": "Type (T): click on the canvas to add text.",
       "cropAspect": "Aspect",
