@@ -240,6 +240,32 @@ export function growSelection(
   const grown = currentMask.slice() // never mutate the caller's mask
   const total = w * h
 
+  // Reference colour = mean RGB of the *original* selection. Candidates are
+  // compared to this fixed reference (not the moving frontier) so the region
+  // can't drift across an anti-aliased edge one sub-tolerance step at a time —
+  // a frontier-only comparison bleeds the whole image on real photos. This
+  // matches PS Grow's "adjacent pixels within tolerance *of the selection*".
+  let sumR = 0
+  let sumG = 0
+  let sumB = 0
+  let seedCount = 0
+  for (let i = 0; i < total; i++) {
+    if (currentMask[i] !== 255) continue
+    const pi = i * 4
+    sumR += data[pi]
+    sumG += data[pi + 1]
+    sumB += data[pi + 2]
+    seedCount++
+  }
+  if (seedCount === 0) return null
+  const refR = sumR / seedCount
+  const refG = sumG / seedCount
+  const refB = sumB / seedCount
+  const withinRef = (idx4: number): boolean =>
+    Math.abs(data[idx4] - refR) <= tolerance &&
+    Math.abs(data[idx4 + 1] - refG) <= tolerance &&
+    Math.abs(data[idx4 + 2] - refB) <= tolerance
+
   // BFS queue of pixel indices. Seed with border pixels of the selection.
   const queue: number[] = []
   const inSelection = (idx: number): boolean => grown[idx] === 255
@@ -272,7 +298,11 @@ export function growSelection(
     if (py < h - 1) neighbours.push(p + w)
     for (const n of neighbours) {
       if (inSelection(n)) continue
-      if (maxChannelDist(data, n * 4, pi) <= tolerance) {
+      // Join when the candidate is within tolerance of EITHER the original
+      // selection's colour (bounds drift) OR its already-selected neighbour
+      // (lets a smooth same-object gradient still grow). The ref bound is what
+      // stops the walk across a hard/anti-aliased boundary into the background.
+      if (withinRef(n * 4) && maxChannelDist(data, n * 4, pi) <= tolerance) {
         grown[n] = 255
         grew = true
         queue.push(n)
