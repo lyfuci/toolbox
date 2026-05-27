@@ -10,7 +10,27 @@ import {
 } from '@/components/ui/dialog'
 import { Slider } from './Slider'
 
-export type SelectModifyKind = 'expand' | 'contract'
+export type SelectModifyKind = 'expand' | 'contract' | 'feather' | 'smooth'
+
+/** Per-kind dialog title + slider-label i18n keys. */
+const MODIFY_LABELS: Record<SelectModifyKind, { title: string; label: string }> = {
+  expand: {
+    title: 'pages.imageEditor.selectMenu.expand',
+    label: 'pages.imageEditor.selectMenu.amountPx',
+  },
+  contract: {
+    title: 'pages.imageEditor.selectMenu.contract',
+    label: 'pages.imageEditor.selectMenu.amountPx',
+  },
+  feather: {
+    title: 'pages.imageEditor.selectMenu.featherTitle',
+    label: 'pages.imageEditor.selectMenu.featherRadius',
+  },
+  smooth: {
+    title: 'pages.imageEditor.selectMenu.smoothTitle',
+    label: 'pages.imageEditor.selectMenu.smoothRadius',
+  },
+}
 
 type Props = {
   /** When set, the modal is open with this operation; null closes it. */
@@ -52,22 +72,21 @@ function SelectModifyDialogInner({
   onCancel: () => void
 }) {
   const { t } = useTranslation()
-  const [px, setPx] = useState<number>(8)
-  const titleKey =
-    kind === 'expand'
-      ? 'pages.imageEditor.selectMenu.expand'
-      : 'pages.imageEditor.selectMenu.contract'
+  // Feather defaults a touch lower than the geometric ops — a 1px feather is
+  // already visible, whereas a 1px expand is imperceptible.
+  const [px, setPx] = useState<number>(kind === 'feather' || kind === 'smooth' ? 4 : 8)
+  const { title, label } = MODIFY_LABELS[kind]
   return (
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>{t(titleKey)}</DialogTitle>
+        <DialogTitle>{t(title)}</DialogTitle>
       </DialogHeader>
       <div className="py-2">
         <Slider
-          label={t('pages.imageEditor.selectMenu.amountPx')}
+          label={t(label)}
           value={px}
-          min={1}
-          max={200}
+          min={kind === 'feather' ? 0 : 1}
+          max={250}
           step={1}
           onChange={setPx}
           unit="px"

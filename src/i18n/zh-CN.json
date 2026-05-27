@@ -945,7 +945,22 @@
         "inverse": "反向",
         "expand": "扩展选区",
         "contract": "收缩选区",
-        "amountPx": "数量（像素）"
+        "feather": "羽化…",
+        "smooth": "平滑…",
+        "grow": "扩大选取",
+        "colorRange": "色彩范围…",
+        "subject": "选择主体",
+        "removeBackground": "移除背景",
+        "amountPx": "数量（像素）",
+        "featherTitle": "羽化选区",
+        "featherRadius": "羽化半径（像素）",
+        "smoothTitle": "平滑选区",
+        "smoothRadius": "取样半径（像素）",
+        "noSelection": "请先建立选区",
+        "subjectNotFound": "未能识别出清晰的主体——可改用色彩范围或套索",
+        "subjectDetecting": "正在识别主体…",
+        "growEmpty": "没有可扩大的区域",
+        "multiRegion": "已选择 {{count}} 个匹配区域中最大的一个"
       },
       "editMenu": {
         "copied": "已拷贝到剪贴板",
@@ -1240,6 +1255,22 @@
       "wandTolerance": "容差",
       "wandEmpty": "该位置未找到匹配区域 —— 试试调高容差。",
       "deselect": "取消选区",
+      "feather": "羽化",
+      "featherHint": "按此像素数柔化选区边缘（应用于接下来绘制的选区）。",
+      "selectionMode": {
+        "label": "模式",
+        "new": "新选区",
+        "add": "添加到选区（Shift）",
+        "subtract": "从选区减去（Alt）",
+        "intersect": "与选区交叉（Shift+Alt）"
+      },
+      "colorRange": {
+        "title": "色彩范围",
+        "fuzziness": "颜色容差",
+        "pickHint": "点击图像以吸取颜色",
+        "sampledColor": "已取样",
+        "noSample": "请先在预览中点击吸取颜色"
+      },
       "rotateViewHint": "旋转视图 (R)：每次点击旋转工作区 90°，仅影响显示，不修改像素。",
       "textToolHint": "文字 (T)：在画布上单击以新增文字。",
       "cropAspect": "比例",
