@@ -85,9 +85,16 @@ type Props = {
     inverseSelection?: () => void
     selectExpand?: () => void
     selectContract?: () => void
+    selectFeather?: () => void
+    selectSmooth?: () => void
+    selectGrow?: () => void
+    selectColorRange?: () => void
+    selectSubject?: () => void
+    removeBackground?: () => void
     canDeselect?: boolean
     canReselect?: boolean
     canModifySelection?: boolean
+    canSelectFromImage?: boolean
     cut?: () => void
     copy?: () => void
     copyMerged?: () => void
@@ -444,6 +451,27 @@ export function MenuBar({ handlers }: Props) {
         { sep: true },
         [
           {
+            id: 'selSubject',
+            label: t('pages.imageEditor.selectMenu.subject'),
+            onClick: handlers.selectSubject,
+            disabled: !handlers.canSelectFromImage,
+          },
+          {
+            id: 'selColorRange',
+            label: t('pages.imageEditor.selectMenu.colorRange'),
+            onClick: handlers.selectColorRange,
+            disabled: !handlers.canSelectFromImage,
+          },
+          {
+            id: 'selRemoveBg',
+            label: t('pages.imageEditor.selectMenu.removeBackground'),
+            onClick: handlers.removeBackground,
+            disabled: !handlers.canSelectFromImage,
+          },
+        ],
+        { sep: true },
+        [
+          {
             id: 'selExpand',
             label: t('pages.imageEditor.selectMenu.expand') + '…',
             onClick: handlers.selectExpand,
@@ -453,6 +481,24 @@ export function MenuBar({ handlers }: Props) {
             id: 'selContract',
             label: t('pages.imageEditor.selectMenu.contract') + '…',
             onClick: handlers.selectContract,
+            disabled: !handlers.canModifySelection,
+          },
+          {
+            id: 'selFeather',
+            label: t('pages.imageEditor.selectMenu.feather'),
+            onClick: handlers.selectFeather,
+            disabled: !handlers.canModifySelection,
+          },
+          {
+            id: 'selSmooth',
+            label: t('pages.imageEditor.selectMenu.smooth'),
+            onClick: handlers.selectSmooth,
+            disabled: !handlers.canModifySelection,
+          },
+          {
+            id: 'selGrow',
+            label: t('pages.imageEditor.selectMenu.grow'),
+            onClick: handlers.selectGrow,
             disabled: !handlers.canModifySelection,
           },
         ],

@@ -53,6 +53,10 @@ import {
 } from '@/lib/image-editor/export-presets'
 import { DEFAULT_BRUSH_OPTIONS, DEFAULT_TEXT_OPTIONS, initialState, PREVIEW_MAX } from '@/lib/image-editor/defaults'
 import { fillSelection, strokeSelection, type StrokePosition } from '@/lib/image-editor/edit-ops'
+import { buildSelectionMaskCanvas } from '@/lib/image-editor/selection-mask'
+import { smoothSelection, growSelection, rasterizePolygonMask } from '@/lib/image-editor/selection-modify'
+import { selectSubject } from '@/lib/image-editor/select-subject'
+import { ColorRangeDialog } from '@/components/image-editor/ColorRangeDialog'
 import { floodFillMask, maskToDataUrl } from '@/lib/image-editor/flood-fill'
 import { useHistoryState } from '@/lib/image-editor/history'
 import {
@@ -126,6 +130,7 @@ import type {
   SmartSource,
   TextOptions,
   Point,
+  Rect,
   Tool,
   Transforms,
 } from '@/lib/image-editor/types'
@@ -159,6 +164,36 @@ function countAllLayers(layers: Layer[]): number {
     if (l.kind === 'group') n += countAllLayers(l.children)
   }
   return n
+}
+
+/** Axis-aligned bbox of a polygon. */
+function bboxOfPath(path: Point[]): Rect {
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const p of path) {
+    if (p.x < minX) minX = p.x
+    if (p.y < minY) minY = p.y
+    if (p.x > maxX) maxX = p.x
+    if (p.y > maxY) maxY = p.y
+  }
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+}
+
+/** Materialize a 4-point polygon from a rect selection (Smooth needs a path). */
+function rectToPath(rect: Rect | undefined): Point[] | null {
+  if (!rect || rect.w === 0 || rect.h === 0) return null
+  const x0 = Math.min(rect.x, rect.x + rect.w)
+  const y0 = Math.min(rect.y, rect.y + rect.h)
+  const x1 = x0 + Math.abs(rect.w)
+  const y1 = y0 + Math.abs(rect.h)
+  return [
+    { x: x0, y: y0 },
+    { x: x1, y: y0 },
+    { x: x1, y: y1 },
+    { x: x0, y: y1 },
+  ]
 }
 
 /**
@@ -216,6 +251,13 @@ export function ImageEditorPage() {
   const [newDocOpen, setNewDocOpen] = useState(false)
   const [bucketTolerance, setBucketTolerance] = useState(32)
   const [wandTolerance, setWandTolerance] = useState(32)
+  // Selection tool options (transient UI state, not document history). PS-style
+  // boolean mode (新建/加/减/交) is the *base* combine mode; Shift/Alt held at
+  // draw time still override it. `featherOption` is the feather radius (preview
+  // px) baked onto newly-drawn selections — Select > Modify > Feather edits the
+  // current selection's `state.selectionFeather` instead.
+  const [selectionMode, setSelectionMode] = useState<SelectionModifier>('replace')
+  const [featherOption, setFeatherOption] = useState(0)
   // Clone Stamp source point — set by Alt+click while the Stamp tool is
   // active, cleared whenever the user switches away from Stamp (handled in
   // trySetTool). Lives outside EditorState because it's transient UI state.
@@ -836,14 +878,39 @@ export function ImageEditorPage() {
   const [selectModifyOp, setSelectModifyOp] = useState<SelectModifyKind | null>(null)
   const handleSelectModifyApply = useCallback(
     (kind: SelectModifyKind, px: number) => {
-      const partial =
-        kind === 'expand'
-          ? expandSelection(state, px, previewDims)
-          : contractSelection(state, px)
-      applySelection(partial)
+      if (kind === 'expand') {
+        applySelection(expandSelection(state, px, previewDims))
+      } else if (kind === 'contract') {
+        applySelection(contractSelection(state, px))
+      } else if (kind === 'feather') {
+        // Feather is a selection property, not a geometry change — just store
+        // the radius; consume sites (Fill / Adjustment / Quick Mask) blur the
+        // mask. 0 clears it.
+        applySelection({ selectionFeather: px > 0 ? px : undefined })
+      } else if (kind === 'smooth' && image) {
+        // smoothSelection works on a polygon; materialize one from a rect-only
+        // (marquee / wand) selection first. Rasterize at full pre-crop preview
+        // dims so the selection-space coords fit the buffer.
+        const path =
+          state.selectionPath && state.selectionPath.length >= 3
+            ? state.selectionPath
+            : rectToPath(state.selection)
+        if (path) {
+          const { baseW, baseH } = dimsAfterRotation(image, state)
+          const ps = Math.min(1, PREVIEW_MAX / Math.max(baseW, baseH, 1))
+          const w = Math.max(1, Math.round(baseW * ps))
+          const h = Math.max(1, Math.round(baseH * ps))
+          const smoothed = smoothSelection(path, px, w, h)
+          if (smoothed) {
+            applySelection({ selection: bboxOfPath(smoothed), selectionPath: smoothed })
+          } else {
+            toast.message(t('pages.imageEditor.selectMenu.growEmpty'))
+          }
+        }
+      }
       setSelectModifyOp(null)
     },
-    [state, previewDims, applySelection],
+    [state, previewDims, applySelection, image, t],
   )
 
   const hasSelection = !!state.selection || (state.selectionPath?.length ?? 0) >= 3
@@ -1608,23 +1675,17 @@ export function ImageEditorPage() {
       if (!ctx) return
       ctx.fillStyle = '#000000'
       ctx.fillRect(0, 0, w, h)
-      ctx.fillStyle = '#ffffff'
-      if (state.selectionPath && state.selectionPath.length >= 3) {
-        ctx.beginPath()
-        const p0 = state.selectionPath[0]
-        ctx.moveTo(p0.x, p0.y)
-        for (let i = 1; i < state.selectionPath.length; i++) {
-          const p = state.selectionPath[i]
-          ctx.lineTo(p.x, p.y)
-        }
-        ctx.closePath()
-        ctx.fill()
-      } else if (state.selection) {
-        const r = state.selection
-        const nx = r.w >= 0 ? r.x : r.x + r.w
-        const ny = r.h >= 0 ? r.y : r.y + r.h
-        ctx.fillRect(nx, ny, Math.abs(r.w), Math.abs(r.h))
-      }
+      // White = selected. Route through the shared mask builder so a feathered
+      // selection carries its soft edge (and inversion) into Quick Mask.
+      const mask = buildSelectionMaskCanvas({
+        w,
+        h,
+        path: state.selectionPath,
+        rect: state.selection,
+        feather: state.selectionFeather ?? 0,
+        inverse: state.selectionInverse,
+      })
+      if (mask) ctx.drawImage(mask, 0, 0)
       const dataUrl = c.toDataURL('image/png')
       try {
         await ensureImage(dataUrl)
@@ -2010,13 +2071,19 @@ export function ImageEditorPage() {
       // Replace mode (default, no modifier) or no existing selection: just
       // overwrite. Modifier flows need a previous selection to combine with.
       if (mod === 'replace' || !state.selection) {
-        history.set({ ...state, selection: fresh, selectionPath: undefined, selectionInverse: false })
+        history.set({
+          ...state,
+          selection: fresh,
+          selectionPath: undefined,
+          selectionInverse: false,
+          selectionFeather: featherOption || undefined,
+        })
         return
       }
       const combined = combineRectSelection(state, fresh, mod, image)
-      history.set({ ...state, ...combined })
+      history.set({ ...state, ...combined, selectionFeather: featherOption || undefined })
     },
-    [history, state, image],
+    [history, state, image, featherOption],
   )
 
   /**
@@ -2052,13 +2119,14 @@ export function ImageEditorPage() {
           selection: fresh,
           selectionPath: shifted,
           selectionInverse: false,
+          selectionFeather: featherOption || undefined,
         })
         return
       }
       const combined = combinePathSelection(state, shifted, fresh, mod, image)
-      history.set({ ...state, ...combined })
+      history.set({ ...state, ...combined, selectionFeather: featherOption || undefined })
     },
-    [history, state, image],
+    [history, state, image, featherOption],
   )
 
   /**
@@ -2133,6 +2201,192 @@ export function ImageEditorPage() {
     },
     [image, state, imageCache, wandTolerance, history, t],
   )
+
+  // ── Color Range / Select Subject / Grow / Remove Background ──────────────
+  //
+  // These all consume the rendered *composite* at preview resolution (what the
+  // user sees) and emit a polygon. Rendering at `scale: previewScale` makes the
+  // buffer 1 px == 1 preview px, so a contour point in buffer space maps to
+  // selection space by adding the crop origin (preview units) — exactly the
+  // convention `handleCommitSelection` uses. w/h are never offset.
+  const renderPreviewComposite = useCallback((): {
+    data: Uint8ClampedArray
+    w: number
+    h: number
+    cropX: number
+    cropY: number
+  } | null => {
+    if (!image) return null
+    const { baseW, baseH } = dimsAfterRotation(image, state)
+    const previewScale = Math.min(1, PREVIEW_MAX / Math.max(baseW, baseH, 1))
+    const c = document.createElement('canvas')
+    renderTo(c, { image, state, scale: previewScale, previewScale, imageCache })
+    const ctx = c.getContext('2d', { willReadFrequently: true })
+    if (!ctx || c.width < 1 || c.height < 1) return null
+    let data: ImageData
+    try {
+      data = ctx.getImageData(0, 0, c.width, c.height)
+    } catch {
+      return null
+    }
+    const cropX = state.cropRect
+      ? Math.min(state.cropRect.x, state.cropRect.x + state.cropRect.w)
+      : 0
+    const cropY = state.cropRect
+      ? Math.min(state.cropRect.y, state.cropRect.y + state.cropRect.h)
+      : 0
+    return { data: data.data, w: c.width, h: c.height, cropX, cropY }
+  }, [image, state, imageCache])
+
+  // Color Range dialog: sampled-color → distance-threshold selection. The
+  // dialog owns the eyedropper + live preview; we hand it the composite buffer
+  // and translate its result (buffer space) back to selection space on apply.
+  const [colorRangeSource, setColorRangeSource] = useState<
+    { data: Uint8ClampedArray; w: number; h: number; cropX: number; cropY: number } | null
+  >(null)
+  const handleOpenColorRange = useCallback(() => {
+    const buf = renderPreviewComposite()
+    if (!buf) {
+      toast.error(t('pages.imageEditor.errBucketRead'))
+      return
+    }
+    setColorRangeSource(buf)
+  }, [renderPreviewComposite, t])
+  const handleColorRangeApply = useCallback(
+    (sel: { path: Point[]; bbox: Rect; regionCount: number }) => {
+      const src = colorRangeSource
+      setColorRangeSource(null)
+      if (!src) return
+      const path = sel.path.map((p) => ({ x: p.x + src.cropX, y: p.y + src.cropY }))
+      history.set({
+        ...state,
+        selection: { ...sel.bbox, x: sel.bbox.x + src.cropX, y: sel.bbox.y + src.cropY },
+        selectionPath: path.length >= 3 ? path : undefined,
+        selectionInverse: false,
+      })
+      if (sel.regionCount > 1) {
+        toast.message(t('pages.imageEditor.selectMenu.multiRegion', { count: sel.regionCount }))
+      }
+    },
+    [colorRangeSource, history, state, t],
+  )
+
+  // Select Subject — saliency heuristic over the composite. Deferred a tick so
+  // the "detecting…" toast paints before the synchronous CV work blocks.
+  const handleSelectSubject = useCallback(() => {
+    const buf = renderPreviewComposite()
+    if (!buf) {
+      toast.error(t('pages.imageEditor.errBucketRead'))
+      return
+    }
+    const id = toast.loading(t('pages.imageEditor.selectMenu.subjectDetecting'))
+    setTimeout(() => {
+      const res = selectSubject(buf.data, buf.w, buf.h)
+      toast.dismiss(id)
+      if (!res) {
+        toast.message(t('pages.imageEditor.selectMenu.subjectNotFound'))
+        return
+      }
+      const path = res.path.map((p) => ({ x: p.x + buf.cropX, y: p.y + buf.cropY }))
+      history.set({
+        ...state,
+        selection: { ...res.bbox, x: res.bbox.x + buf.cropX, y: res.bbox.y + buf.cropY },
+        selectionPath: path.length >= 3 ? path : undefined,
+        selectionInverse: false,
+      })
+    }, 16)
+  }, [renderPreviewComposite, history, state, t])
+
+  // Grow — expand the current selection into contiguous same-ish-color pixels.
+  const handleSelectGrow = useCallback(() => {
+    if (!state.selection && (state.selectionPath?.length ?? 0) < 3) {
+      toast.message(t('pages.imageEditor.selectMenu.noSelection'))
+      return
+    }
+    const buf = renderPreviewComposite()
+    if (!buf) return
+    // Current selection → buffer space (subtract crop origin), rasterize a mask.
+    const path =
+      state.selectionPath && state.selectionPath.length >= 3
+        ? state.selectionPath.map((p) => ({ x: p.x - buf.cropX, y: p.y - buf.cropY }))
+        : undefined
+    const rect = state.selection
+      ? { ...state.selection, x: state.selection.x - buf.cropX, y: state.selection.y - buf.cropY }
+      : undefined
+    const mask = rasterizePolygonMask(path, rect, buf.w, buf.h)
+    const res = growSelection(buf.data, buf.w, buf.h, mask, wandTolerance)
+    if (!res) {
+      toast.message(t('pages.imageEditor.selectMenu.growEmpty'))
+      return
+    }
+    const outPath = res.path.map((p) => ({ x: p.x + buf.cropX, y: p.y + buf.cropY }))
+    history.set({
+      ...state,
+      selection: { ...res.bbox, x: res.bbox.x + buf.cropX, y: res.bbox.y + buf.cropY },
+      selectionPath: outPath.length >= 3 ? outPath : undefined,
+      selectionInverse: false,
+    })
+  }, [renderPreviewComposite, state, history, wandTolerance, t])
+
+  // Remove Background — Select Subject, then add a raster Layer Mask that
+  // reveals only the subject (white) over a black background. Reuses the same
+  // mask-layer machinery as handleNewRasterMask; no new masking engine.
+  const handleRemoveBackground = useCallback(async () => {
+    const buf = renderPreviewComposite()
+    if (!buf) {
+      toast.error(t('pages.imageEditor.errBucketRead'))
+      return
+    }
+    const id = toast.loading(t('pages.imageEditor.selectMenu.subjectDetecting'))
+    const res = selectSubject(buf.data, buf.w, buf.h)
+    if (!res) {
+      toast.dismiss(id)
+      toast.message(t('pages.imageEditor.selectMenu.subjectNotFound'))
+      return
+    }
+    // Build the mask at full pre-crop preview dims so it aligns with the canvas
+    // the renderer composites mask layers against.
+    const { w, h } = previewDimsOf(image!, state)
+    const c = document.createElement('canvas')
+    c.width = w
+    c.height = h
+    const ctx = c.getContext('2d')
+    if (!ctx) {
+      toast.dismiss(id)
+      return
+    }
+    ctx.fillStyle = '#000000'
+    ctx.fillRect(0, 0, w, h)
+    const shape = buildSelectionMaskCanvas({
+      w,
+      h,
+      path: res.path.map((p) => ({ x: p.x + buf.cropX, y: p.y + buf.cropY })),
+      feather: 0,
+    })
+    if (shape) ctx.drawImage(shape, 0, 0)
+    const dataUrl = c.toDataURL('image/png')
+    try {
+      await ensureImage(dataUrl)
+    } catch {
+      /* mask still renders for non-paint compositing */
+    }
+    const layer: Layer = {
+      id: crypto.randomUUID(),
+      name: t('pages.imageEditor.selectMenu.removeBackground'),
+      visible: true,
+      opacity: 100,
+      blend: 'normal',
+      kind: 'mask',
+      rects: [],
+      dataUrl,
+      w,
+      h,
+    }
+    toast.dismiss(id)
+    history.set({ ...state, layers: [...state.layers, layer] })
+    setSelectedLayerId(layer.id)
+    toast.success(t('pages.imageEditor.selectMenu.removeBackground'))
+  }, [renderPreviewComposite, image, state, ensureImage, history, t])
 
   const handleClearCrop = useCallback(() => {
     if (!state.cropRect) return
@@ -2925,9 +3179,16 @@ export function ImageEditorPage() {
             inverseSelection: handleInverse,
             selectExpand: () => setSelectModifyOp('expand'),
             selectContract: () => setSelectModifyOp('contract'),
+            selectFeather: () => setSelectModifyOp('feather'),
+            selectSmooth: () => setSelectModifyOp('smooth'),
+            selectGrow: handleSelectGrow,
+            selectColorRange: handleOpenColorRange,
+            selectSubject: handleSelectSubject,
+            removeBackground: handleRemoveBackground,
             canDeselect: hasSelection,
             canReselect,
             canModifySelection: hasSelection,
+            canSelectFromImage: !!image,
             cut: handleCut,
             copy: handleCopy,
             copyMerged: handleCopyMerged,
@@ -3009,6 +3270,10 @@ export function ImageEditorPage() {
           setBucketTolerance={setBucketTolerance}
           wandTolerance={wandTolerance}
           setWandTolerance={setWandTolerance}
+          selectionMode={selectionMode}
+          setSelectionMode={setSelectionMode}
+          feather={featherOption}
+          setFeather={setFeatherOption}
           isStubTool={STUB_TOOLS.has(tool)}
           hasActiveCrop={!!state.cropRect}
           cropPending={cropPending}
@@ -3102,6 +3367,7 @@ export function ImageEditorPage() {
               onCommitGradient={handleCommitGradient}
               onCommitSelection={handleCommitSelection}
               onCommitPolygonSelection={handleCommitPolygonSelection}
+              selectionMode={selectionMode}
               onWandClick={handleWandClick}
               wandTolerance={wandTolerance}
               onCloneSetSource={handleSetCloneSource}
@@ -3270,6 +3536,12 @@ export function ImageEditorPage() {
         open={selectModifyOp}
         onApply={handleSelectModifyApply}
         onCancel={() => setSelectModifyOp(null)}
+      />
+      <ColorRangeDialog
+        open={!!colorRangeSource}
+        source={colorRangeSource}
+        onApply={handleColorRangeApply}
+        onCancel={() => setColorRangeSource(null)}
       />
       <FillDialog
         open={fillOpen}

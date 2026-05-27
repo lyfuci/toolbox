@@ -4,6 +4,12 @@ import { dimsAfterRotation } from './render'
 import type { EditorState, Point, Rect } from './types'
 
 /**
+ * Boolean combination always operates on the *un-feathered* polygon geometry.
+ * Feather (`state.selectionFeather`) is a selection property reapplied at
+ * consume time (Fill / Stroke / Adjustment), never baked into the stored
+ * shape — so Add / Subtract / Intersect stay lossless and Moore tracing never
+ * has to recover a polygon from a blurred mask.
+ *
  * PS-style selection combination modes. `replace` overwrites the existing
  * selection (no modifier held); the others combine with the active one.
  */

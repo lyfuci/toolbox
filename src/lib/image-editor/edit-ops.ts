@@ -1,4 +1,5 @@
 import { buildImageShapeLayer, previewDimsOf, regionFromSelection } from './composite-ops'
+import { buildSelectionMaskCanvas } from './selection-mask'
 import type { AnnotationLayer, BlendMode, EditorState } from './types'
 
 /**
@@ -37,7 +38,37 @@ export function fillSelection(args: {
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
   ctx.fillStyle = color
-  if (region === null) {
+  const feather = state.selectionFeather ?? 0
+  if (region !== null && feather > 0) {
+    // Feathered fill: paint the whole canvas, then knock it back to the
+    // selection via a blurred mask (destination-in). The soft edge is baked
+    // into the layer's pixels, so the layer carries no geometric clip — see
+    // `withSelectionClip`. Inverse is baked into the mask here too.
+    const s = dims.previewScale
+    ctx.fillRect(0, 0, w, h)
+    const mask = buildSelectionMaskCanvas({
+      w,
+      h,
+      path: region.kind === 'path'
+        ? region.path.map((p) => ({ x: p.x / s, y: p.y / s }))
+        : undefined,
+      rect: region.kind === 'rect'
+        ? {
+            x: region.rect.x / s,
+            y: region.rect.y / s,
+            w: region.rect.w / s,
+            h: region.rect.h / s,
+          }
+        : undefined,
+      feather: feather / s,
+      inverse: state.selectionInverse,
+    })
+    if (mask) {
+      ctx.globalCompositeOperation = 'destination-in'
+      ctx.drawImage(mask, 0, 0)
+      ctx.globalCompositeOperation = 'source-over'
+    }
+  } else if (region === null) {
     // No selection → fill entire canvas.
     ctx.fillRect(0, 0, w, h)
   } else if (region.kind === 'rect') {

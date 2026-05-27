@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next'
+import { Square, SquarePlus, SquareMinus, SquaresIntersect } from 'lucide-react'
 import type { BrushOptions, FontStyle, FontWeight, TextAlign, TextOptions, Tool } from '@/lib/image-editor/types'
+import type { SelectionModifier } from '@/lib/image-editor/selection-combine'
+import { cn } from '@/lib/utils'
 
 import { CROP_ASPECTS } from '@/lib/image-editor/crop-presets'
 
@@ -39,6 +42,12 @@ type Props = {
   setBucketTolerance: (n: number) => void
   wandTolerance: number
   setWandTolerance: (n: number) => void
+  /** PS-style boolean combine mode for marquee/lasso (新建/加/减/交). */
+  selectionMode: SelectionModifier
+  setSelectionMode: (m: SelectionModifier) => void
+  /** Feather radius (preview px) baked onto newly-drawn selections. */
+  feather: number
+  setFeather: (n: number) => void
   /** Show "applies to all in fly-out group" notice for stub tools. */
   isStubTool: boolean
   /** Re-fired with the toast pattern when a stub tool was clicked. */
@@ -80,6 +89,10 @@ export function OptionsBar({
   setBucketTolerance,
   wandTolerance,
   setWandTolerance,
+  selectionMode,
+  setSelectionMode,
+  feather,
+  setFeather,
   isStubTool,
   stubMessage,
   hasActiveCrop,
@@ -114,9 +127,48 @@ export function OptionsBar({
         : tool === 'polyLasso'
           ? 'pages.imageEditor.polyLassoHint'
           : 'pages.imageEditor.marqueeHint'
+    const modes: { id: SelectionModifier; Icon: typeof Square; key: string }[] = [
+      { id: 'replace', Icon: Square, key: 'new' },
+      { id: 'add', Icon: SquarePlus, key: 'add' },
+      { id: 'subtract', Icon: SquareMinus, key: 'subtract' },
+      { id: 'intersect', Icon: SquaresIntersect, key: 'intersect' },
+    ]
     return (
       <div className="pf-options">
+        {/* PS-style boolean mode group — Shift/Alt still override momentarily. */}
         <div className="pf-opt-group">
+          <span className="pf-opt-label">{t('pages.imageEditor.selectionMode.label')}:</span>
+          <div style={{ display: 'flex', gap: 2 }}>
+            {modes.map(({ id, Icon, key }) => (
+              <button
+                key={id}
+                type="button"
+                className={cn('pf-opt-btn', selectionMode === id && 'pf-active')}
+                aria-pressed={selectionMode === id}
+                onClick={() => setSelectionMode(id)}
+                title={t(`pages.imageEditor.selectionMode.${key}`)}
+              >
+                <Icon size={15} />
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* Feather radius baked onto new selections (Select > Modify > Feather
+            edits an existing selection's feather instead). */}
+        <div className="pf-opt-group">
+          <span className="pf-opt-label">{t('pages.imageEditor.feather')}:</span>
+          <input
+            className="pf-opt-input"
+            type="number"
+            min={0}
+            max={250}
+            value={feather}
+            onChange={(e) => setFeather(Math.min(250, Math.max(0, Number(e.target.value) || 0)))}
+            title={t('pages.imageEditor.featherHint')}
+          />
+          <span className="pf-opt-label" style={{ marginLeft: 4, opacity: 0.7 }}>px</span>
+        </div>
+        <div className="pf-opt-group" style={{ borderRight: hasSelection ? undefined : 0 }}>
           <span className="pf-opt-label" style={{ marginRight: 0 }}>
             {t(hintKey)}
           </span>

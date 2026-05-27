@@ -123,6 +123,12 @@ type Props = {
    */
   onCommitPolygonSelection?: (points: Point[], mod: SelectionModifier) => void
   /**
+   * PS-style base combine mode set by the Options Bar buttons (新建/加/减/交).
+   * Shift/Alt held at draw time still override it; when no key is held this
+   * is the mode a fresh marquee/lasso drag commits with. Defaults to 'replace'.
+   */
+  selectionMode?: SelectionModifier
+  /**
    * Called by the Magic Wand on click. Point is in canvas-pixel space; the
    * parent runs the flood fill and stores the bbox of the matching region
    * as the rect selection.
@@ -329,6 +335,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     onCommitGradient,
     onCommitSelection,
     onCommitPolygonSelection,
+    selectionMode = 'replace',
     onWandClick,
     onCloneSetSource,
     cloneSource,
@@ -725,7 +732,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       setInteraction({
         kind: 'marquee-drawing',
         rect: { x: p.x, y: p.y, w: 0, h: 0 },
-        mod: selectionModFromEvent(e),
+        mod: selectionModFromEvent(e, selectionMode),
       })
       return
     }
@@ -733,7 +740,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     // Lasso: drag-to-trace a freeform polygon. mousedown starts; mousemove
     // appends points; mouseup closes + commits.
     if (tool === 'lasso') {
-      setInteraction({ kind: 'lasso-drawing', points: [p], mod: selectionModFromEvent(e) })
+      setInteraction({ kind: 'lasso-drawing', points: [p], mod: selectionModFromEvent(e, selectionMode) })
       return
     }
 
@@ -745,7 +752,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       setInteraction({
         kind: 'magnetic-lasso-drawing',
         points: [snapped],
-        mod: selectionModFromEvent(e),
+        mod: selectionModFromEvent(e, selectionMode),
         edgeMap,
       })
       return
@@ -778,7 +785,7 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
           kind: 'polylasso-drawing',
           points: [p],
           cursor: p,
-          mod: selectionModFromEvent(e),
+          mod: selectionModFromEvent(e, selectionMode),
         })
       }
       return
@@ -2101,11 +2108,19 @@ function drawCropOverlay(
  * Resolve Shift/Alt modifier state into a PS-style selection combination
  * mode. Captured at mousedown so the modifier is stable across the drag.
  */
-function selectionModFromEvent(e: ReactMouseEvent<HTMLCanvasElement>): SelectionModifier {
+/**
+ * Effective combine mode for a selection drag. Held Shift/Alt take priority
+ * (matching PS's momentary override); with no modifier held we fall back to
+ * the persistent Options Bar `base` mode.
+ */
+function selectionModFromEvent(
+  e: ReactMouseEvent<HTMLCanvasElement>,
+  base: SelectionModifier = 'replace',
+): SelectionModifier {
   if (e.shiftKey && e.altKey) return 'intersect'
   if (e.shiftKey) return 'add'
   if (e.altKey) return 'subtract'
-  return 'replace'
+  return base
 }
 
 type CropHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'

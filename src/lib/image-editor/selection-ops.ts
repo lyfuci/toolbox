@@ -11,6 +11,11 @@ import type { EditorState, Point, Rect } from './types'
  * polygon paths (Lasso) are simplified to their bbox first, since the
  * proper polygon-offset algorithm is large enough to deserve its own PR.
  * v1 trades that fidelity for predictable behaviour.
+ *
+ * Feather is NOT a geometry transform — it lives on `state.selectionFeather`
+ * and is reapplied when the selection is consumed (Fill / Stroke / Adjustment).
+ * These ops therefore never touch it; the polygon they return is the crisp
+ * shape the boolean ops and feather both build on.
  */
 
 /** Build a snapshot of the current selection so Reselect can restore it. */
