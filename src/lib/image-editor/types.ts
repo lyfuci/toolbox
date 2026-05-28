@@ -870,6 +870,54 @@ export type CameraRawParams = {
   dehaze: number
 }
 
+/**
+ * Black & White (PS Image > Adjustments > Black & White). Six per-hue-family
+ * lightness weights (% — 100 is neutral) drive the RGB→gray mix; optional tint
+ * recolors the result. Implementation lives in `adj-black-white.ts`.
+ */
+export type BlackWhiteParams = {
+  kind: 'blackWhite'
+  reds: number
+  yellows: number
+  greens: number
+  cyans: number
+  blues: number
+  magentas: number
+  tint: boolean
+  tintHue: number // degrees [0,360]
+  tintSat: number // percent [0,100]
+}
+
+/** One color range's CMYK deltas for Selective Color (each %, [-100,100]). */
+export type SelectiveColorRange = { c: number; m: number; y: number; k: number }
+
+/**
+ * Selective Color (PS Image > Adjustments > Selective Color). Per-color-range
+ * CMYK shifts; `relative` scales existing ink, `absolute` adds. Implementation
+ * in `adj-selective-color.ts`; the dialog edits one range at a time.
+ */
+export type SelectiveColorParams = {
+  kind: 'selectiveColor'
+  mode: 'relative' | 'absolute'
+  ranges: {
+    reds: SelectiveColorRange
+    yellows: SelectiveColorRange
+    greens: SelectiveColorRange
+    cyans: SelectiveColorRange
+    blues: SelectiveColorRange
+    magentas: SelectiveColorRange
+    whites: SelectiveColorRange
+    neutrals: SelectiveColorRange
+    blacks: SelectiveColorRange
+  }
+}
+
+/** Equalize (PS) — hue-preserving histogram equalization. No parameters. */
+export type EqualizeParams = { kind: 'equalize' }
+
+/** Solarize (PS Filter > Stylize) — invert channels above `threshold` (0..255). */
+export type SolarizeParams = { kind: 'solarize'; threshold: number }
+
 export type AdjustmentParams =
   | LevelsParams
   | CurvesParams
@@ -885,6 +933,10 @@ export type AdjustmentParams =
   | GradientMapParams
   | PhotoFilterParams
   | CameraRawParams
+  | BlackWhiteParams
+  | SelectiveColorParams
+  | EqualizeParams
+  | SolarizeParams
 
 export type AdjustmentKind = AdjustmentParams['kind']
 
@@ -1059,6 +1111,39 @@ export type SmartSharpenParams = {
   threshold: number // 0..255
 }
 
+/**
+ * Shadows/Highlights (PS Image > Adjustments). Regional tonal recovery driven
+ * by a blurred luminance mask (`radius`, bake-scaled). Implemented as a filter
+ * (`flt-shadows-highlights.ts`) because the mask is spatial.
+ */
+export type ShadowsHighlightsParams = {
+  kind: 'shadowsHighlights'
+  shadowsAmount: number // 0..100
+  highlightsAmount: number // 0..100
+  radius: number // preview-canvas px, bake-scaled
+}
+
+/** Vignette (PS lens-correction style). Percent-based, resolution-independent. */
+export type VignetteParams = {
+  kind: 'vignette'
+  amount: number // -100..100 (neg darken, pos lighten)
+  midpoint: number // 0..100 % of half-diagonal where falloff starts
+  roundness: number // -100..100 circular↔rectangular
+  feather: number // 0..100 % transition width
+}
+
+/** Render > Clouds — deterministic seeded fractal noise blending fg↔bg. */
+export type CloudsParams = {
+  kind: 'clouds'
+  seed: number
+  scale: number // base lattice cells across the min side
+  fg: string // hex
+  bg: string // hex
+}
+
+/** Noise > Median — per-channel median over a (2·radius+1)² window. */
+export type MedianParams = { kind: 'median'; radius: number } // px, bake-scaled
+
 export type FilterParams =
   | GaussianBlurParams
   | BoxBlurParams
@@ -1079,6 +1164,10 @@ export type FilterParams =
   | PolarCoordinatesParams
   | LensFlareParams
   | SmartSharpenParams
+  | ShadowsHighlightsParams
+  | VignetteParams
+  | CloudsParams
+  | MedianParams
 
 export type FilterKind = FilterParams['kind']
 

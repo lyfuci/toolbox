@@ -28,6 +28,9 @@ import type {
   PosterizeParams,
   ThresholdParams,
   VibranceParams,
+  BlackWhiteParams,
+  SelectiveColorParams,
+  SelectiveColorRange,
 } from '@/lib/image-editor/types'
 
 type Props = {
@@ -153,6 +156,12 @@ function AdjustmentDialogInner({
         )}
         {draft.kind === 'cameraRaw' && (
           <CameraRawForm value={draft} onChange={update} />
+        )}
+        {draft.kind === 'blackWhite' && (
+          <BlackWhiteForm value={draft} onChange={update} />
+        )}
+        {draft.kind === 'selectiveColor' && (
+          <SelectiveColorForm value={draft} onChange={update} />
         )}
       </div>
       <DialogFooter>
@@ -792,5 +801,136 @@ function CameraRawForm({
         onChange={(v) => onChange({ saturation: v })}
       />
     </div>
+  )
+}
+
+function BlackWhiteForm({
+  value,
+  onChange,
+}: {
+  value: BlackWhiteParams
+  onChange: (patch: Partial<BlackWhiteParams>) => void
+}) {
+  const { t } = useTranslation()
+  const families = ['reds', 'yellows', 'greens', 'cyans', 'blues', 'magentas'] as const
+  return (
+    <>
+      {families.map((f) => (
+        <Slider
+          key={f}
+          label={t(`pages.imageEditor.adjustments.bw.${f}`)}
+          value={value[f]}
+          min={-200}
+          max={300}
+          unit="%"
+          onChange={(v) => onChange({ [f]: Math.round(v) } as Partial<BlackWhiteParams>)}
+        />
+      ))}
+      <label className="flex items-center gap-2 text-sm text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={value.tint}
+          onChange={(e) => onChange({ tint: e.target.checked })}
+        />
+        {t('pages.imageEditor.adjustments.bw.tint')}
+      </label>
+      {value.tint && (
+        <>
+          <Slider
+            label={t('pages.imageEditor.adjustments.bw.tintHue')}
+            value={value.tintHue}
+            min={0}
+            max={360}
+            unit="°"
+            onChange={(v) => onChange({ tintHue: Math.round(v) })}
+          />
+          <Slider
+            label={t('pages.imageEditor.adjustments.bw.tintSat')}
+            value={value.tintSat}
+            min={0}
+            max={100}
+            unit="%"
+            onChange={(v) => onChange({ tintSat: Math.round(v) })}
+          />
+        </>
+      )}
+    </>
+  )
+}
+
+const SELECTIVE_RANGES = [
+  'reds', 'yellows', 'greens', 'cyans', 'blues', 'magentas', 'whites', 'neutrals', 'blacks',
+] as const
+type SelRangeKey = (typeof SELECTIVE_RANGES)[number]
+
+function SelectiveColorForm({
+  value,
+  onChange,
+}: {
+  value: SelectiveColorParams
+  onChange: (patch: Partial<SelectiveColorParams>) => void
+}) {
+  const { t } = useTranslation()
+  // PS edits one range at a time — a dropdown picks the range, 4 sliders edit
+  // its CMYK; storage stays the full 9-range object.
+  const [range, setRange] = useState<SelRangeKey>('reds')
+  const cur = value.ranges[range]
+  const patchRange = (patch: Partial<SelectiveColorRange>) =>
+    onChange({ ranges: { ...value.ranges, [range]: { ...cur, ...patch } } })
+  const cmyk: { key: keyof SelectiveColorRange; label: string }[] = [
+    { key: 'c', label: t('pages.imageEditor.adjustments.sel.cyan') },
+    { key: 'm', label: t('pages.imageEditor.adjustments.sel.magenta') },
+    { key: 'y', label: t('pages.imageEditor.adjustments.sel.yellow') },
+    { key: 'k', label: t('pages.imageEditor.adjustments.sel.black') },
+  ]
+  return (
+    <>
+      <div className="flex items-center gap-1 text-xs">
+        <Label className="w-16 text-muted-foreground">
+          {t('pages.imageEditor.adjustments.sel.colors')}
+        </Label>
+        <select
+          value={range}
+          onChange={(e) => setRange(e.target.value as SelRangeKey)}
+          className="h-7 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+        >
+          {SELECTIVE_RANGES.map((r) => (
+            <option key={r} value={r}>
+              {t(`pages.imageEditor.adjustments.sel.${r}`)}
+            </option>
+          ))}
+        </select>
+      </div>
+      {cmyk.map(({ key, label }) => (
+        <Slider
+          key={key}
+          label={label}
+          value={cur[key]}
+          min={-100}
+          max={100}
+          unit="%"
+          onChange={(v) => patchRange({ [key]: Math.round(v) } as Partial<SelectiveColorRange>)}
+        />
+      ))}
+      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+        <span>{t('pages.imageEditor.adjustments.sel.method')}</span>
+        <label className="flex items-center gap-1">
+          <input
+            type="radio"
+            checked={value.mode === 'relative'}
+            onChange={() => onChange({ mode: 'relative' })}
+          />
+          {t('pages.imageEditor.adjustments.sel.relative')}
+        </label>
+        <label className="flex items-center gap-1">
+          <input
+            type="radio"
+            checked={value.mode === 'absolute'}
+            onChange={() => onChange({ mode: 'absolute' })}
+          />
+          {t('pages.imageEditor.adjustments.sel.absolute')}
+        </label>
+      </div>
+    </>
   )
 }

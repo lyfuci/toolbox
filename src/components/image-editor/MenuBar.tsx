@@ -72,6 +72,8 @@ type Props = {
     revealAll?: () => void
     openAdjustment?: (kind: AdjustmentKind) => void
     openFilter?: (kind: FilterKind) => void
+    applyEqualize?: () => void
+    applySolarize?: () => void
     duplicateLayer?: () => void
     deleteLayer?: () => void
     newGroup?: () => void
@@ -413,6 +415,31 @@ export function MenuBar({ handlers }: Props) {
             label: t('pages.imageEditor.adjustments.cameraRaw.title') + '…',
             onClick: () => handlers.openAdjustment?.('cameraRaw'),
           },
+          {
+            id: 'adj-blackWhite',
+            label: t('pages.imageEditor.adjustments.blackWhite') + '…',
+            onClick: () => handlers.openAdjustment?.('blackWhite'),
+          },
+          {
+            id: 'adj-selectiveColor',
+            label: t('pages.imageEditor.adjustments.selectiveColor') + '…',
+            onClick: () => handlers.openAdjustment?.('selectiveColor'),
+          },
+          {
+            id: 'adj-shadowsHighlights',
+            label: t('pages.imageEditor.filters.shadowsHighlights') + '…',
+            onClick: () => handlers.openFilter?.('shadowsHighlights'),
+          },
+          {
+            id: 'adj-equalize',
+            label: t('pages.imageEditor.adjustments.equalize'),
+            onClick: () => handlers.applyEqualize?.(),
+          },
+          {
+            id: 'adj-solarize',
+            label: t('pages.imageEditor.adjustments.solarize'),
+            onClick: () => handlers.applySolarize?.(),
+          },
         ],
       ],
     },
@@ -613,6 +640,24 @@ export function MenuBar({ handlers }: Props) {
             id: 'flt-lensFlare',
             label: t('pages.imageEditor.filters.lensFlare') + '…',
             onClick: () => handlers.openFilter?.('lensFlare'),
+          },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'flt-clouds',
+            label: t('pages.imageEditor.filters.clouds') + '…',
+            onClick: () => handlers.openFilter?.('clouds'),
+          },
+          {
+            id: 'flt-vignette',
+            label: t('pages.imageEditor.filters.vignette') + '…',
+            onClick: () => handlers.openFilter?.('vignette'),
+          },
+          {
+            id: 'flt-median',
+            label: t('pages.imageEditor.filters.median') + '…',
+            onClick: () => handlers.openFilter?.('median'),
           },
         ],
       ],

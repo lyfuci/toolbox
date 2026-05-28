@@ -20,6 +20,10 @@ import type {
   TwirlParams,
   UnsharpMaskParams,
 } from './types'
+import { applyShadowsHighlights, DEFAULT_SHADOWS_HIGHLIGHTS } from './flt-shadows-highlights'
+import { applyVignette, DEFAULT_VIGNETTE } from './flt-vignette'
+import { applyClouds, DEFAULT_CLOUDS } from './flt-clouds'
+import { applyMedian, DEFAULT_MEDIAN } from './flt-median'
 
 /**
  * Pixel transforms backing each FilterLayer kind. All operate on RGBA
@@ -129,6 +133,10 @@ export const DEFAULT_FOR_FILTER_KIND: Record<FilterParams['kind'], FilterParams>
   polarCoordinates: DEFAULT_POLAR_COORDINATES,
   lensFlare: DEFAULT_LENS_FLARE,
   smartSharpen: DEFAULT_SMART_SHARPEN,
+  shadowsHighlights: DEFAULT_SHADOWS_HIGHLIGHTS,
+  vignette: DEFAULT_VIGNETTE,
+  clouds: DEFAULT_CLOUDS,
+  median: DEFAULT_MEDIAN,
 }
 
 /**
@@ -162,6 +170,10 @@ export function scaleFilterParams(
     case 'motionBlur':
       return { ...params, distance: params.distance * scale }
     case 'smartSharpen':
+      return { ...params, radius: params.radius * scale }
+    case 'shadowsHighlights':
+      return { ...params, radius: params.radius * scale }
+    case 'median':
       return { ...params, radius: params.radius * scale }
     default:
       return params
@@ -231,6 +243,18 @@ export function applyFilter(
       return
     case 'smartSharpen':
       smartSharpen(data, width, height, params)
+      return
+    case 'shadowsHighlights':
+      applyShadowsHighlights(data, width, height, params)
+      return
+    case 'vignette':
+      applyVignette(data, width, height, params)
+      return
+    case 'clouds':
+      applyClouds(data, width, height, params)
+      return
+    case 'median':
+      applyMedian(data, width, height, params)
       return
   }
 }
