@@ -29,6 +29,7 @@ import {
   SquareDashed,
   Squircle,
   StickyNote,
+  Waves,
   Sun,
   Type,
   Wand2,
@@ -181,6 +182,7 @@ const GROUPS: ToolDef[][] = [
     },
     { id: 'mosaic', icon: <Squircle className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.mosaic' },
     { id: 'blur', icon: <Aperture className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.blur' },
+    { id: 'liquify', icon: <Waves className="h-4 w-4" />, labelKey: 'pages.imageEditor.tool.liquify' },
   ],
   // 5. Navigation
   [

@@ -939,7 +939,20 @@
         "hand": "抓手",
         "rotateView": "旋转视图",
         "frame": "画框",
-        "note": "注释"
+        "note": "注释",
+        "liquify": "液化"
+      },
+      "liquify": {
+        "mode": "模式",
+        "size": "大小",
+        "strength": "强度",
+        "modes": {
+          "push": "向前推（拖动）",
+          "twirlCW": "顺时针旋转",
+          "twirlCCW": "逆时针旋转",
+          "bloat": "膨胀",
+          "pucker": "褶皱"
+        }
       },
       "menu": {
         "file": "文件",

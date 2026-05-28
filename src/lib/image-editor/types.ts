@@ -96,6 +96,10 @@ export type Tool =
   | 'frame'
   | 'note'
   | 'burn'
+  // PS Filter > Liquify — modal warp brush (push/twirl/bloat/pucker). Enters
+  // a session that snapshots the composite, lets the user warp the snapshot
+  // with successive brush strokes, then commits as an image-shape layer.
+  | 'liquify'
 
 export type Transforms = {
   rotation: Rotation

@@ -939,7 +939,20 @@
         "hand": "Hand",
         "rotateView": "Rotate View",
         "frame": "Frame",
-        "note": "Note"
+        "note": "Note",
+        "liquify": "Liquify"
+      },
+      "liquify": {
+        "mode": "Mode",
+        "size": "Size",
+        "strength": "Strength",
+        "modes": {
+          "push": "Push (drag)",
+          "twirlCW": "Twirl CW",
+          "twirlCCW": "Twirl CCW",
+          "bloat": "Bloat",
+          "pucker": "Pucker"
+        }
       },
       "menu": {
         "file": "File",
