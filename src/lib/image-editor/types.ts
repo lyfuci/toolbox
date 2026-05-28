@@ -164,6 +164,15 @@ export type TextShape = {
   lineHeight?: number
   /** Decoration: render an underline beneath the baseline. */
   underline?: boolean
+  /**
+   * Type-on-Path (PS) — when set, the renderer looks up the AnnotationLayer
+   * with this id (expected to carry a `PathShape`), uniformly samples its
+   * arclength, and lays each glyph centered on the samples rotated to the
+   * local tangent. (x, y) become the path-following anchor (the path's first
+   * sample) so existing move/select math still works without a special case.
+   * Edits to the path automatically reflow text on next render.
+   */
+  followPathLayerId?: string
 }
 export type MosaicShape = {
   kind: 'mosaic'
@@ -912,6 +921,21 @@ export type SelectiveColorParams = {
   }
 }
 
+/**
+ * Replace Color (PS Image > Adjustments > Replace Color). Per-pixel: pick
+ * pixels matching `target` within `fuzziness` and shift their HSL. The dialog
+ * surfaces an eyedropper to set `target`; implementation in
+ * `adj-replace-color.ts`.
+ */
+export type ReplaceColorParams = {
+  kind: 'replaceColor'
+  target: { r: number; g: number; b: number }
+  fuzziness: number // 0..200 RGB-distance tolerance
+  hueShift: number // ±180°
+  saturationShift: number // ±100 percentage points
+  lightnessShift: number // ±100 percentage points
+}
+
 /** Equalize (PS) — hue-preserving histogram equalization. No parameters. */
 export type EqualizeParams = { kind: 'equalize' }
 
@@ -937,6 +961,7 @@ export type AdjustmentParams =
   | SelectiveColorParams
   | EqualizeParams
   | SolarizeParams
+  | ReplaceColorParams
 
 export type AdjustmentKind = AdjustmentParams['kind']
 
@@ -1404,6 +1429,14 @@ export type EditorState = {
    * transient editing mode).
    */
   quickMask?: { dataUrl: string; w: number; h: number }
+  /**
+   * View > Guides — horizontal (`h`) guides at y-coordinates, vertical (`v`)
+   * guides at x-coordinates, both in preview-pixel post-rotation space (same
+   * frame as `selection`). Display + drag-from-ruler creation is wired in
+   * Canvas; visibility is toggled at the editor-UI level (not stored on
+   * EditorState — guides are document state but visibility is a viewing aid).
+   */
+  guides?: { h: number[]; v: number[] }
   /**
    * Saved Actions (PS "Actions" panel — really closer to PS "Snapshots"
    * here because the editor doesn't store a command vocabulary it can

@@ -718,6 +718,7 @@
         "selectiveColor": "可选颜色",
         "equalize": "色调均化",
         "solarize": "曝光过度",
+        "replaceColor": "替换颜色",
         "bw": {
           "reds": "红色",
           "yellows": "黄色",
@@ -1000,6 +1001,10 @@
         "actualPixels": "实际像素 (100%)",
         "showGrid": "显示网格",
         "snapToGrid": "对齐到网格",
+        "showRulers": "标尺",
+        "showGuides": "显示参考线",
+        "clearGuides": "清除参考线",
+        "typeOnPath": "沿所选路径排版文字",
         "toggleFocus": "切换焦点模式"
       },
       "selectMenu": {
@@ -1334,6 +1339,22 @@
         "pickHint": "点击图像以吸取颜色",
         "sampledColor": "已取样",
         "noSample": "请先在预览中点击吸取颜色"
+      },
+      "replaceColor": {
+        "title": "替换颜色",
+        "fuzziness": "颜色容差",
+        "hueShift": "色相",
+        "saturationShift": "饱和度",
+        "lightnessShift": "明度",
+        "pickHint": "点击图像吸取要替换的颜色",
+        "sampledColor": "已取样"
+      },
+      "typeOnPath": {
+        "placeholder": "沿路径输入",
+        "layerName": "路径文字"
+      },
+      "view": {
+        "guidesCleared": "已清除参考线"
       },
       "rotateViewHint": "旋转视图 (R)：每次点击旋转工作区 90°，仅影响显示，不修改像素。",
       "textToolHint": "文字 (T)：在画布上单击以新增文字。",

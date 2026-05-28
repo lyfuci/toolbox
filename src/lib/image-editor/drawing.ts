@@ -13,6 +13,7 @@ import type {
   Shape,
   TextShape,
 } from './types'
+import type { ArcSample } from './bezier-arclength'
 
 // All shape coordinates are stored in PREVIEW canvas pixels. The render
 // pipeline passes a `scale` factor that maps preview-px → target-px so the
@@ -29,6 +30,10 @@ export function drawShape(
   // Used by image shapes — cache of loaded HTMLImageElements keyed by dataUrl.
   // If a referenced dataUrl isn't in the cache, the shape is skipped this frame.
   imageCache?: ImageCache,
+  // Type-on-Path: if the text shape has `followPathLayerId`, the renderer
+  // resolves the path and passes its uniform-arclength samples here so this
+  // module stays decoupled from EditorState / layer lookup.
+  pathSamples?: ArcSample[],
 ): void {
   switch (shape.kind) {
     case 'rect':
@@ -38,7 +43,11 @@ export function drawShape(
       drawArrow(ctx, shape, scale)
       break
     case 'text':
-      drawText(ctx, shape, scale)
+      if (pathSamples && pathSamples.length >= 2) {
+        drawTextOnPath(ctx, shape, scale, pathSamples)
+      } else {
+        drawText(ctx, shape, scale)
+      }
       break
     case 'mosaic':
       drawMosaic(ctx, shape, scale, underlying)
@@ -342,6 +351,88 @@ function drawText(ctx: CanvasRenderingContext2D, s: TextShape, scale: number) {
     ;(ctx as unknown as Record<string, unknown>).letterSpacing = '0px'
   } catch {
     /* noop */
+  }
+}
+
+/**
+ * Type on Path — lay each glyph at its cumulative-advance position along the
+ * pre-sampled path, rotated to the local tangent. `samples` are uniform-
+ * arclength samples from `bezier-arclength.ts`; we measure each glyph's width
+ * and walk a moving "distance from path start" pointer, looking up the matching
+ * sample at each step. Stops drawing when the text runs off the path end
+ * (matches PS — glyphs that don't fit just disappear).
+ *
+ * Path samples are in preview-pixel space; `scale` maps them to target px,
+ * same convention as the rest of drawShape.
+ */
+function drawTextOnPath(
+  ctx: CanvasRenderingContext2D,
+  s: TextShape,
+  scale: number,
+  samples: ArcSample[],
+) {
+  ctx.fillStyle = s.color
+  const family = s.fontFamily ?? 'sans-serif'
+  const weight = s.fontWeight ?? 'normal'
+  const style = s.fontStyle ?? 'normal'
+  const sizePx = Math.round(s.fontSize * scale)
+  ctx.font = `${style} ${weight} ${sizePx}px ${family}`
+  ctx.textBaseline = 'alphabetic'
+  ctx.textAlign = 'center'
+
+  // Total arclength of the sampled path (samples are evenly spaced by chord
+  // length, so straight chord sum is fine here for the lookup math).
+  let totalLen = 0
+  for (let i = 1; i < samples.length; i++) {
+    const dx = samples[i].x - samples[i - 1].x
+    const dy = samples[i].y - samples[i - 1].y
+    totalLen += Math.hypot(dx, dy)
+  }
+  if (totalLen <= 0) return
+
+  const text = s.text ?? ''
+  const letterSpacingPx = (s.letterSpacing ?? 0) * scale
+  // Walk a "distance" pointer; place each glyph centered on the corresponding
+  // arclength sample. Look up the sample by binary-searching cumulative chord
+  // lengths derived once here.
+  const cum: number[] = [0]
+  for (let i = 1; i < samples.length; i++) {
+    const dx = samples[i].x - samples[i - 1].x
+    const dy = samples[i].y - samples[i - 1].y
+    cum.push(cum[i - 1] + Math.hypot(dx, dy))
+  }
+  const sampleAt = (d: number): ArcSample => {
+    if (d <= 0) return samples[0]
+    if (d >= totalLen) return samples[samples.length - 1]
+    // Linear search is fine: samples are dense (count >= 64 in our caller).
+    for (let i = 1; i < cum.length; i++) {
+      if (cum[i] >= d) {
+        const t = (d - cum[i - 1]) / Math.max(1e-6, cum[i] - cum[i - 1])
+        const a = samples[i - 1]
+        const b = samples[i]
+        return {
+          x: a.x + (b.x - a.x) * t,
+          y: a.y + (b.y - a.y) * t,
+          tangent: a.tangent + (b.tangent - a.tangent) * t,
+          t: a.t + (b.t - a.t) * t,
+        }
+      }
+    }
+    return samples[samples.length - 1]
+  }
+
+  let cursor = 0
+  for (const ch of text) {
+    const w = ctx.measureText(ch).width
+    const center = cursor + w / 2
+    if (center * scale > totalLen) break
+    const p = sampleAt(center * scale)
+    ctx.save()
+    ctx.translate(p.x, p.y)
+    ctx.rotate(p.tangent)
+    ctx.fillText(ch, 0, 0)
+    ctx.restore()
+    cursor += w + letterSpacingPx
   }
 }
 
