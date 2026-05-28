@@ -946,6 +946,29 @@ export type EqualizeParams = { kind: 'equalize' }
 /** Solarize (PS Filter > Stylize) — invert channels above `threshold` (0..255). */
 export type SolarizeParams = { kind: 'solarize'; threshold: number }
 
+/**
+ * Color Lookup (PS Image > Adjustments > Color Lookup) — a 3D-LUT color grade.
+ * To stay self-contained and serialization-light (history snapshots and
+ * project files are kept by reference / JSON-stringified — a full 33³ LUT would
+ * bloat both), we store only a small `preset` KEY and an `intensity`; the LUT
+ * itself is generated procedurally at apply time from original, royalty-free
+ * looks (see `adj-color-lookup.ts`). No Adobe LUT data is shipped.
+ */
+export type ColorLookupPreset =
+  | 'tealOrange'
+  | 'warm'
+  | 'cool'
+  | 'vintageFilm'
+  | 'bwFilm'
+  | 'sepiaTone'
+  | 'punch'
+  | 'fade'
+export type ColorLookupParams = {
+  kind: 'colorLookup'
+  preset: ColorLookupPreset
+  intensity: number // %, 0..100 — blend amount of the graded result over original
+}
+
 export type AdjustmentParams =
   | LevelsParams
   | CurvesParams
@@ -966,6 +989,7 @@ export type AdjustmentParams =
   | EqualizeParams
   | SolarizeParams
   | ReplaceColorParams
+  | ColorLookupParams
 
 export type AdjustmentKind = AdjustmentParams['kind']
 
@@ -1212,6 +1236,47 @@ export type WindParams = {
   strength: number // streak-length scale in px, bake-scaled
 }
 
+/**
+ * Blur > Lens Blur — depth-of-field bokeh. Unlike a Gaussian/box blur (which
+ * averages with a bell/flat kernel), this convolves with a flat APERTURE DISC
+ * so out-of-focus highlights bloom into bright, hard-edged bokeh circles. The
+ * `bloom` term lifts pixels brighter than `threshold` before the disc average
+ * so specular highlights read as glowing discs the way a real fast lens renders
+ * them.
+ */
+export type LensBlurParams = {
+  kind: 'lensBlur'
+  radius: number // px, bake-scaled — aperture disc radius (focus falloff)
+  bloom: number // 0..100 — extra weight given to highlights → bokeh bloom
+  threshold: number // 0..255 luma above which a pixel blooms (NOT bake-scaled)
+}
+
+/**
+ * Stylize > Oil Paint — painterly posterization via the classic intensity-
+ * histogram method: for each pixel, bucket the (2·radius+1) neighbourhood into
+ * `levels` intensity bins, then output the mean colour of the most-populous
+ * bin. Flat regions collapse to a single brushy colour while edges snap to the
+ * dominant side, giving the smeared-brush look.
+ */
+export type OilPaintParams = {
+  kind: 'oilPaint'
+  radius: number // px, bake-scaled — brush/neighbourhood size
+  levels: number // 3..40 intensity buckets (NOT bake-scaled); fewer = chunkier
+}
+
+/**
+ * Stylize > Glowing Edges — Sobel edge magnitude rendered as bright neon edges
+ * on black (the inverse of Find Edges). `edgeWidth` sets the gradient sampling
+ * distance, `brightness` gains the result, `smoothness` softens the edges with
+ * a small blur afterwards.
+ */
+export type GlowingEdgesParams = {
+  kind: 'glowingEdges'
+  edgeWidth: number // px, bake-scaled — Sobel sampling step (1..14)
+  brightness: number // 0..100 edge-intensity gain (NOT bake-scaled)
+  smoothness: number // px, bake-scaled — post-blur radius (0..15)
+}
+
 export type FilterParams =
   | GaussianBlurParams
   | BoxBlurParams
@@ -1242,6 +1307,9 @@ export type FilterParams =
   | ColorHalftoneParams
   | SurfaceBlurParams
   | WindParams
+  | LensBlurParams
+  | OilPaintParams
+  | GlowingEdgesParams
 
 export type FilterKind = FilterParams['kind']
 

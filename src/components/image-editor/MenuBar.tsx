@@ -455,6 +455,11 @@ export function MenuBar({ handlers }: Props) {
             label: t('pages.imageEditor.adjustments.replaceColor') + '…',
             onClick: () => handlers.openReplaceColor?.(),
           },
+          {
+            id: 'adj-colorLookup',
+            label: t('pages.imageEditor.adjustments.colorLookup') + '…',
+            onClick: () => handlers.openAdjustment?.('colorLookup'),
+          },
         ],
       ],
     },
@@ -706,6 +711,21 @@ export function MenuBar({ handlers }: Props) {
             id: 'flt-wind',
             label: t('pages.imageEditor.filters.wind') + '…',
             onClick: () => handlers.openFilter?.('wind'),
+          },
+          {
+            id: 'flt-lensBlur',
+            label: t('pages.imageEditor.filters.lensBlur') + '…',
+            onClick: () => handlers.openFilter?.('lensBlur'),
+          },
+          {
+            id: 'flt-oilPaint',
+            label: t('pages.imageEditor.filters.oilPaint') + '…',
+            onClick: () => handlers.openFilter?.('oilPaint'),
+          },
+          {
+            id: 'flt-glowingEdges',
+            label: t('pages.imageEditor.filters.glowingEdges') + '…',
+            onClick: () => handlers.openFilter?.('glowingEdges'),
           },
         ],
       ],
