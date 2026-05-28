@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { AdjustmentDialog } from '@/components/image-editor/AdjustmentDialog'
@@ -12,6 +12,7 @@ import { ColorPickerDialog } from '@/components/image-editor/ColorPickerDialog'
 import { ContextMenu, type ContextMenuItem } from '@/components/image-editor/ContextMenu'
 import { ImageSizeDialog } from '@/components/image-editor/ImageSizeDialog'
 import { LayerStyleDialog } from '@/components/image-editor/LayerStyleDialog'
+import { WarpTextDialog } from '@/components/image-editor/WarpTextDialog'
 import { MenuBar } from '@/components/image-editor/MenuBar'
 import { RotateArbitraryDialog } from '@/components/image-editor/RotateArbitraryDialog'
 import { NewDocumentDialog } from '@/components/image-editor/NewDocumentDialog'
@@ -131,12 +132,17 @@ import type {
   OutputFormat,
   SmartSource,
   TextOptions,
+  TextShape,
+  TextWarp,
   Point,
   Rect,
   ReplaceColorParams,
   Tool,
   Transforms,
 } from '@/lib/image-editor/types'
+
+/** Identity warp — used to seed the Warp Text dialog for un-warped text. */
+const NONE_WARP: TextWarp = { style: 'none', bend: 0, horizontal: 0, vertical: 0 }
 
 /**
  * Compact relative-time formatter ("5m ago", "2h ago", "3d ago"). Used by
@@ -870,6 +876,14 @@ export function ImageEditorPage() {
     selectedLayer.shape.kind === 'path' &&
     selectedLayer.shape.anchors.length >= 2
 
+  // Warp Text needs a plain text layer. Path-following text can't also warp
+  // (the renderer's path placement wins), so exclude it.
+  const canWarpText =
+    !!selectedLayer &&
+    selectedLayer.kind === 'annotation' &&
+    selectedLayer.shape.kind === 'text' &&
+    !selectedLayer.shape.followPathLayerId
+
   const handleTypeOnPath = useCallback(() => {
     const sel = findLayerById(state.layers, selectedLayerId)
     if (!sel || sel.kind !== 'annotation' || sel.shape.kind !== 'path') return
@@ -900,6 +914,69 @@ export function ImageEditorPage() {
       },
     })
   }, [state.layers, selectedLayerId, commitLayer, t, textOptions, colors.fg])
+
+  // ── Warp Text ──────────────────────────────────────────────────────────
+  // Warp edits an existing text layer's `shape.warp`. Live preview overlays a
+  // warped copy onto the canvas via `displayState` (below) WITHOUT touching
+  // history; Apply commits one history step via patchLayer; Cancel just drops
+  // the preview. This keeps the undo stack to a single original→warped entry.
+  const [warpTarget, setWarpTarget] = useState<{
+    layerId: string
+    initial: TextWarp
+  } | null>(null)
+  const [warpPreview, setWarpPreview] = useState<TextWarp | null>(null)
+
+  const handleOpenWarpText = useCallback(() => {
+    const sel = findLayerById(state.layers, selectedLayerId)
+    if (!sel || sel.kind !== 'annotation' || sel.shape.kind !== 'text') return
+    const init = sel.shape.warp ?? NONE_WARP
+    setWarpTarget({ layerId: sel.id, initial: init })
+    setWarpPreview(init)
+  }, [state.layers, selectedLayerId])
+
+  const handleWarpPreview = useCallback((warp: TextWarp) => {
+    setWarpPreview(warp)
+  }, [])
+
+  const handleWarpApply = useCallback(
+    (warp: TextWarp) => {
+      if (warpTarget) {
+        const finalWarp: TextWarp | undefined =
+          warp.style === 'none' ? undefined : warp
+        history.set({
+          ...state,
+          layers: mapLayerById(state.layers, warpTarget.layerId, (l) =>
+            l.kind === 'annotation' && l.shape.kind === 'text'
+              ? { ...l, shape: { ...(l.shape as TextShape), warp: finalWarp } }
+              : l,
+          ),
+        })
+      }
+      setWarpTarget(null)
+      setWarpPreview(null)
+    },
+    [warpTarget, history, state],
+  )
+
+  const handleWarpCancel = useCallback(() => {
+    setWarpTarget(null)
+    setWarpPreview(null)
+  }, [])
+
+  // Canvas render state with the live warp preview overlaid on the target text
+  // layer (history untouched). Everything else — hit-testing, handles — keeps
+  // using the real `state`, so selection stays on the layer's logical bbox.
+  const displayState: EditorState = useMemo(() => {
+    if (!warpTarget || !warpPreview) return state
+    return {
+      ...state,
+      layers: mapLayerById(state.layers, warpTarget.layerId, (l) =>
+        l.kind === 'annotation' && l.shape.kind === 'text'
+          ? { ...l, shape: { ...(l.shape as TextShape), warp: warpPreview } }
+          : l,
+      ),
+    }
+  }, [state, warpTarget, warpPreview])
 
   // ── Selection menu handlers ───────────────────────────────────────────
   // `applySelection` merges a partial selection update into history. The
@@ -3456,6 +3533,8 @@ export function ImageEditorPage() {
             openLayerStyle: handleOpenLayerStyle,
             typeOnPath: handleTypeOnPath,
             canTypeOnPath,
+            warpText: handleOpenWarpText,
+            canWarpText,
             zoomIn,
             zoomOut,
             zoomFit: zoomReset,
@@ -3577,7 +3656,7 @@ export function ImageEditorPage() {
             <Canvas
               ref={canvasRef}
               image={image}
-              state={state}
+              state={displayState}
               tool={tool}
               toolColor={colors.fg}
               toolStrokeWidth={strokeWidth}
@@ -3762,6 +3841,13 @@ export function ImageEditorPage() {
         onPreview={handleAdjustmentPreview}
         onApply={handleAdjustmentApply}
         onCancel={handleAdjustmentCancel}
+      />
+      <WarpTextDialog
+        open={warpTarget !== null}
+        initial={warpTarget?.initial ?? NONE_WARP}
+        onPreview={handleWarpPreview}
+        onApply={handleWarpApply}
+        onCancel={handleWarpCancel}
       />
       <FilterDialog
         open={openFilter}
