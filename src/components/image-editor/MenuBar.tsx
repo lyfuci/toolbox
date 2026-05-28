@@ -659,6 +659,39 @@ export function MenuBar({ handlers }: Props) {
             label: t('pages.imageEditor.filters.median') + '…',
             onClick: () => handlers.openFilter?.('median'),
           },
+          {
+            id: 'flt-surfaceBlur',
+            label: t('pages.imageEditor.filters.surfaceBlur') + '…',
+            onClick: () => handlers.openFilter?.('surfaceBlur'),
+          },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'flt-wave',
+            label: t('pages.imageEditor.filters.wave') + '…',
+            onClick: () => handlers.openFilter?.('wave'),
+          },
+          {
+            id: 'flt-ripple',
+            label: t('pages.imageEditor.filters.ripple') + '…',
+            onClick: () => handlers.openFilter?.('ripple'),
+          },
+          {
+            id: 'flt-crystallize',
+            label: t('pages.imageEditor.filters.crystallize') + '…',
+            onClick: () => handlers.openFilter?.('crystallize'),
+          },
+          {
+            id: 'flt-colorHalftone',
+            label: t('pages.imageEditor.filters.colorHalftone') + '…',
+            onClick: () => handlers.openFilter?.('colorHalftone'),
+          },
+          {
+            id: 'flt-wind',
+            label: t('pages.imageEditor.filters.wind') + '…',
+            onClick: () => handlers.openFilter?.('wind'),
+          },
         ],
       ],
     },

@@ -1,3 +1,4 @@
+import type { WindParams } from './types'
 /**
  * Wind — the classic "speed streak" Stylize filter (Photoshop Filter →
  * Stylize → Wind). Spatial filter → shared FILTER signature, mutates `data` in
@@ -44,13 +45,6 @@
  * Edge cases: strength ≤ 0 → max streak length 0 → identity. A flat field has
  * no edges over the detection threshold → identity. Alpha is left untouched.
  */
-
-export type WindParams = {
-  kind: 'wind'
-  direction: 'left' | 'right'
-  /** 1..100 streak-length scale (pixels-ish; bake-scaled). Default 30. */
-  strength: number
-}
 
 export const DEFAULT_WIND: WindParams = {
   kind: 'wind',

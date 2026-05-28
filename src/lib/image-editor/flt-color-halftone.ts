@@ -1,3 +1,4 @@
+import type { ColorHalftoneParams } from './types'
 /**
  * Color Halftone — the classic CMYK halftone screen (Photoshop's Pixelate →
  * Color Halftone), producing the comic-book / newsprint dot look. Spatial
@@ -40,12 +41,6 @@
  * by K) so pure white stays white (zero ink ⇒ no dots) and saturated/black
  * areas get dense dots — the two behaviours the tests check.
  */
-
-export type ColorHalftoneParams = {
-  kind: 'colorHalftone'
-  dotRadius: number
-  angle: number
-}
 
 export const DEFAULT_COLOR_HALFTONE: ColorHalftoneParams = {
   kind: 'colorHalftone',

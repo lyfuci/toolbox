@@ -1,3 +1,4 @@
+import type { WaveParams } from './types'
 /**
  * Wave — a Photoshop Distort > Wave clone. Every output pixel is *pulled* from
  * a wavy offset of its own position, so straight features bend into waves. This
@@ -25,19 +26,6 @@
  * preview buffer — otherwise a wave tuned on a small preview would look far too
  * weak (or short) on the exported image. `type` is an enum and is not scaled.
  */
-
-export type WaveParams = {
-  kind: 'wave'
-  /** Peak displacement in pixels (how far a crest pushes a pixel). */
-  amplitude: number
-  /** Distance in pixels between successive wave crests. */
-  wavelength: number
-  /**
-   * Waveform: 'sine' is a smooth swell; 'triangle' is a linear zig-zag with
-   * the same period and peak. (PS also offers Square; we ship sine + triangle.)
-   */
-  type: 'sine' | 'triangle'
-}
 
 export const DEFAULT_WAVE: WaveParams = {
   kind: 'wave',

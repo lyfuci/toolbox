@@ -1,3 +1,4 @@
+import type { RippleParams } from './types'
 /**
  * Ripple — a Photoshop Distort > Ripple clone: a fine, water-on-a-pond
  * displacement. Like Wave it is a spatial *displacement* filter (the colour at
@@ -25,14 +26,6 @@
  * resolution scales `size`, which already scales the displacement with it.
  * Therefore `amount` does NOT need bake-scale scaling — only `size` does.
  */
-
-export type RippleParams = {
-  kind: 'ripple'
-  /** Displacement strength, -100..100. Sign flips the ripple phase. */
-  amount: number
-  /** Ripple wavelength scale in pixels, 1..30 (smaller = finer ripples). */
-  size: number
-}
 
 export const DEFAULT_RIPPLE: RippleParams = {
   kind: 'ripple',

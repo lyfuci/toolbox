@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { applyRipple, DEFAULT_RIPPLE, type RippleParams } from '../flt-ripple'
+import { applyRipple, DEFAULT_RIPPLE } from '../flt-ripple'
+import type { RippleParams } from '../types'
 
 /**
  * Node-only (no canvas / no DOM): hand-built RGBA buffers exercise the public

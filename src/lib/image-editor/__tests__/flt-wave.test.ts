@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { applyWave, DEFAULT_WAVE, type WaveParams } from '../flt-wave'
+import { applyWave, DEFAULT_WAVE } from '../flt-wave'
+import type { WaveParams } from '../types'
 
 /**
  * Node-only (no canvas / no DOM): we hand-build RGBA buffers and exercise the

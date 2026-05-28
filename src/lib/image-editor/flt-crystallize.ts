@@ -1,3 +1,4 @@
+import type { CrystallizeParams } from './types'
 /**
  * Crystallize — Voronoi pixelation (Photoshop's Pixelate → Crystallize). The
  * image is shattered into irregular polygonal "crystal" regions, each filled
@@ -34,8 +35,6 @@
  * The result is crisp polygon edges (each pixel snaps wholly to one seed) with
  * a flat average fill per region — the signature Crystallize look.
  */
-
-export type CrystallizeParams = { kind: 'crystallize'; cellSize: number }
 
 export const DEFAULT_CRYSTALLIZE: CrystallizeParams = {
   kind: 'crystallize',

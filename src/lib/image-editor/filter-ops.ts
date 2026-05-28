@@ -24,6 +24,12 @@ import { applyShadowsHighlights, DEFAULT_SHADOWS_HIGHLIGHTS } from './flt-shadow
 import { applyVignette, DEFAULT_VIGNETTE } from './flt-vignette'
 import { applyClouds, DEFAULT_CLOUDS } from './flt-clouds'
 import { applyMedian, DEFAULT_MEDIAN } from './flt-median'
+import { applyWave, DEFAULT_WAVE } from './flt-wave'
+import { applyRipple, DEFAULT_RIPPLE } from './flt-ripple'
+import { applyCrystallize, DEFAULT_CRYSTALLIZE } from './flt-crystallize'
+import { applyColorHalftone, DEFAULT_COLOR_HALFTONE } from './flt-color-halftone'
+import { applySurfaceBlur, DEFAULT_SURFACE_BLUR } from './flt-surface-blur'
+import { applyWind, DEFAULT_WIND } from './flt-wind'
 
 /**
  * Pixel transforms backing each FilterLayer kind. All operate on RGBA
@@ -137,6 +143,12 @@ export const DEFAULT_FOR_FILTER_KIND: Record<FilterParams['kind'], FilterParams>
   vignette: DEFAULT_VIGNETTE,
   clouds: DEFAULT_CLOUDS,
   median: DEFAULT_MEDIAN,
+  wave: DEFAULT_WAVE,
+  ripple: DEFAULT_RIPPLE,
+  crystallize: DEFAULT_CRYSTALLIZE,
+  colorHalftone: DEFAULT_COLOR_HALFTONE,
+  surfaceBlur: DEFAULT_SURFACE_BLUR,
+  wind: DEFAULT_WIND,
 }
 
 /**
@@ -175,6 +187,20 @@ export function scaleFilterParams(
       return { ...params, radius: params.radius * scale }
     case 'median':
       return { ...params, radius: params.radius * scale }
+    case 'wave':
+      return { ...params, amplitude: params.amplitude * scale, wavelength: params.wavelength * scale }
+    case 'ripple':
+      // `amount` is dimensionless — `size` (wavelength) carries the spatial
+      // dependence, so only it scales (scaling both would double-displace).
+      return { ...params, size: params.size * scale }
+    case 'crystallize':
+      return { ...params, cellSize: params.cellSize * scale }
+    case 'colorHalftone':
+      return { ...params, dotRadius: params.dotRadius * scale }
+    case 'surfaceBlur':
+      return { ...params, radius: params.radius * scale }
+    case 'wind':
+      return { ...params, strength: params.strength * scale }
     default:
       return params
   }
@@ -255,6 +281,24 @@ export function applyFilter(
       return
     case 'median':
       applyMedian(data, width, height, params)
+      return
+    case 'wave':
+      applyWave(data, width, height, params)
+      return
+    case 'ripple':
+      applyRipple(data, width, height, params)
+      return
+    case 'crystallize':
+      applyCrystallize(data, width, height, params)
+      return
+    case 'colorHalftone':
+      applyColorHalftone(data, width, height, params)
+      return
+    case 'surfaceBlur':
+      applySurfaceBlur(data, width, height, params)
+      return
+    case 'wind':
+      applyWind(data, width, height, params)
       return
   }
 }

@@ -1,3 +1,4 @@
+import type { SurfaceBlurParams } from './types'
 /**
  * Surface Blur — an edge-preserving (bilateral-style) blur that mirrors
  * Photoshop's Filter → Blur → Surface Blur. Spatial filter → shared FILTER
@@ -41,14 +42,6 @@
  * filter pass. A separable approximation is NOT valid for a bilateral filter
  * (the range weight is not separable), so we keep the honest 2D window.
  */
-
-export type SurfaceBlurParams = {
-  kind: 'surfaceBlur'
-  /** Neighbourhood radius in pixels (window is (2·radius+1)²). Default 8. */
-  radius: number
-  /** Max per-channel value difference (0..255) for a neighbour to count. Default 25. */
-  threshold: number
-}
 
 export const DEFAULT_SURFACE_BLUR: SurfaceBlurParams = {
   kind: 'surfaceBlur',
