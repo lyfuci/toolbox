@@ -42,6 +42,17 @@ type Props = {
   setBucketTolerance: (n: number) => void
   wandTolerance: number
   setWandTolerance: (n: number) => void
+  /** Liquify session — when the tool is active these drive the warp brush
+   *  + the Apply/Cancel commit flow shown in the options bar. */
+  liquifyActive?: boolean
+  liquifyMode?: 'push' | 'twirlCW' | 'twirlCCW' | 'bloat' | 'pucker'
+  setLiquifyMode?: (m: 'push' | 'twirlCW' | 'twirlCCW' | 'bloat' | 'pucker') => void
+  liquifySize?: number
+  setLiquifySize?: (n: number) => void
+  liquifyStrength?: number
+  setLiquifyStrength?: (n: number) => void
+  onApplyLiquify?: () => void
+  onCancelLiquify?: () => void
   /** PS-style boolean combine mode for marquee/lasso (新建/加/减/交). */
   selectionMode: SelectionModifier
   setSelectionMode: (m: SelectionModifier) => void
@@ -89,6 +100,15 @@ export function OptionsBar({
   setBucketTolerance,
   wandTolerance,
   setWandTolerance,
+  liquifyActive,
+  liquifyMode,
+  setLiquifyMode,
+  liquifySize,
+  setLiquifySize,
+  liquifyStrength,
+  setLiquifyStrength,
+  onApplyLiquify,
+  onCancelLiquify,
   selectionMode,
   setSelectionMode,
   feather,
@@ -230,6 +250,87 @@ export function OptionsBar({
               title={t('pages.imageEditor.deselect')}
             >
               {t('pages.imageEditor.deselect')}
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Liquify — mode dropdown + brush size + strength + Apply/Cancel session
+  // commit. PS uses a separate modal; we surface the same controls in-place.
+  if (tool === 'liquify') {
+    const modes: { id: 'push' | 'twirlCW' | 'twirlCCW' | 'bloat' | 'pucker'; key: string }[] = [
+      { id: 'push', key: 'push' },
+      { id: 'twirlCW', key: 'twirlCW' },
+      { id: 'twirlCCW', key: 'twirlCCW' },
+      { id: 'bloat', key: 'bloat' },
+      { id: 'pucker', key: 'pucker' },
+    ]
+    return (
+      <div className="pf-options">
+        <div className="pf-opt-group">
+          <span className="pf-opt-label">{t('pages.imageEditor.liquify.mode')}:</span>
+          <select
+            className="pf-opt-input"
+            style={{ width: 110 }}
+            value={liquifyMode ?? 'push'}
+            onChange={(e) =>
+              setLiquifyMode?.(e.target.value as 'push' | 'twirlCW' | 'twirlCCW' | 'bloat' | 'pucker')
+            }
+          >
+            {modes.map((m) => (
+              <option key={m.id} value={m.id}>
+                {t(`pages.imageEditor.liquify.modes.${m.key}`)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="pf-opt-group">
+          <span className="pf-opt-label">{t('pages.imageEditor.liquify.size')}:</span>
+          <input
+            type="range"
+            min={5}
+            max={300}
+            value={liquifySize ?? 60}
+            onChange={(e) => setLiquifySize?.(Number(e.target.value))}
+            style={{ width: 100, accentColor: 'var(--pf-accent)' }}
+          />
+          <span className="pf-opt-label" style={{ marginLeft: 4, minWidth: 28 }}>
+            {liquifySize ?? 60}px
+          </span>
+        </div>
+        <div className="pf-opt-group">
+          <span className="pf-opt-label">{t('pages.imageEditor.liquify.strength')}:</span>
+          <input
+            type="range"
+            min={1}
+            max={100}
+            value={liquifyStrength ?? 50}
+            onChange={(e) => setLiquifyStrength?.(Number(e.target.value))}
+            style={{ width: 100, accentColor: 'var(--pf-accent)' }}
+          />
+          <span className="pf-opt-label" style={{ marginLeft: 4, minWidth: 28 }}>
+            {liquifyStrength ?? 50}%
+          </span>
+        </div>
+        {liquifyActive && (
+          <div className="pf-opt-group" style={{ borderRight: 0 }}>
+            <button
+              type="button"
+              className="pf-opt-btn"
+              onClick={onCancelLiquify}
+              style={{ width: 'auto', padding: '0 8px' }}
+            >
+              {t('pages.imageEditor.cancel')}
+            </button>
+            <button
+              type="button"
+              className="pf-opt-btn"
+              onClick={onApplyLiquify}
+              style={{ width: 'auto', padding: '0 8px', marginLeft: 4 }}
+            >
+              {t('pages.imageEditor.apply')}
             </button>
           </div>
         )}

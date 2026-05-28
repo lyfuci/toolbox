@@ -166,6 +166,19 @@ type Props = {
   guides?: { h: number[]; v: number[] }
   /** Called when the user drag-creates a new guide from a ruler. */
   onAddGuide?: (axis: 'h' | 'v', pos: number) => void
+  /** Liquify session — the working canvas (warped image surface). When set
+   *  and the Liquify tool is active, the Canvas paints this OVER the rendered
+   *  composite so the user sees the in-progress warp; brush strokes drive
+   *  `onLiquifyStamp`. The component itself never mutates this canvas. */
+  liquifyOverlay?: HTMLCanvasElement | null
+  /** Fires on each pointer-move during a Liquify stroke. `(cx, cy)` is the
+   *  current cursor in canvas-pixel space; `(dx, dy)` is the delta from the
+   *  previous frame (used by 'push' mode; ignored by other modes). */
+  onLiquifyStamp?: (cx: number, cy: number, dx: number, dy: number) => void
+  /** Monotonic tick from the parent; bumped after every Liquify stamp so the
+   *  render effect re-paints the overlay even though the canvas-object
+   *  identity is stable. */
+  liquifyTick?: number
   /** Quick Mask overlay — when present, render red rubylith over the
    *  canvas where the mask alpha is low. Resolved via imageCache. */
   quickMaskDataUrl?: string
@@ -311,6 +324,13 @@ type Interaction =
    */
   | { kind: 'ruler-dragging'; axis: 'h' | 'v'; pos: number }
   /**
+   * Liquify warp-brush stroke. Stays alive between mousedown/mouseup; each
+   * mousemove fires `onLiquifyStamp(cx, cy, dx, dy)` and updates `last` to
+   * the current cursor. ImageEditor's stamp handler is the one mutating the
+   * overlay canvas — the Canvas just routes events.
+   */
+  | { kind: 'liquify-stroking'; last: Point }
+  /**
    * Raster Layer Mask painting. When the brush tool is active and the
    * selected layer is a MaskLayer with `dataUrl`, brush strokes paint
    * into a mask-sized offscreen instead of creating a new brush layer.
@@ -364,6 +384,9 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     showGuides = true,
     guides,
     onAddGuide,
+    liquifyOverlay,
+    onLiquifyStamp,
+    liquifyTick,
     quickMaskDataUrl,
     onUpdateQuickMaskDataUrl,
     cropAspect,
@@ -512,6 +535,20 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     if (showGrid) {
       drawGridOverlay(canvasRef.current, gridStep)
     }
+    // Liquify: paint the warped working canvas directly over the rendered
+    // composite. The committed (un-warped) composite stays underneath only
+    // for redraw timing — the user sees only the overlay. Drawn before
+    // guides/rulers so those still sit on top.
+    if (liquifyOverlay) {
+      const lc = canvasRef.current!
+      const lctx = lc.getContext('2d')
+      if (lctx) {
+        lctx.save()
+        lctx.setTransform(1, 0, 0, 1, 0, 0)
+        lctx.drawImage(liquifyOverlay, 0, 0, lc.width, lc.height)
+        lctx.restore()
+      }
+    }
     // View > Guides — draw the cyan guide lines under the rulers (so the
     // ruler band hides any guide that drifts under it).
     if (showGuides) {
@@ -577,6 +614,8 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     showRulers,
     showGuides,
     guides,
+    liquifyOverlay,
+    liquifyTick,
     quickMaskDataUrl,
   ])
 
@@ -732,6 +771,19 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
           return
         }
       }
+    }
+
+    // Liquify — clicking the canvas starts a warp stroke. The actual pixel
+    // work happens in `onLiquifyStamp` (parent-managed: snapshot+warp+swap
+    // on the working overlay canvas). Each stamp also re-renders us via the
+    // overlay ref read in the render effect.
+    if (tool === 'liquify' && liquifyOverlay && onLiquifyStamp) {
+      const p = eventToCanvasXY(e)
+      // Initial stamp at click position with zero delta so push mode doesn't
+      // jump (delta is meaningful only between successive moves).
+      onLiquifyStamp(p.x, p.y, 0, 0)
+      setInteraction({ kind: 'liquify-stroking', last: p })
+      return
     }
 
     // Zoom tool: click zoom-in 2x at point, Alt+click zoom-out 0.5x at point.
@@ -1112,6 +1164,12 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       return
     }
 
+    if (interaction.kind === 'liquify-stroking') {
+      onLiquifyStamp?.(p.x, p.y, p.x - interaction.last.x, p.y - interaction.last.y)
+      setInteraction({ kind: 'liquify-stroking', last: p })
+      return
+    }
+
     if (interaction.kind === 'crop-drawing') {
       const r = interaction.rect
       const dw = p.x - r.x
@@ -1269,6 +1327,10 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
       // (so a stray click on the ruler doesn't litter the canvas with guides).
       const min = RULER_BAND_PX + 1
       if (interaction.pos >= min) onAddGuide?.(interaction.axis, interaction.pos)
+      setInteraction({ kind: 'idle' })
+      return
+    }
+    if (interaction.kind === 'liquify-stroking') {
       setInteraction({ kind: 'idle' })
       return
     }

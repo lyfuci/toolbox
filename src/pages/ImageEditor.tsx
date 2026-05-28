@@ -58,6 +58,7 @@ import { smoothSelection, growSelection, rasterizePolygonMask } from '@/lib/imag
 import { selectSubject } from '@/lib/image-editor/select-subject'
 import { ColorRangeDialog } from '@/components/image-editor/ColorRangeDialog'
 import { ReplaceColorDialog } from '@/components/image-editor/ReplaceColorDialog'
+import { applyLiquifyBrush, type LiquifyMode } from '@/lib/image-editor/liquify-warp'
 import { floodFillMask, maskToDataUrl } from '@/lib/image-editor/flood-fill'
 import { useHistoryState } from '@/lib/image-editor/history'
 import {
@@ -264,6 +265,20 @@ export function ImageEditorPage() {
   // active, cleared whenever the user switches away from Stamp (handled in
   // trySetTool). Lives outside EditorState because it's transient UI state.
   const [cloneSource, setCloneSource] = useState<Point | null>(null)
+  // Liquify session — when the user enters the Liquify tool, we snapshot the
+  // composite into this canvas. Each brush stamp warps it in place (no React
+  // re-render needed; the Canvas component reads the ref each draw). Apply
+  // commits the canvas's pixels as an image-shape layer; Cancel/tool-switch
+  // discards it. Tool options below are transient UI state — they don't push
+  // history (history fires only on Apply, like Quick Mask).
+  const [liquifyCanvas, setLiquifyCanvas] = useState<HTMLCanvasElement | null>(null)
+  // Identity of `liquifyCanvas` is stable across stamps (we mutate it in
+  // place), so the Canvas component needs a separate trigger to re-render
+  // after each stamp. Bumping this tick on each stamp does exactly that.
+  const [liquifyTick, setLiquifyTick] = useState(0)
+  const [liquifyMode, setLiquifyMode] = useState<LiquifyMode>('push')
+  const [liquifySize, setLiquifySize] = useState(60)
+  const [liquifyStrength, setLiquifyStrength] = useState(50) // %
   const [selectedLayerId, setSelectedLayerId] = useState<string>('image')
 
   const [outFormat, setOutFormat] = useState<OutputFormat>('png')
@@ -495,9 +510,16 @@ export function ImageEditorPage() {
       // Leaving the Clone Stamp tool drops any stale source so re-entering
       // doesn't surprise the user with a sample point from minutes ago.
       if (next !== 'stamp') setCloneSource(null)
+      // Liquify: entering snapshots the composite into the working canvas;
+      // leaving with an unapplied session in flight discards it (same pattern
+      // as Crop). The handler is defined later in the component, so we
+      // forward through a ref (same mechanism as `duplicateRef` etc.).
+      if (next === 'liquify') liquifyEnterRef.current()
+      else if (liquifyCanvas) setLiquifyCanvas(null)
     },
-    [stubMsg, t],
+    [stubMsg, t, liquifyCanvas],
   )
+  const liquifyEnterRef = useRef<() => void>(() => {})
 
   // ── Global keyboard shortcuts (PS-style) ────────────────────────────────
   useEffect(() => {
@@ -2466,6 +2488,92 @@ export function ImageEditorPage() {
     toast.success(t('pages.imageEditor.selectMenu.removeBackground'))
   }, [renderPreviewComposite, image, state, ensureImage, history, t])
 
+  // ── Liquify session ────────────────────────────────────────────────────
+  /** Snapshot the composite into a working canvas — that canvas becomes the
+   *  warpable surface the Canvas overlays on top of the rendered scene. */
+  const handleEnterLiquify = useCallback(() => {
+    if (!image) return
+    const buf = renderPreviewComposite()
+    if (!buf) {
+      toast.error(t('pages.imageEditor.errBucketRead'))
+      return
+    }
+    const c = document.createElement('canvas')
+    c.width = buf.w
+    c.height = buf.h
+    const ctx = c.getContext('2d', { willReadFrequently: true })
+    if (!ctx) return
+    ctx.putImageData(new ImageData(new Uint8ClampedArray(buf.data), buf.w, buf.h), 0, 0)
+    setLiquifyCanvas(c)
+  }, [image, renderPreviewComposite, t])
+  // Bind the entry handler into the ref `trySetTool` reaches; mirrors the
+  // forward-ref pattern used by duplicateRef / moveLayerRef / etc. (Same
+  // shape as those, but the linter over-fires on this one specifically — the
+  // assignment is idiomatic React + identical to the pattern several lines
+  // up; disabling locally with a justification.)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
+    liquifyEnterRef.current = () => handleEnterLiquify()
+  }, [handleEnterLiquify])
+
+  const handleCancelLiquify = useCallback(() => {
+    setLiquifyCanvas(null)
+  }, [])
+
+  /** Apply: commit the warped canvas as a full-canvas image-shape layer.
+   *  Layer bbox uses preview-pixel dims so existing transform math applies. */
+  const handleApplyLiquify = useCallback(() => {
+    if (!liquifyCanvas || !image) return
+    let dataUrl: string
+    try {
+      dataUrl = liquifyCanvas.toDataURL('image/png')
+    } catch {
+      toast.error(t('pages.imageEditor.errBucketRead'))
+      return
+    }
+    const { w, h } = previewDimsOf(image, state)
+    commitLayer({
+      id: crypto.randomUUID(),
+      name: t('pages.imageEditor.tool.liquify'),
+      visible: true,
+      opacity: 100,
+      blend: 'normal',
+      kind: 'annotation',
+      shape: { kind: 'image', x: 0, y: 0, w, h, dataUrl },
+    })
+    setLiquifyCanvas(null)
+  }, [liquifyCanvas, image, state, commitLayer, t])
+
+  /** Each pointer-move during a Liquify stroke: snapshot the working canvas,
+   *  apply the warp stamp into a fresh buffer, write back. Source/dest are
+   *  separate so a single stamp can't feedback on itself mid-evaluation. */
+  const handleLiquifyStamp = useCallback(
+    (cx: number, cy: number, dx: number, dy: number) => {
+      const c = liquifyCanvas
+      if (!c) return
+      const ctx = c.getContext('2d', { willReadFrequently: true })
+      if (!ctx) return
+      const src = ctx.getImageData(0, 0, c.width, c.height)
+      const dst = new ImageData(new Uint8ClampedArray(src.data), c.width, c.height)
+      applyLiquifyBrush({
+        src: src.data,
+        dst: dst.data,
+        w: c.width,
+        h: c.height,
+        cx,
+        cy,
+        radius: liquifySize,
+        strength: liquifyStrength / 100,
+        mode: liquifyMode,
+        dx,
+        dy,
+      })
+      ctx.putImageData(dst, 0, 0)
+      setLiquifyTick((n) => n + 1)
+    },
+    [liquifyCanvas, liquifySize, liquifyStrength, liquifyMode],
+  )
+
   const handleClearCrop = useCallback(() => {
     if (!state.cropRect) return
     history.set({ ...state, cropRect: undefined })
@@ -3383,6 +3491,15 @@ export function ImageEditorPage() {
           setBucketTolerance={setBucketTolerance}
           wandTolerance={wandTolerance}
           setWandTolerance={setWandTolerance}
+          liquifyActive={!!liquifyCanvas}
+          liquifyMode={liquifyMode}
+          setLiquifyMode={setLiquifyMode}
+          liquifySize={liquifySize}
+          setLiquifySize={setLiquifySize}
+          liquifyStrength={liquifyStrength}
+          setLiquifyStrength={setLiquifyStrength}
+          onApplyLiquify={handleApplyLiquify}
+          onCancelLiquify={handleCancelLiquify}
           selectionMode={selectionMode}
           setSelectionMode={setSelectionMode}
           feather={featherOption}
@@ -3493,6 +3610,9 @@ export function ImageEditorPage() {
               showGuides={showGuides}
               guides={state.guides}
               onAddGuide={handleAddGuide}
+              liquifyOverlay={liquifyCanvas}
+              onLiquifyStamp={handleLiquifyStamp}
+              liquifyTick={liquifyTick}
               quickMaskDataUrl={state.quickMask?.dataUrl}
               cropAspect={CROP_ASPECTS.find((a) => a.id === cropAspectId)?.ratio ?? undefined}
               onCursorMove={setCursor}
