@@ -157,6 +157,15 @@ type Props = {
   showGrid?: boolean
   /** Grid spacing in preview-canvas pixels. Default 50. */
   gridStep?: number
+  /** View > Rulers — show pixel rulers at top + left edges. */
+  showRulers?: boolean
+  /** View > Show Guides — visibility toggle for the guide lines themselves. */
+  showGuides?: boolean
+  /** Active guides (preview-pixel space). Drawn when showGuides; created by
+   *  click-dragging from a ruler band. */
+  guides?: { h: number[]; v: number[] }
+  /** Called when the user drag-creates a new guide from a ruler. */
+  onAddGuide?: (axis: 'h' | 'v', pos: number) => void
   /** Quick Mask overlay — when present, render red rubylith over the
    *  canvas where the mask alpha is low. Resolved via imageCache. */
   quickMaskDataUrl?: string
@@ -294,6 +303,14 @@ type Interaction =
    */
   | { kind: 'text-editing'; point: Point; value: string }
   /**
+   * View > Rulers drag — user is dragging out a new guide from one of the
+   * ruler bands. `axis` says which ruler started the drag; `pos` is the
+   * current mouse position projected onto that axis (preview-pixel space).
+   * On mouseup, commits via `onAddGuide`. Lives independently of `tool` so
+   * users can pull guides regardless of which tool is active.
+   */
+  | { kind: 'ruler-dragging'; axis: 'h' | 'v'; pos: number }
+  /**
    * Raster Layer Mask painting. When the brush tool is active and the
    * selected layer is a MaskLayer with `dataUrl`, brush strokes paint
    * into a mask-sized offscreen instead of creating a new brush layer.
@@ -343,6 +360,10 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     extraPreviewLayer,
     showGrid,
     gridStep = 50,
+    showRulers,
+    showGuides = true,
+    guides,
+    onAddGuide,
     quickMaskDataUrl,
     onUpdateQuickMaskDataUrl,
     cropAspect,
@@ -491,6 +512,38 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     if (showGrid) {
       drawGridOverlay(canvasRef.current, gridStep)
     }
+    // View > Guides — draw the cyan guide lines under the rulers (so the
+    // ruler band hides any guide that drifts under it).
+    if (showGuides) {
+      drawGuidesOverlay(canvasRef.current, guides)
+    }
+    // View > Rulers — drawn LAST so the bars overlay everything else at the
+    // top/left edges of the canvas viewport.
+    if (showRulers) {
+      drawRulersOverlay(canvasRef.current)
+    }
+    // Live preview of a guide being dragged out of the ruler band.
+    if (interaction.kind === 'ruler-dragging') {
+      const c = canvasRef.current!
+      const ctx = c.getContext('2d')
+      if (ctx) {
+        ctx.save()
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
+        ctx.strokeStyle = 'rgba(0, 200, 255, 0.6)'
+        ctx.lineWidth = 1
+        ctx.setLineDash([4, 3])
+        ctx.beginPath()
+        if (interaction.axis === 'h') {
+          ctx.moveTo(0, interaction.pos + 0.5)
+          ctx.lineTo(c.width, interaction.pos + 0.5)
+        } else {
+          ctx.moveTo(interaction.pos + 0.5, 0)
+          ctx.lineTo(interaction.pos + 0.5, c.height)
+        }
+        ctx.stroke()
+        ctx.restore()
+      }
+    }
     // Quick Mask rubylith — show the in-progress offscreen during a stroke
     // (live preview for both add-to-selection and subtract-from-selection),
     // otherwise the committed dataUrl from the cache.
@@ -521,6 +574,9 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     extraPreviewLayer,
     showGrid,
     gridStep,
+    showRulers,
+    showGuides,
+    guides,
     quickMaskDataUrl,
   ])
 
@@ -654,6 +710,29 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
   const handleMouseDown = (e: ReactMouseEvent<HTMLCanvasElement>) => {
     // Pan mode: yield to Workspace's drag handler.
     if (panMode) return
+
+    // Ruler-drag — pulling a new guide out of the top/left ruler band wins
+    // over every tool (PS: rulers are always interactive when visible). Hit-
+    // test the band first; on mousedown we capture the axis and the initial
+    // projected position, then the move handler tracks the cursor until
+    // mouseup commits via onAddGuide.
+    if (showRulers && onAddGuide) {
+      const r = canvasRef.current?.getBoundingClientRect()
+      if (r) {
+        const sx = canvasRef.current!.width / r.width
+        const sy = canvasRef.current!.height / r.height
+        const cx = (e.clientX - r.left) * sx
+        const cy = (e.clientY - r.top) * sy
+        if (cy < RULER_BAND_PX) {
+          setInteraction({ kind: 'ruler-dragging', axis: 'v', pos: cx })
+          return
+        }
+        if (cx < RULER_BAND_PX) {
+          setInteraction({ kind: 'ruler-dragging', axis: 'h', pos: cy })
+          return
+        }
+      }
+    }
 
     // Zoom tool: click zoom-in 2x at point, Alt+click zoom-out 0.5x at point.
     if (tool === 'zoom') {
@@ -1024,6 +1103,15 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
     if (interaction.kind === 'idle') return
     const p = eventToCanvasXY(e)
 
+    if (interaction.kind === 'ruler-dragging') {
+      setInteraction({
+        kind: 'ruler-dragging',
+        axis: interaction.axis,
+        pos: interaction.axis === 'h' ? p.y : p.x,
+      })
+      return
+    }
+
     if (interaction.kind === 'crop-drawing') {
       const r = interaction.rect
       const dw = p.x - r.x
@@ -1176,6 +1264,14 @@ export const Canvas = forwardRef<CanvasHandle, Props>(function Canvas(
 
   const handleMouseUp = () => {
     if (interaction.kind === 'idle') return
+    if (interaction.kind === 'ruler-dragging') {
+      // Drop the guide only if the user pulled it past the opposite ruler band
+      // (so a stray click on the ruler doesn't litter the canvas with guides).
+      const min = RULER_BAND_PX + 1
+      if (interaction.pos >= min) onAddGuide?.(interaction.axis, interaction.pos)
+      setInteraction({ kind: 'idle' })
+      return
+    }
     if (interaction.kind === 'crop-drawing') {
       const r = interaction.rect
       if (Math.abs(r.w) < 4 || Math.abs(r.h) < 4) {
@@ -2532,6 +2628,102 @@ function drawQuickMaskOverlay(
   octx.drawImage(maskImg, 0, 0, overlay.width, overlay.height)
   // Now blit the overlay onto the main canvas. source-over by default.
   ctx.drawImage(overlay, 0, 0)
+  ctx.restore()
+}
+
+/**
+ * View > Guides — paint a cyan line for each h/v guide. Coords are in
+ * preview-pixel space (same as the live canvas at scale=previewScale), so we
+ * draw directly on the canvas with identity transform.
+ */
+function drawGuidesOverlay(
+  canvas: HTMLCanvasElement | null,
+  guides: { h: number[]; v: number[] } | undefined,
+) {
+  if (!canvas || !guides) return
+  if (guides.h.length === 0 && guides.v.length === 0) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.strokeStyle = 'rgba(0, 200, 255, 0.85)' // PS guide cyan
+  ctx.lineWidth = 1
+  ctx.setLineDash([])
+  for (const y of guides.h) {
+    ctx.beginPath()
+    ctx.moveTo(0, y + 0.5)
+    ctx.lineTo(canvas.width, y + 0.5)
+    ctx.stroke()
+  }
+  for (const x of guides.v) {
+    ctx.beginPath()
+    ctx.moveTo(x + 0.5, 0)
+    ctx.lineTo(x + 0.5, canvas.height)
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
+const RULER_BAND_PX = 18
+
+/**
+ * View > Rulers — top + left bars showing pixel ticks. Drawn last over the
+ * top/left edges of the canvas. Tick step adapts to canvas size so the labels
+ * don't pile up on tiny previews.
+ */
+function drawRulersOverlay(canvas: HTMLCanvasElement | null) {
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  const w = canvas.width
+  const h = canvas.height
+  // Choose a step that gives ~20-30 major ticks across the longer side.
+  const longSide = Math.max(w, h)
+  const niceSteps = [10, 20, 50, 100, 200, 500, 1000]
+  let step = niceSteps[niceSteps.length - 1]
+  for (const s of niceSteps) {
+    if (longSide / s <= 30) {
+      step = s
+      break
+    }
+  }
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  // Background bands.
+  ctx.fillStyle = 'rgba(20, 24, 32, 0.92)'
+  ctx.fillRect(0, 0, w, RULER_BAND_PX)
+  ctx.fillRect(0, 0, RULER_BAND_PX, h)
+  ctx.strokeStyle = 'rgba(120, 130, 140, 0.7)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(0, RULER_BAND_PX + 0.5)
+  ctx.lineTo(w, RULER_BAND_PX + 0.5)
+  ctx.moveTo(RULER_BAND_PX + 0.5, 0)
+  ctx.lineTo(RULER_BAND_PX + 0.5, h)
+  ctx.stroke()
+  // Ticks + labels.
+  ctx.fillStyle = 'rgba(220, 226, 232, 0.85)'
+  ctx.font = '9px ui-sans-serif, system-ui, sans-serif'
+  ctx.textBaseline = 'top'
+  // Top ruler (vertical ticks ↓, labels at major).
+  for (let x = 0; x < w; x += step / 5) {
+    const major = Math.round(x) % step === 0
+    ctx.fillRect(x, RULER_BAND_PX - (major ? 8 : 4), 1, major ? 8 : 4)
+    if (major && x >= 20 && x < w - 20) ctx.fillText(String(Math.round(x)), x + 2, 2)
+  }
+  // Left ruler (horizontal ticks →, labels at major).
+  ctx.textBaseline = 'bottom'
+  for (let y = 0; y < h; y += step / 5) {
+    const major = Math.round(y) % step === 0
+    ctx.fillRect(RULER_BAND_PX - (major ? 8 : 4), y, major ? 8 : 4, 1)
+    if (major && y >= 20 && y < h - 20) {
+      ctx.save()
+      ctx.translate(2, y - 2)
+      ctx.rotate(-Math.PI / 2)
+      ctx.fillText(String(Math.round(y)), 0, 0)
+      ctx.restore()
+    }
+  }
   ctx.restore()
 }
 

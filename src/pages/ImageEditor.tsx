@@ -57,6 +57,7 @@ import { buildSelectionMaskCanvas } from '@/lib/image-editor/selection-mask'
 import { smoothSelection, growSelection, rasterizePolygonMask } from '@/lib/image-editor/selection-modify'
 import { selectSubject } from '@/lib/image-editor/select-subject'
 import { ColorRangeDialog } from '@/components/image-editor/ColorRangeDialog'
+import { ReplaceColorDialog } from '@/components/image-editor/ReplaceColorDialog'
 import { floodFillMask, maskToDataUrl } from '@/lib/image-editor/flood-fill'
 import { useHistoryState } from '@/lib/image-editor/history'
 import {
@@ -131,6 +132,7 @@ import type {
   TextOptions,
   Point,
   Rect,
+  ReplaceColorParams,
   Tool,
   Transforms,
 } from '@/lib/image-editor/types'
@@ -394,6 +396,10 @@ export function ImageEditorPage() {
   // Grid + snap travel together: snap is a no-op when the grid is hidden.
   const [showGrid, setShowGrid] = useState(false)
   const [snapToGrid, setSnapToGrid] = useState(false)
+  // View > Rulers + Guides — rulers off by default (PS default), guides on so
+  // existing-document guides are visible the moment a user opens a saved file.
+  const [showRulers, setShowRulers] = useState(false)
+  const [showGuides, setShowGuides] = useState(true)
   // gridStep is a constant in v1; a follow-up will expose it via a settings
   // popover next to the View menu toggle.
   const gridStep = 50 // preview-canvas pixels
@@ -833,6 +839,45 @@ export function ImageEditorPage() {
   const selectedLayer = findLayerById(state.layers, selectedLayerId)
   const canGroupSelected = !!selectedLayer && selectedLayerId !== 'image'
   const canUngroupSelected = !!selectedLayer && isGroup(selectedLayer)
+  // Type-on-Path is offered only when the selected layer is a vector PathShape
+  // annotation — that's the only thing the renderer's `resolvePathSamples` can
+  // walk.
+  const canTypeOnPath =
+    !!selectedLayer &&
+    selectedLayer.kind === 'annotation' &&
+    selectedLayer.shape.kind === 'path' &&
+    selectedLayer.shape.anchors.length >= 2
+
+  const handleTypeOnPath = useCallback(() => {
+    const sel = findLayerById(state.layers, selectedLayerId)
+    if (!sel || sel.kind !== 'annotation' || sel.shape.kind !== 'path') return
+    // Anchor the text shape at the path's first anchor for sensible move/
+    // select math; the actual glyph placement comes from path samples at
+    // render time, so this (x, y) is just a convenient default origin.
+    const first = sel.shape.anchors[0]
+    const text = t('pages.imageEditor.typeOnPath.placeholder')
+    commitLayer({
+      id: crypto.randomUUID(),
+      name: t('pages.imageEditor.typeOnPath.layerName'),
+      visible: true,
+      opacity: 100,
+      blend: 'normal',
+      kind: 'annotation',
+      shape: {
+        kind: 'text',
+        x: first.x,
+        y: first.y,
+        text,
+        color: colors.fg,
+        fontSize: textOptions.fontSize,
+        fontFamily: textOptions.fontFamily,
+        fontWeight: textOptions.fontWeight,
+        fontStyle: textOptions.fontStyle,
+        align: 'left',
+        followPathLayerId: sel.id,
+      },
+    })
+  }, [state.layers, selectedLayerId, commitLayer, t, textOptions, colors.fg])
 
   // ── Selection menu handlers ───────────────────────────────────────────
   // `applySelection` merges a partial selection update into history. The
@@ -2271,6 +2316,39 @@ export function ImageEditorPage() {
     [colorRangeSource, history, state, t],
   )
 
+  // Replace Color dialog: same eyedropper-on-composite pattern as Color Range.
+  // Reuses the renderPreviewComposite helper; commits an adjustment layer with
+  // the resulting params (the actual pixel work happens in applyAdjustment).
+  const [replaceColorSource, setReplaceColorSource] = useState<
+    { data: Uint8ClampedArray; w: number; h: number } | null
+  >(null)
+  const handleOpenReplaceColor = useCallback(() => {
+    const buf = renderPreviewComposite()
+    if (!buf) {
+      toast.error(t('pages.imageEditor.errBucketRead'))
+      return
+    }
+    setReplaceColorSource({ data: buf.data, w: buf.w, h: buf.h })
+  }, [renderPreviewComposite, t])
+  const handleReplaceColorApply = useCallback(
+    (params: ReplaceColorParams) => {
+      setReplaceColorSource(null)
+      // Replace Color uses its own eyedropper dialog rather than the generic
+      // AdjustmentDialog, so the commit is inlined here (mirrors the
+      // handleAdjustmentApply path — just commits an adjustment layer).
+      commitLayer({
+        id: crypto.randomUUID(),
+        name: t('pages.imageEditor.adjustments.replaceColor'),
+        visible: true,
+        opacity: 100,
+        blend: 'normal',
+        kind: 'adjustment',
+        params,
+      })
+    },
+    [commitLayer, t],
+  )
+
   // Select Subject — saliency heuristic over the composite. Deferred a tick so
   // the "detecting…" toast paints before the synchronous CV work blocks.
   const handleSelectSubject = useCallback(() => {
@@ -2392,6 +2470,29 @@ export function ImageEditorPage() {
     if (!state.cropRect) return
     history.set({ ...state, cropRect: undefined })
     toast.success(t('pages.imageEditor.cropCleared'))
+  }, [history, state, t])
+
+  // ── Rulers + Guides ────────────────────────────────────────────────────
+  /** Drop a new guide at `pos` (preview px) on the given axis. Deduped so a
+   *  user dragging out the same spot twice doesn't pile up identical lines. */
+  const handleAddGuide = useCallback(
+    (axis: 'h' | 'v', pos: number) => {
+      const rounded = Math.round(pos)
+      const prev = state.guides ?? { h: [], v: [] }
+      const arr = axis === 'h' ? prev.h : prev.v
+      if (arr.some((g) => Math.abs(g - rounded) < 1)) return
+      const next = {
+        h: axis === 'h' ? [...prev.h, rounded] : prev.h,
+        v: axis === 'v' ? [...prev.v, rounded] : prev.v,
+      }
+      history.set({ ...state, guides: next })
+    },
+    [history, state],
+  )
+  const handleClearGuides = useCallback(() => {
+    if (!state.guides || (state.guides.h.length === 0 && state.guides.v.length === 0)) return
+    history.set({ ...state, guides: undefined })
+    toast.success(t('pages.imageEditor.view.guidesCleared'))
   }, [history, state, t])
 
   // ── Adjustments dialog ─────────────────────────────────────────────────
@@ -3169,6 +3270,7 @@ export function ImageEditorPage() {
             // Parameter-free adjustments commit immediately (no dialog).
             applyEqualize: () => handleAdjustmentApply({ kind: 'equalize' }),
             applySolarize: () => handleAdjustmentApply({ kind: 'solarize', threshold: 128 }),
+            openReplaceColor: handleOpenReplaceColor,
             duplicateLayer: () => duplicateRef.current(),
             deleteLayer: () => deleteLayerRef.current(),
             newGroup,
@@ -3244,6 +3346,8 @@ export function ImageEditorPage() {
               return !!l && l.kind === 'mask'
             })(),
             openLayerStyle: handleOpenLayerStyle,
+            typeOnPath: handleTypeOnPath,
+            canTypeOnPath,
             zoomIn,
             zoomOut,
             zoomFit: zoomReset,
@@ -3253,6 +3357,12 @@ export function ImageEditorPage() {
             toggleSnap: () => setSnapToGrid((v) => !v),
             showGrid,
             snapToGrid,
+            toggleRulers: () => setShowRulers((v) => !v),
+            showRulers,
+            toggleGuides: () => setShowGuides((v) => !v),
+            showGuides,
+            clearGuides: handleClearGuides,
+            hasGuides: !!state.guides && (state.guides.h.length + state.guides.v.length > 0),
             toggleFocus: () => setFocused((v) => !v),
           }}
         />
@@ -3379,6 +3489,10 @@ export function ImageEditorPage() {
               extraPreviewLayer={adjustmentDraft ?? filterDraft ?? undefined}
               showGrid={showGrid}
               gridStep={gridStep}
+              showRulers={showRulers}
+              showGuides={showGuides}
+              guides={state.guides}
+              onAddGuide={handleAddGuide}
               quickMaskDataUrl={state.quickMask?.dataUrl}
               cropAspect={CROP_ASPECTS.find((a) => a.id === cropAspectId)?.ratio ?? undefined}
               onCursorMove={setCursor}
@@ -3545,6 +3659,12 @@ export function ImageEditorPage() {
         source={colorRangeSource}
         onApply={handleColorRangeApply}
         onCancel={() => setColorRangeSource(null)}
+      />
+      <ReplaceColorDialog
+        open={!!replaceColorSource}
+        source={replaceColorSource}
+        onApply={handleReplaceColorApply}
+        onCancel={() => setReplaceColorSource(null)}
       />
       <FillDialog
         open={fillOpen}

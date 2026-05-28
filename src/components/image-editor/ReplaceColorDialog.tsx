@@ -10,11 +10,8 @@ import {
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { Slider } from './Slider'
-import {
-  applyReplaceColor,
-  DEFAULT_REPLACE_COLOR,
-  type ReplaceColorParams,
-} from '@/lib/image-editor/adj-replace-color'
+import { applyReplaceColor, DEFAULT_REPLACE_COLOR } from '@/lib/image-editor/adj-replace-color'
+import type { ReplaceColorParams } from '@/lib/image-editor/types'
 
 /**
  * Replace Color dialog (PS: Image > Adjustments > Replace Color).

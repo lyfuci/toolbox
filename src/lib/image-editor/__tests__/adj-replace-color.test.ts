@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import {
-  applyReplaceColor,
-  DEFAULT_REPLACE_COLOR,
-  type ReplaceColorParams,
-} from '../adj-replace-color'
+import { applyReplaceColor, DEFAULT_REPLACE_COLOR } from '../adj-replace-color'
+import type { ReplaceColorParams } from '../types'
 
 /**
  * Replace Color shifts matching pixels in HSL space; we assert the spec's

@@ -718,6 +718,7 @@
         "selectiveColor": "Selective Color",
         "equalize": "Equalize",
         "solarize": "Solarize",
+        "replaceColor": "Replace Color",
         "bw": {
           "reds": "Reds",
           "yellows": "Yellows",
@@ -1000,6 +1001,10 @@
         "actualPixels": "Actual Pixels (100%)",
         "showGrid": "Show Grid",
         "snapToGrid": "Snap to Grid",
+        "showRulers": "Rulers",
+        "showGuides": "Show Guides",
+        "clearGuides": "Clear Guides",
+        "typeOnPath": "Type on Selected Path",
         "toggleFocus": "Toggle Focus Mode"
       },
       "selectMenu": {
@@ -1334,6 +1339,22 @@
         "pickHint": "Click the image to sample a color",
         "sampledColor": "Sampled",
         "noSample": "Click the preview to pick a color first"
+      },
+      "replaceColor": {
+        "title": "Replace Color",
+        "fuzziness": "Fuzziness",
+        "hueShift": "Hue",
+        "saturationShift": "Saturation",
+        "lightnessShift": "Lightness",
+        "pickHint": "Click the image to sample the color to replace",
+        "sampledColor": "Sampled"
+      },
+      "typeOnPath": {
+        "placeholder": "Type on path",
+        "layerName": "Path Type"
+      },
+      "view": {
+        "guidesCleared": "Guides cleared"
       },
       "rotateViewHint": "Rotate View (R): each click rotates the workspace 90°. Pixels are not modified — purely a viewing aid.",
       "textToolHint": "Type (T): click on the canvas to add text.",

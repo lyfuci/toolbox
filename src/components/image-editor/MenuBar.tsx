@@ -74,6 +74,7 @@ type Props = {
     openFilter?: (kind: FilterKind) => void
     applyEqualize?: () => void
     applySolarize?: () => void
+    openReplaceColor?: () => void
     duplicateLayer?: () => void
     deleteLayer?: () => void
     newGroup?: () => void
@@ -111,6 +112,9 @@ type Props = {
     flatten?: () => void
     /** Open Layer Style dialog. `kind` preselects an effect; undefined = "Blending Options" (no preselect). */
     openLayerStyle?: (kind?: LayerEffectKind) => void
+    /** PS Type on Path — create a TextLayer that follows the selected path. */
+    typeOnPath?: () => void
+    canTypeOnPath?: boolean
     /** Smart Object commands. */
     convertToSmartObject?: () => void
     replaceSmartObjectContents?: () => void
@@ -143,6 +147,12 @@ type Props = {
     toggleSnap?: () => void
     showGrid?: boolean
     snapToGrid?: boolean
+    toggleRulers?: () => void
+    showRulers?: boolean
+    toggleGuides?: () => void
+    showGuides?: boolean
+    clearGuides?: () => void
+    hasGuides?: boolean
     toggleFocus?: () => void
   }
 }
@@ -440,6 +450,11 @@ export function MenuBar({ handlers }: Props) {
             label: t('pages.imageEditor.adjustments.solarize'),
             onClick: () => handlers.applySolarize?.(),
           },
+          {
+            id: 'adj-replaceColor',
+            label: t('pages.imageEditor.adjustments.replaceColor') + '…',
+            onClick: () => handlers.openReplaceColor?.(),
+          },
         ],
       ],
     },
@@ -709,6 +724,15 @@ export function MenuBar({ handlers }: Props) {
         { sep: true },
         [
           {
+            id: 'typeOnPath',
+            label: t('pages.imageEditor.menu.typeOnPath'),
+            onClick: handlers.typeOnPath,
+            disabled: !handlers.canTypeOnPath,
+          },
+        ],
+        { sep: true },
+        [
+          {
             id: 'ls-blending',
             label: t('pages.imageEditor.menu.blendingOptions') + '…',
             onClick: () => handlers.openLayerStyle?.(),
@@ -913,6 +937,30 @@ export function MenuBar({ handlers }: Props) {
               t('pages.imageEditor.menu.snapToGrid'),
             shortcut: '⇧⌘;',
             onClick: handlers.toggleSnap,
+          },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'showRulers',
+            label:
+              (handlers.showRulers ? '✓ ' : '') +
+              t('pages.imageEditor.menu.showRulers'),
+            shortcut: '⌘R',
+            onClick: handlers.toggleRulers,
+          },
+          {
+            id: 'showGuides',
+            label:
+              (handlers.showGuides ? '✓ ' : '') +
+              t('pages.imageEditor.menu.showGuides'),
+            onClick: handlers.toggleGuides,
+          },
+          {
+            id: 'clearGuides',
+            label: t('pages.imageEditor.menu.clearGuides'),
+            onClick: handlers.clearGuides,
+            disabled: !handlers.hasGuides,
           },
         ],
         { sep: true },

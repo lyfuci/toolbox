@@ -4,6 +4,7 @@ import { applyFilter, scaleFilterParams } from './filter-ops'
 import { filterString } from './filters'
 import { getHandles, getLayerBBox, normalizeRect } from './hit'
 import { buildSelectionMaskCanvas } from './selection-mask'
+import { samplePathByArclength, type ArcSample } from './bezier-arclength'
 import {
   buildEffectContribution,
   effectIsBehindContent,
@@ -191,11 +192,24 @@ export function renderTo(canvas: HTMLCanvasElement, input: RenderInput): void {
   const shiftForCrop = (layer: Layer): Layer =>
     state.cropRect ? translateLayer(layer, -cropOriginX, -cropOriginY) : layer
 
+  // Flat id→layer index so Type-on-Path can resolve `followPathLayerId` in
+  // O(1) per draw (vs O(N) tree walk). Index the *original* layers, not the
+  // crop-shifted copies — followPathLayerId is by id (stable).
+  const layerById = new Map<string, Layer>()
+  const indexLayers = (layers: Layer[]): void => {
+    for (const l of layers) {
+      layerById.set(l.id, l)
+      if (l.kind === 'group') indexLayers(l.children)
+    }
+  }
+  indexLayers(state.layers)
+
   const renderCtx: PerLayerCtx = {
     annoScale,
     liveCanvas: !!input.liveCanvas,
     imageCache: input.imageCache,
     smartSources: state.smartSources ?? {},
+    layerById,
   }
   renderLayerStack(canvas, ctx, state.layers.map(shiftForCrop), renderCtx)
 
@@ -253,6 +267,28 @@ type PerLayerCtx = {
    *  group-recursive render path can resolve SO sources without re-passing
    *  EditorState everywhere. Empty object if state has none. */
   smartSources: { [id: string]: SmartSource }
+  /** Flat layer index by id — populated once per render, used by Type-on-Path
+   *  to resolve a text layer's `followPathLayerId` without re-walking the
+   *  layer tree per draw. */
+  layerById: Map<string, Layer>
+}
+
+/**
+ * Type-on-Path resolver: if `layer` is an annotation text layer with
+ * `followPathLayerId` pointing at an annotation path layer in `rc.layerById`,
+ * uniformly sample the path's arclength so `drawShape` can lay glyphs along
+ * the result. Returns undefined when there's nothing to follow — drawShape
+ * falls back to its standard text path in that case.
+ */
+function resolvePathSamples(layer: Layer, rc: PerLayerCtx): ArcSample[] | undefined {
+  if (layer.kind !== 'annotation' || layer.shape.kind !== 'text') return undefined
+  const id = layer.shape.followPathLayerId
+  if (!id) return undefined
+  const path = rc.layerById.get(id)
+  if (!path || path.kind !== 'annotation' || path.shape.kind !== 'path') return undefined
+  // 96 samples = roughly 1px per sample on a 100px path, plenty smooth for
+  // glyph placement on typical curves; cap the cost on huge paths.
+  return samplePathByArclength(path.shape.anchors, path.shape.closed, 96) ?? undefined
 }
 
 /**
@@ -302,7 +338,14 @@ function renderLayer(
     // so they read pre-shape pixels rather than their own output.
     const needsUnderlying = layer.shape.kind === 'mosaic' || layer.shape.kind === 'blur'
     const underlying = needsUnderlying ? snapshotCanvas(canvas) : canvas
-    drawShape(ctx, layer.shape, rc.annoScale, underlying, rc.imageCache)
+    drawShape(
+      ctx,
+      layer.shape,
+      rc.annoScale,
+      underlying,
+      rc.imageCache,
+      resolvePathSamples(layer, rc),
+    )
     ctx.restore()
     return
   }
@@ -525,7 +568,14 @@ function renderAnnotationWithEffects(
   // Pixel-sampling shapes (mosaic / blur) read the *destination* canvas, not
   // their own offscreen — same as the fast path's "snapshot before draw".
   const underlying = needsUnderlying ? snapshotCanvas(canvas) : offscreen
-  drawShape(octx, layer.shape, rc.annoScale, underlying, rc.imageCache)
+  drawShape(
+    octx,
+    layer.shape,
+    rc.annoScale,
+    underlying,
+    rc.imageCache,
+    resolvePathSamples(layer, rc),
+  )
   compositeLayerWithEffects(canvas, ctx, layer, offscreen, rc)
 }
 

@@ -1,3 +1,4 @@
+import type { ReplaceColorParams } from './types'
 /**
  * Replace Color adjustment (Photoshop Image > Adjustments > Replace Color).
  *
@@ -21,24 +22,6 @@
  * zero DOM dependencies (no `canvas`, no `ImageData`, no `document`), which
  * keeps the algorithm fully node-testable.
  */
-
-export type ReplaceColorParams = {
-  kind: 'replaceColor'
-  /** Target colour sampled from the image (RGB 0..255). */
-  target: { r: number; g: number; b: number }
-  /**
-   * Fuzziness / tolerance, 0..200 — how far in RGB-Euclidean distance counts
-   * as "matching" the target. 0 means an effectively-exact match (special
-   * cased to avoid divide-by-zero in the falloff).
-   */
-  fuzziness: number
-  /** Hue rotation in degrees, applied to matching pixels. Conceptually ±180. */
-  hueShift: number
-  /** Additive saturation shift in percentage points, -100..100. */
-  saturationShift: number
-  /** Additive lightness shift in percentage points, -100..100. */
-  lightnessShift: number
-}
 
 export const DEFAULT_REPLACE_COLOR: ReplaceColorParams = {
   kind: 'replaceColor',
