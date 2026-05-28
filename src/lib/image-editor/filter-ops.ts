@@ -30,6 +30,9 @@ import { applyCrystallize, DEFAULT_CRYSTALLIZE } from './flt-crystallize'
 import { applyColorHalftone, DEFAULT_COLOR_HALFTONE } from './flt-color-halftone'
 import { applySurfaceBlur, DEFAULT_SURFACE_BLUR } from './flt-surface-blur'
 import { applyWind, DEFAULT_WIND } from './flt-wind'
+import { applyLensBlur, DEFAULT_LENS_BLUR } from './flt-lens-blur'
+import { applyOilPaint, DEFAULT_OIL_PAINT } from './flt-oil-paint'
+import { applyGlowingEdges, DEFAULT_GLOWING_EDGES } from './flt-glowing-edges'
 
 /**
  * Pixel transforms backing each FilterLayer kind. All operate on RGBA
@@ -149,6 +152,9 @@ export const DEFAULT_FOR_FILTER_KIND: Record<FilterParams['kind'], FilterParams>
   colorHalftone: DEFAULT_COLOR_HALFTONE,
   surfaceBlur: DEFAULT_SURFACE_BLUR,
   wind: DEFAULT_WIND,
+  lensBlur: DEFAULT_LENS_BLUR,
+  oilPaint: DEFAULT_OIL_PAINT,
+  glowingEdges: DEFAULT_GLOWING_EDGES,
 }
 
 /**
@@ -201,6 +207,16 @@ export function scaleFilterParams(
       return { ...params, radius: params.radius * scale }
     case 'wind':
       return { ...params, strength: params.strength * scale }
+    case 'lensBlur':
+      return { ...params, radius: params.radius * scale }
+    case 'oilPaint':
+      return { ...params, radius: params.radius * scale }
+    case 'glowingEdges':
+      return {
+        ...params,
+        edgeWidth: params.edgeWidth * scale,
+        smoothness: params.smoothness * scale,
+      }
     default:
       return params
   }
@@ -299,6 +315,15 @@ export function applyFilter(
       return
     case 'wind':
       applyWind(data, width, height, params)
+      return
+    case 'lensBlur':
+      applyLensBlur(data, width, height, params)
+      return
+    case 'oilPaint':
+      applyOilPaint(data, width, height, params)
+      return
+    case 'glowingEdges':
+      applyGlowingEdges(data, width, height, params)
       return
   }
 }

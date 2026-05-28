@@ -20,6 +20,7 @@ import { applySelectiveColor, DEFAULT_SELECTIVE_COLOR } from './adj-selective-co
 import { applyEqualize, DEFAULT_EQUALIZE } from './adj-equalize'
 import { applySolarize, DEFAULT_SOLARIZE } from './adj-solarize'
 import { applyReplaceColor, DEFAULT_REPLACE_COLOR } from './adj-replace-color'
+import { applyColorLookup, DEFAULT_COLOR_LOOKUP } from './adj-color-lookup'
 
 /**
  * In-place pixel transforms backing each AdjustmentLayer kind. All operate on
@@ -144,6 +145,7 @@ export const DEFAULT_FOR_KIND: Record<
   equalize: DEFAULT_EQUALIZE,
   solarize: DEFAULT_SOLARIZE,
   replaceColor: DEFAULT_REPLACE_COLOR,
+  colorLookup: DEFAULT_COLOR_LOOKUP,
 }
 
 export function applyAdjustment(
@@ -207,6 +209,9 @@ export function applyAdjustment(
       return
     case 'replaceColor':
       applyReplaceColor(data, params)
+      return
+    case 'colorLookup':
+      applyColorLookup(data, params)
       return
   }
 }

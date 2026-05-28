@@ -40,6 +40,9 @@ import type {
   ColorHalftoneParams,
   SurfaceBlurParams,
   WindParams,
+  LensBlurParams,
+  OilPaintParams,
+  GlowingEdgesParams,
 } from '@/lib/image-editor/types'
 
 type Props = {
@@ -180,6 +183,15 @@ function FilterDialogInner({
           <SurfaceBlurForm value={draft} onChange={update} />
         )}
         {draft.kind === 'wind' && <WindForm value={draft} onChange={update} />}
+        {draft.kind === 'lensBlur' && (
+          <LensBlurForm value={draft} onChange={update} />
+        )}
+        {draft.kind === 'oilPaint' && (
+          <OilPaintForm value={draft} onChange={update} />
+        )}
+        {draft.kind === 'glowingEdges' && (
+          <GlowingEdgesForm value={draft} onChange={update} />
+        )}
       </div>
       <DialogFooter>
         <Button variant="ghost" onClick={reset}>
@@ -1019,6 +1031,109 @@ function WindForm({
         min={1}
         max={100}
         onChange={(v) => onChange({ strength: Math.round(v) })}
+      />
+    </>
+  )
+}
+
+function LensBlurForm({
+  value,
+  onChange,
+}: {
+  value: LensBlurParams
+  onChange: (patch: Partial<LensBlurParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <Slider
+        label={t('pages.imageEditor.filters.radius')}
+        value={value.radius}
+        min={1}
+        max={50}
+        unit=" px"
+        onChange={(v) => onChange({ radius: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.lensBlurBloom')}
+        value={value.bloom}
+        min={0}
+        max={100}
+        unit="%"
+        onChange={(v) => onChange({ bloom: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.threshold')}
+        value={value.threshold}
+        min={0}
+        max={255}
+        onChange={(v) => onChange({ threshold: Math.round(v) })}
+      />
+    </>
+  )
+}
+
+function OilPaintForm({
+  value,
+  onChange,
+}: {
+  value: OilPaintParams
+  onChange: (patch: Partial<OilPaintParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <Slider
+        label={t('pages.imageEditor.filters.oilPaintRadius')}
+        value={value.radius}
+        min={1}
+        max={15}
+        unit=" px"
+        onChange={(v) => onChange({ radius: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.oilPaintLevels')}
+        value={value.levels}
+        min={2}
+        max={40}
+        onChange={(v) => onChange({ levels: Math.round(v) })}
+      />
+    </>
+  )
+}
+
+function GlowingEdgesForm({
+  value,
+  onChange,
+}: {
+  value: GlowingEdgesParams
+  onChange: (patch: Partial<GlowingEdgesParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <Slider
+        label={t('pages.imageEditor.filters.glowingEdgesWidth')}
+        value={value.edgeWidth}
+        min={1}
+        max={14}
+        unit=" px"
+        onChange={(v) => onChange({ edgeWidth: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.glowingEdgesBrightness')}
+        value={value.brightness}
+        min={0}
+        max={100}
+        onChange={(v) => onChange({ brightness: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.glowingEdgesSmoothness')}
+        value={value.smoothness}
+        min={0}
+        max={15}
+        unit=" px"
+        onChange={(v) => onChange({ smoothness: Math.round(v) })}
       />
     </>
   )

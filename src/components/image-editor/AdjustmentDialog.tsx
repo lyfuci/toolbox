@@ -12,9 +12,12 @@ import { Label } from '@/components/ui/label'
 import { Slider } from './Slider'
 import { CurvesEditor } from './CurvesEditor'
 import { DEFAULT_FOR_KIND } from '@/lib/image-editor/adjustments'
+import { COLOR_LOOKUP_PRESETS } from '@/lib/image-editor/adj-color-lookup'
 import type {
   AdjustmentKind,
   AdjustmentParams,
+  ColorLookupParams,
+  ColorLookupPreset,
   BrightnessContrastParams,
   CameraRawParams,
   ColorBalanceParams,
@@ -162,6 +165,9 @@ function AdjustmentDialogInner({
         )}
         {draft.kind === 'selectiveColor' && (
           <SelectiveColorForm value={draft} onChange={update} />
+        )}
+        {draft.kind === 'colorLookup' && (
+          <ColorLookupForm value={draft} onChange={update} />
         )}
       </div>
       <DialogFooter>
@@ -692,6 +698,52 @@ function PhotoFilterForm({
         />
         {t('pages.imageEditor.adjustments.photoFilterPreserveLum')}
       </label>
+    </>
+  )
+}
+
+/**
+ * Color Lookup form — pick one of the built-in procedural looks and dial its
+ * intensity (the look's opacity over the original). Mirrors PS's Color Lookup
+ * adjustment, minus the file-loaded LUT (see adj-color-lookup.ts for why the
+ * looks are procedural rather than stored).
+ */
+function ColorLookupForm({
+  value,
+  onChange,
+}: {
+  value: ColorLookupParams
+  onChange: (patch: Partial<ColorLookupParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <Label className="w-24 text-xs text-muted-foreground">
+          {t('pages.imageEditor.adjustments.colorLookupPreset')}
+        </Label>
+        <select
+          value={value.preset}
+          onChange={(e) =>
+            onChange({ preset: e.target.value as ColorLookupPreset })
+          }
+          className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+        >
+          {COLOR_LOOKUP_PRESETS.map((p) => (
+            <option key={p} value={p}>
+              {t(`pages.imageEditor.adjustments.colorLookupPresets.${p}`)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <Slider
+        label={t('pages.imageEditor.adjustments.colorLookupIntensity')}
+        value={value.intensity}
+        min={0}
+        max={100}
+        unit="%"
+        onChange={(v) => onChange({ intensity: v })}
+      />
     </>
   )
 }
