@@ -34,6 +34,12 @@ import type {
   VignetteParams,
   CloudsParams,
   MedianParams,
+  WaveParams,
+  RippleParams,
+  CrystallizeParams,
+  ColorHalftoneParams,
+  SurfaceBlurParams,
+  WindParams,
 } from '@/lib/image-editor/types'
 
 type Props = {
@@ -164,6 +170,16 @@ function FilterDialogInner({
         {draft.kind === 'vignette' && <VignetteForm value={draft} onChange={update} />}
         {draft.kind === 'clouds' && <CloudsForm value={draft} onChange={update} />}
         {draft.kind === 'median' && <MedianForm value={draft} onChange={update} />}
+        {draft.kind === 'wave' && <WaveForm value={draft} onChange={update} />}
+        {draft.kind === 'ripple' && <RippleForm value={draft} onChange={update} />}
+        {draft.kind === 'crystallize' && <CrystallizeForm value={draft} onChange={update} />}
+        {draft.kind === 'colorHalftone' && (
+          <ColorHalftoneForm value={draft} onChange={update} />
+        )}
+        {draft.kind === 'surfaceBlur' && (
+          <SurfaceBlurForm value={draft} onChange={update} />
+        )}
+        {draft.kind === 'wind' && <WindForm value={draft} onChange={update} />}
       </div>
       <DialogFooter>
         <Button variant="ghost" onClick={reset}>
@@ -821,5 +837,189 @@ function MedianForm({
       unit=" px"
       onChange={(v) => onChange({ radius: Math.round(v) })}
     />
+  )
+}
+
+function WaveForm({
+  value,
+  onChange,
+}: {
+  value: WaveParams
+  onChange: (patch: Partial<WaveParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <Slider
+        label={t('pages.imageEditor.filters.amplitude')}
+        value={value.amplitude}
+        min={0}
+        max={100}
+        unit=" px"
+        onChange={(v) => onChange({ amplitude: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.wavelength')}
+        value={value.wavelength}
+        min={4}
+        max={300}
+        unit=" px"
+        onChange={(v) => onChange({ wavelength: Math.round(v) })}
+      />
+      <div className="flex items-center gap-1 text-xs">
+        <span className="w-20 text-muted-foreground">
+          {t('pages.imageEditor.filters.waveform')}
+        </span>
+        <select
+          value={value.type}
+          onChange={(e) => onChange({ type: e.target.value as WaveParams['type'] })}
+          className="h-7 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+        >
+          <option value="sine">{t('pages.imageEditor.filters.waveSine')}</option>
+          <option value="triangle">{t('pages.imageEditor.filters.waveTriangle')}</option>
+        </select>
+      </div>
+    </>
+  )
+}
+
+function RippleForm({
+  value,
+  onChange,
+}: {
+  value: RippleParams
+  onChange: (patch: Partial<RippleParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <Slider
+        label={t('pages.imageEditor.filters.amount')}
+        value={value.amount}
+        min={-100}
+        max={100}
+        onChange={(v) => onChange({ amount: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.size')}
+        value={value.size}
+        min={1}
+        max={30}
+        onChange={(v) => onChange({ size: Math.round(v) })}
+      />
+    </>
+  )
+}
+
+function CrystallizeForm({
+  value,
+  onChange,
+}: {
+  value: CrystallizeParams
+  onChange: (patch: Partial<CrystallizeParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <Slider
+      label={t('pages.imageEditor.filters.cellSize')}
+      value={value.cellSize}
+      min={2}
+      max={100}
+      unit=" px"
+      onChange={(v) => onChange({ cellSize: Math.round(v) })}
+    />
+  )
+}
+
+function ColorHalftoneForm({
+  value,
+  onChange,
+}: {
+  value: ColorHalftoneParams
+  onChange: (patch: Partial<ColorHalftoneParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <Slider
+        label={t('pages.imageEditor.filters.dotRadius')}
+        value={value.dotRadius}
+        min={1}
+        max={20}
+        unit=" px"
+        onChange={(v) => onChange({ dotRadius: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.angle')}
+        value={value.angle}
+        min={0}
+        max={360}
+        unit="°"
+        onChange={(v) => onChange({ angle: Math.round(v) })}
+      />
+    </>
+  )
+}
+
+function SurfaceBlurForm({
+  value,
+  onChange,
+}: {
+  value: SurfaceBlurParams
+  onChange: (patch: Partial<SurfaceBlurParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <Slider
+        label={t('pages.imageEditor.filters.radius')}
+        value={value.radius}
+        min={0}
+        max={50}
+        unit=" px"
+        onChange={(v) => onChange({ radius: Math.round(v) })}
+      />
+      <Slider
+        label={t('pages.imageEditor.filters.threshold')}
+        value={value.threshold}
+        min={0}
+        max={255}
+        onChange={(v) => onChange({ threshold: Math.round(v) })}
+      />
+    </>
+  )
+}
+
+function WindForm({
+  value,
+  onChange,
+}: {
+  value: WindParams
+  onChange: (patch: Partial<WindParams>) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <div className="flex items-center gap-1 text-xs">
+        <span className="w-20 text-muted-foreground">
+          {t('pages.imageEditor.filters.direction')}
+        </span>
+        <select
+          value={value.direction}
+          onChange={(e) => onChange({ direction: e.target.value as WindParams['direction'] })}
+          className="h-7 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+        >
+          <option value="right">{t('pages.imageEditor.filters.windRight')}</option>
+          <option value="left">{t('pages.imageEditor.filters.windLeft')}</option>
+        </select>
+      </div>
+      <Slider
+        label={t('pages.imageEditor.filters.strength')}
+        value={value.strength}
+        min={1}
+        max={100}
+        onChange={(v) => onChange({ strength: Math.round(v) })}
+      />
+    </>
   )
 }

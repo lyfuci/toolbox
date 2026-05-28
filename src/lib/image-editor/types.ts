@@ -1144,6 +1144,45 @@ export type CloudsParams = {
 /** Noise > Median — per-channel median over a (2·radius+1)² window. */
 export type MedianParams = { kind: 'median'; radius: number } // px, bake-scaled
 
+/** Distort > Wave — sine/triangle displacement on both axes. */
+export type WaveParams = {
+  kind: 'wave'
+  amplitude: number // px, bake-scaled
+  wavelength: number // px, bake-scaled
+  type: 'sine' | 'triangle'
+}
+
+/** Distort > Ripple — fine perpendicular-sine water ripple. */
+export type RippleParams = {
+  kind: 'ripple'
+  amount: number // -100..100, dimensionless (NOT bake-scaled)
+  size: number // px wavelength, bake-scaled
+}
+
+/** Pixelate > Crystallize — Voronoi cells filled with their mean color. */
+export type CrystallizeParams = { kind: 'crystallize'; cellSize: number } // px, bake-scaled
+
+/** Pixelate > Color Halftone — rotated per-channel CMYK dot screen. */
+export type ColorHalftoneParams = {
+  kind: 'colorHalftone'
+  dotRadius: number // px, bake-scaled
+  angle: number // degrees (NOT bake-scaled)
+}
+
+/** Blur > Surface Blur — edge-preserving bilateral-style blur. */
+export type SurfaceBlurParams = {
+  kind: 'surfaceBlur'
+  radius: number // px, bake-scaled
+  threshold: number // 0..255 value tolerance (NOT bake-scaled)
+}
+
+/** Stylize > Wind — directional edge streaks. */
+export type WindParams = {
+  kind: 'wind'
+  direction: 'left' | 'right'
+  strength: number // streak-length scale in px, bake-scaled
+}
+
 export type FilterParams =
   | GaussianBlurParams
   | BoxBlurParams
@@ -1168,6 +1207,12 @@ export type FilterParams =
   | VignetteParams
   | CloudsParams
   | MedianParams
+  | WaveParams
+  | RippleParams
+  | CrystallizeParams
+  | ColorHalftoneParams
+  | SurfaceBlurParams
+  | WindParams
 
 export type FilterKind = FilterParams['kind']
 
