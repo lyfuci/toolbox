@@ -145,6 +145,30 @@ export type TextAlign = 'left' | 'center' | 'right'
 export type FontWeight = 'normal' | 'bold'
 export type FontStyle = 'normal' | 'italic'
 
+/**
+ * Warp Text (PS Type > Warp Text). All styles here are *vertical-envelope*
+ * warps (the faithful model for horizontal text): the rendered text bitmap is
+ * remapped column-by-column between a per-column top and bottom edge curve, so
+ * a glyph's x is preserved while its vertical band is bent/stretched. This
+ * reproduces every classic PS warp shape without a 2D mesh solve. See
+ * `text-warp.ts` for the edge math and `drawWarpedText` for the bitmap pass.
+ */
+export type TextWarpStyle =
+  | 'none'
+  | 'arc'
+  | 'bulge'
+  | 'flag'
+  | 'wave'
+  | 'rise'
+  | 'fish'
+  | 'inflate'
+export type TextWarp = {
+  style: TextWarpStyle
+  bend: number // -100..100 — primary warp amount
+  horizontal: number // -100..100 — left/right asymmetry of the warp (NOT a 2D skew)
+  vertical: number // -100..100 — vertical tilt of the band
+}
+
 export type TextShape = {
   kind: 'text'
   x: number
@@ -177,6 +201,13 @@ export type TextShape = {
    * Edits to the path automatically reflow text on next render.
    */
   followPathLayerId?: string
+  /**
+   * Warp Text envelope. When set with a non-'none' style and a non-zero
+   * amount, the renderer rasterizes the text and bends it via the vertical-
+   * envelope warp (see TextWarp). Absent / 'none' renders plain text. Mutually
+   * exclusive with followPathLayerId in practice (path-following wins).
+   */
+  warp?: TextWarp
 }
 export type MosaicShape = {
   kind: 'mosaic'

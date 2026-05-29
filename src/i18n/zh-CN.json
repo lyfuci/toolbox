@@ -1040,6 +1040,7 @@
         "showGuides": "显示参考线",
         "clearGuides": "清除参考线",
         "typeOnPath": "沿所选路径排版文字",
+        "warpText": "文字变形",
         "toggleFocus": "切换焦点模式"
       },
       "selectMenu": {
@@ -1387,6 +1388,23 @@
       "typeOnPath": {
         "placeholder": "沿路径输入",
         "layerName": "路径文字"
+      },
+      "warpText": {
+        "title": "文字变形",
+        "style": "样式",
+        "bend": "弯曲",
+        "horizontal": "水平扭曲",
+        "vertical": "垂直扭曲",
+        "styles": {
+          "none": "无",
+          "arc": "扇形",
+          "bulge": "凸起",
+          "flag": "旗帜",
+          "wave": "波浪",
+          "rise": "上升",
+          "fish": "鱼形",
+          "inflate": "膨胀"
+        }
       },
       "view": {
         "guidesCleared": "已清除参考线"

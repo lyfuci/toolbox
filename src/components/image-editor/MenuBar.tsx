@@ -115,6 +115,8 @@ type Props = {
     /** PS Type on Path — create a TextLayer that follows the selected path. */
     typeOnPath?: () => void
     canTypeOnPath?: boolean
+    warpText?: () => void
+    canWarpText?: boolean
     /** Smart Object commands. */
     convertToSmartObject?: () => void
     replaceSmartObjectContents?: () => void
@@ -748,6 +750,12 @@ export function MenuBar({ handlers }: Props) {
             label: t('pages.imageEditor.menu.typeOnPath'),
             onClick: handlers.typeOnPath,
             disabled: !handlers.canTypeOnPath,
+          },
+          {
+            id: 'warpText',
+            label: t('pages.imageEditor.menu.warpText') + '…',
+            onClick: handlers.warpText,
+            disabled: !handlers.canWarpText,
           },
         ],
         { sep: true },

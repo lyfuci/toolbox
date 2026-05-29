@@ -14,6 +14,7 @@ import type {
   TextShape,
 } from './types'
 import type { ArcSample } from './bezier-arclength'
+import { isWarpActive, warpTextPixels } from './text-warp'
 
 // All shape coordinates are stored in PREVIEW canvas pixels. The render
 // pipeline passes a `scale` factor that maps preview-px → target-px so the
@@ -45,6 +46,8 @@ export function drawShape(
     case 'text':
       if (pathSamples && pathSamples.length >= 2) {
         drawTextOnPath(ctx, shape, scale, pathSamples)
+      } else if (isWarpActive(shape.warp)) {
+        drawWarpedText(ctx, shape, scale)
       } else {
         drawText(ctx, shape, scale)
       }
@@ -311,6 +314,23 @@ function drawArrow(ctx: CanvasRenderingContext2D, s: ArrowShape, scale: number) 
 }
 
 function drawText(ctx: CanvasRenderingContext2D, s: TextShape, scale: number) {
+  paintTextBlock(ctx, s, scale, s.x * scale, s.y * scale)
+}
+
+/**
+ * Paint a text block at an explicit (baseX, baseY) origin — the shared layout
+ * core used by both `drawText` (origin = the shape's anchor) and
+ * `drawWarpedText` (origin = an offscreen buffer). Keeping ONE implementation
+ * means warp can't silently drift from plain text on multi-line / align /
+ * letterSpacing / underline behaviour.
+ */
+function paintTextBlock(
+  ctx: CanvasRenderingContext2D,
+  s: TextShape,
+  scale: number,
+  baseX: number,
+  baseY: number,
+) {
   ctx.fillStyle = s.color
   const family = s.fontFamily ?? 'sans-serif'
   const weight = s.fontWeight ?? 'normal'
@@ -332,8 +352,6 @@ function drawText(ctx: CanvasRenderingContext2D, s: TextShape, scale: number) {
   const lineHeight = (s.lineHeight ?? 1.2) * sizePx
   // Multi-line: split on \n. Each line drawn at its own y.
   const lines = (s.text ?? '').split('\n')
-  const baseX = s.x * scale
-  const baseY = s.y * scale
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
     const y = baseY + i * lineHeight
@@ -352,6 +370,129 @@ function drawText(ctx: CanvasRenderingContext2D, s: TextShape, scale: number) {
   } catch {
     /* noop */
   }
+}
+
+// Warped-text bitmaps are expensive to recompute (rasterize + per-pixel
+// envelope remap), and drawShape runs on EVERY render — so cache the warped
+// canvas keyed on everything that affects it (text, font, align, warp params,
+// scale). Small LRU-ish cap; the oldest entry is dropped when full.
+const warpCache = new Map<string, HTMLCanvasElement>()
+const WARP_CACHE_MAX = 24
+let measureCanvas: HTMLCanvasElement | null = null
+
+/** Measure the text block (max line width + total height) at `scale`. */
+function measureTextBlock(
+  s: TextShape,
+  scale: number,
+): { textW: number; textH: number; sizePx: number } {
+  if (!measureCanvas) measureCanvas = document.createElement('canvas')
+  const ctx = measureCanvas.getContext('2d')!
+  const family = s.fontFamily ?? 'sans-serif'
+  const weight = s.fontWeight ?? 'normal'
+  const style = s.fontStyle ?? 'normal'
+  const sizePx = Math.round(s.fontSize * scale)
+  ctx.font = `${style} ${weight} ${sizePx}px ${family}`
+  try {
+    ;(ctx as unknown as Record<string, unknown>).letterSpacing =
+      `${(s.letterSpacing ?? 0) * scale}px`
+  } catch {
+    /* noop */
+  }
+  const lines = (s.text ?? '').split('\n')
+  let maxW = 0
+  for (const line of lines) maxW = Math.max(maxW, ctx.measureText(line).width)
+  try {
+    ;(ctx as unknown as Record<string, unknown>).letterSpacing = '0px'
+  } catch {
+    /* noop */
+  }
+  const lineHeight = (s.lineHeight ?? 1.2) * sizePx
+  // top-baseline lines span [y, y+sizePx]; add a line's worth of descender +
+  // underline room below the last line so glyph tails aren't clipped.
+  const textH = (lines.length - 1) * lineHeight + Math.ceil(sizePx * 1.3)
+  return {
+    textW: Math.max(1, Math.ceil(maxW)),
+    textH: Math.max(1, Math.ceil(textH)),
+    sizePx,
+  }
+}
+
+/**
+ * Warp Text — rasterize the text block into a padded offscreen, remap it
+ * through the vertical-envelope warp, and blit it so the text's logical anchor
+ * stays put (the unwarped hit-bbox still lines up). Result is cached.
+ */
+function drawWarpedText(
+  ctx: CanvasRenderingContext2D,
+  s: TextShape,
+  scale: number,
+) {
+  const warp = s.warp
+  if (!warp) return
+  const { textW, textH, sizePx } = measureTextBlock(s, scale)
+  const align = s.align ?? 'left'
+  // Horizontal pad covers italic/letterSpacing overhang; vertical pad gives the
+  // envelope room to overflow (styles displace up to ~0.6·textH each way).
+  const padX = Math.ceil(sizePx * 0.5) + 2
+  const padY = Math.ceil(textH * 0.9) + sizePx
+  const W = textW + 2 * padX
+  const H = textH + 2 * padY
+
+  const key = [
+    Math.round(scale * 1000),
+    s.fontFamily ?? '',
+    s.fontWeight ?? '',
+    s.fontStyle ?? '',
+    sizePx,
+    align,
+    s.letterSpacing ?? 0,
+    s.lineHeight ?? 1.2,
+    s.underline ? 1 : 0,
+    s.color,
+    warp.style,
+    warp.bend,
+    warp.horizontal,
+    warp.vertical,
+    s.text ?? '',
+  ].join('|')
+
+  let warped = warpCache.get(key)
+  if (!warped) {
+    const off = document.createElement('canvas')
+    off.width = W
+    off.height = H
+    const octx = off.getContext('2d')!
+    // Render so the block occupies [padX, padX+textW]; fillText anchors per
+    // align, so shift the origin accordingly.
+    const originX =
+      align === 'center'
+        ? padX + textW / 2
+        : align === 'right'
+          ? padX + textW
+          : padX
+    paintTextBlock(octx, s, scale, originX, padY)
+    const srcData = octx.getImageData(0, 0, W, H).data
+    const outData = warpTextPixels(srcData, W, H, warp, padX, padY, textW, textH)
+    const outImg = octx.createImageData(W, H)
+    outImg.data.set(outData)
+    octx.putImageData(outImg, 0, 0)
+    warped = off
+    if (warpCache.size >= WARP_CACHE_MAX) {
+      const oldest = warpCache.keys().next().value
+      if (oldest !== undefined) warpCache.delete(oldest)
+    }
+    warpCache.set(key, warped)
+  }
+
+  // Match plain drawText's block-left so the warp sits exactly where unwarped
+  // text would (keeps move/select aligned with the logical bbox).
+  const blockLeft =
+    align === 'center'
+      ? s.x * scale - textW / 2
+      : align === 'right'
+        ? s.x * scale - textW
+        : s.x * scale
+  ctx.drawImage(warped, blockLeft - padX, s.y * scale - padY)
 }
 
 /**

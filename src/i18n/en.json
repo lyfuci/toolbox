@@ -1040,6 +1040,7 @@
         "showGuides": "Show Guides",
         "clearGuides": "Clear Guides",
         "typeOnPath": "Type on Selected Path",
+        "warpText": "Warp Text",
         "toggleFocus": "Toggle Focus Mode"
       },
       "selectMenu": {
@@ -1387,6 +1388,23 @@
       "typeOnPath": {
         "placeholder": "Type on path",
         "layerName": "Path Type"
+      },
+      "warpText": {
+        "title": "Warp Text",
+        "style": "Style",
+        "bend": "Bend",
+        "horizontal": "Horizontal Distortion",
+        "vertical": "Vertical Distortion",
+        "styles": {
+          "none": "None",
+          "arc": "Arc",
+          "bulge": "Bulge",
+          "flag": "Flag",
+          "wave": "Wave",
+          "rise": "Rise",
+          "fish": "Fish",
+          "inflate": "Inflate"
+        }
       },
       "view": {
         "guidesCleared": "Guides cleared"
