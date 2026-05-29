@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useMemo,
   useRef,
@@ -29,7 +30,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { formatRelative } from '@/lib/time'
+import { FieldTooltip } from '@/components/FieldTooltip'
+import { formatRelative, formatTimestampBreakdown } from '@/lib/time'
 
 const SAMPLE_TOKEN =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
@@ -542,6 +544,15 @@ export function JwtPage() {
                 ⚠ {t('pages.jwt.jsonError')}: {headerParse.error}
               </p>
             )}
+            {headerObj && (
+              <DecodedFields
+                obj={headerObj}
+                keyPrefix="pages.jwt.headerField."
+                withTime={false}
+                locale={locale}
+                t={t}
+              />
+            )}
           </Panel>
 
           {/* Payload pane */}
@@ -561,6 +572,15 @@ export function JwtPage() {
               <p className="mt-1 text-xs text-destructive">
                 ⚠ {t('pages.jwt.jsonError')}: {payloadParse.error}
               </p>
+            )}
+            {payloadObj && (
+              <DecodedFields
+                obj={payloadObj}
+                keyPrefix="pages.jwt.claim."
+                withTime
+                locale={locale}
+                t={t}
+              />
             )}
           </Panel>
 
@@ -667,6 +687,107 @@ function Panel({
       {children}
     </div>
   )
+}
+
+// Time-bearing claims that get a readable-time tooltip + inline relative hint.
+const TIME_CLAIMS = new Set(['exp', 'nbf', 'iat', 'auth_time'])
+
+/**
+ * Read-only decoded view of a header/payload object. Each field NAME is wrapped
+ * in a FieldTooltip resolving `${keyPrefix}${name}` — the RFC-sourced claim /
+ * header descriptions already in the i18n catalog (unknown keys render plain).
+ * With `withTime`, numeric time claims also get a human-readable time tooltip on
+ * the VALUE plus an inline relative hint. Editing still happens in the textarea
+ * above; this panel is purely an explanatory mirror.
+ */
+function DecodedFields({
+  obj,
+  keyPrefix,
+  withTime,
+  locale,
+  t,
+}: {
+  obj: Record<string, unknown>
+  keyPrefix: string
+  withTime: boolean
+  locale: string
+  t: Translator
+}) {
+  const entries = Object.entries(obj)
+  if (entries.length === 0) return null
+  return (
+    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5 text-xs">
+      {entries.map(([k, v]) => (
+        <Fragment key={k}>
+          <dt className="font-mono font-medium text-muted-foreground">
+            <FieldTooltip body={`${keyPrefix}${k}`} bodyIsKey>
+              {k}
+            </FieldTooltip>
+          </dt>
+          <dd className="min-w-0 break-all font-mono text-foreground">
+            <FieldValue
+              fieldKey={k}
+              value={v}
+              withTime={withTime}
+              locale={locale}
+              t={t}
+            />
+          </dd>
+        </Fragment>
+      ))}
+    </dl>
+  )
+}
+
+function FieldValue({
+  fieldKey,
+  value,
+  withTime,
+  locale,
+  t,
+}: {
+  fieldKey: string
+  value: unknown
+  withTime: boolean
+  locale: string
+  t: Translator
+}) {
+  if (
+    withTime &&
+    TIME_CLAIMS.has(fieldKey) &&
+    typeof value === 'number' &&
+    Number.isFinite(value)
+  ) {
+    const date = new Date(value * 1000)
+    // Guard nonsensical timestamps (e.g. a pasted 99999999999999) — don't show
+    // an "Invalid Date" tooltip; fall through to the raw-number rendering.
+    if (!Number.isNaN(date.getTime())) {
+      const { utc, local, relative } = formatTimestampBreakdown(value, locale)
+      const body = (
+        <span className="block space-y-0.5">
+          <span className="block">
+            {t('pages.jwt.timeLocal')}: {local}
+          </span>
+          <span className="block">
+            {t('pages.jwt.timeUtc')}: {utc}
+          </span>
+          <span className="block">
+            {t('pages.jwt.timeRelative')}: {relative}
+          </span>
+        </span>
+      )
+      return (
+        <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <FieldTooltip body={body}>{String(value)}</FieldTooltip>
+          <span className="inline-flex items-center gap-1 text-[0.7rem] text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            {relative}
+          </span>
+        </span>
+      )
+    }
+  }
+  return <>{typeof value === 'string' ? value : JSON.stringify(value)}</>
 }
 
 function ExpStatusPill({
