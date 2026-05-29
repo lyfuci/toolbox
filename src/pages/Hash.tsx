@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, Copy, X, Shield, ShieldAlert, ShieldCheck, Loader2 } from 'lucide-react'
+import {
+  Check,
+  Copy,
+  X,
+  Shield,
+  ShieldAlert,
+  ShieldCheck,
+  Loader2,
+  ExternalLink,
+} from 'lucide-react'
 import { pwnedPasswordCount } from '@/lib/hibp'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -300,6 +309,18 @@ export function HashPage() {
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
             {t('pages.hash.pwned.note')}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t('pages.hash.pwned.emailHint')}{' '}
+            <a
+              href="https://haveibeenpwned.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-primary hover:underline"
+            >
+              {t('pages.hash.pwned.emailLink')}
+              <ExternalLink className="h-3 w-3" />
+            </a>
           </p>
           {pwned.kind === 'done' && pwned.count > 0 ? (
             <div className="mt-2 flex items-center gap-2 text-sm text-destructive">
