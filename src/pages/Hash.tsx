@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, Copy, X } from 'lucide-react'
+import { Check, Copy, X, Shield, ShieldAlert, ShieldCheck, Loader2 } from 'lucide-react'
+import { pwnedPasswordCount } from '@/lib/hibp'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,6 +21,12 @@ import { formatSize } from '@/lib/file-bytes'
 const SAMPLE = 'The quick brown fox jumps over the lazy dog'
 
 type Tab = 'text' | 'file'
+
+type PwnedState =
+  | { kind: 'idle' }
+  | { kind: 'checking' }
+  | { kind: 'done'; count: number }
+  | { kind: 'error'; message: string }
 
 const ENCODINGS: DigestEncoding[] = ['hex', 'base64', 'base64url']
 
@@ -41,6 +48,8 @@ export function HashPage() {
   const [pickedFile, setPickedFile] = useState<{ name: string; size: number } | null>(null)
   const [computing, setComputing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Pwned-password (HIBP) check — explicit-trigger only; reset when input edits.
+  const [pwned, setPwned] = useState<PwnedState>({ kind: 'idle' })
   // ^ `computing` only flips during the file-mode async path (text mode is instant);
   //   the text-mode useEffect intentionally doesn't touch it to satisfy the
   //   react-hooks/set-state-in-effect rule.
@@ -110,6 +119,22 @@ export function HashPage() {
     toast.success(t('common.copiedLabel', { label: algo }))
   }
 
+  // Strip the textarea's (almost always unintended) trailing newline before
+  // treating the input as a password. Internal/leading spaces are preserved —
+  // passwords can contain them.
+  const pwnedCandidate = input.replace(/[\r\n]+$/, '')
+
+  const checkPwned = async () => {
+    if (!pwnedCandidate) return
+    setPwned({ kind: 'checking' })
+    try {
+      const count = await pwnedPasswordCount(pwnedCandidate)
+      setPwned({ kind: 'done', count })
+    } catch (e) {
+      setPwned({ kind: 'error', message: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <header className="mb-6">
@@ -161,7 +186,10 @@ export function HashPage() {
       {tab === 'text' ? (
         <Textarea
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value)
+            setPwned({ kind: 'idle' })
+          }}
           spellCheck={false}
           className="mb-6 min-h-[180px] font-mono text-sm leading-relaxed"
           placeholder={t('pages.hash.placeholder')}
@@ -244,6 +272,56 @@ export function HashPage() {
       </div>
 
       {error ? <div className="mt-3 text-xs text-destructive">⚠ {error}</div> : null}
+
+      {tab === 'text' ? (
+        <div className="mt-4 rounded-md border border-border bg-card/40 px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">
+                {t('pages.hash.pwned.title')}
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={checkPwned}
+              disabled={pwned.kind === 'checking' || !pwnedCandidate}
+            >
+              {pwned.kind === 'checking' ? (
+                <>
+                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                  {t('pages.hash.pwned.checking')}
+                </>
+              ) : (
+                t('pages.hash.pwned.check')
+              )}
+            </Button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {t('pages.hash.pwned.note')}
+          </p>
+          {pwned.kind === 'done' && pwned.count > 0 ? (
+            <div className="mt-2 flex items-center gap-2 text-sm text-destructive">
+              <ShieldAlert className="h-4 w-4 shrink-0" />
+              {t('pages.hash.pwned.found', {
+                times: pwned.count.toLocaleString(),
+              })}
+            </div>
+          ) : null}
+          {pwned.kind === 'done' && pwned.count === 0 ? (
+            <div className="mt-2 flex items-center gap-2 text-sm text-emerald-500">
+              <ShieldCheck className="h-4 w-4 shrink-0" />
+              {t('pages.hash.pwned.notFound')}
+            </div>
+          ) : null}
+          {pwned.kind === 'error' ? (
+            <div className="mt-2 text-sm text-destructive">
+              ⚠ {t('pages.hash.pwned.error', { message: pwned.message })}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

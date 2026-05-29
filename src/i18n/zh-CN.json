@@ -344,7 +344,16 @@
       "verifyPlaceholder": "粘贴该算法的期望哈希…",
       "verifyMatch": "匹配",
       "verifyMismatch": "不匹配",
-      "computing": "计算中…"
+      "computing": "计算中…",
+      "pwned": {
+        "title": "密码泄露检测",
+        "note": "对照 Have I Been Pwned 检测上方文本。仅发送其 SHA-1 哈希的前 5 个字符（k-匿名），密码本身不会离开浏览器。",
+        "check": "检测",
+        "checking": "检测中…",
+        "found": "在 {{times}} 次已知泄露中出现 —— 请换一个密码。",
+        "notFound": "未在任何已知泄露中发现（这不代表密码就一定安全）。",
+        "error": "查询失败：{{message}}"
+      }
     },
     "hmac": {
       "description": "基于 Web Crypto 的 HMAC（SHA-1 / 256 / 384 / 512）。本地计算，密钥不出浏览器。",

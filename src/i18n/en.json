@@ -344,7 +344,16 @@
       "verifyPlaceholder": "Paste expected hash for this algo…",
       "verifyMatch": "Matches",
       "verifyMismatch": "Does not match",
-      "computing": "Computing…"
+      "computing": "Computing…",
+      "pwned": {
+        "title": "Pwned password check",
+        "note": "Checks the text above against Have I Been Pwned. Only the first 5 characters of its SHA-1 hash are sent (k-anonymity) — the password itself never leaves your browser.",
+        "check": "Check",
+        "checking": "Checking…",
+        "found": "Found in {{times}} known breaches — pick a different password.",
+        "notFound": "Not found in any known breach (this is not a strength guarantee).",
+        "error": "Lookup failed: {{message}}"
+      }
     },
     "hmac": {
       "description": "HMAC based on Web Crypto (SHA-1 / 256 / 384 / 512). Key stays in the browser.",
