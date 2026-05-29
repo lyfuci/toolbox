@@ -4,6 +4,7 @@ import { json as cmJson } from '@codemirror/lang-json'
 import { xml as cmXml } from '@codemirror/lang-xml'
 import { yaml as cmYaml } from '@codemirror/lang-yaml'
 import { EditorView } from '@codemirror/view'
+import { Prec } from '@codemirror/state'
 import { cn } from '@/lib/utils'
 
 /**
@@ -81,7 +82,10 @@ export function CodeEditor({
   const exts = useMemo(() => {
     const arr = [
       ...(langExtensions[language]?.() ?? []),
-      themeExtension,
+      // Prec.highest so our shadcn-token colours (notably the near-black
+      // `--background`) override the base `theme="dark"` editor chrome below;
+      // the dark theme is kept only for its readable syntax highlighting.
+      Prec.highest(themeExtension),
       EditorView.lineWrapping,
     ]
     if (extraExtensions) arr.push(...extraExtensions)
@@ -96,6 +100,7 @@ export function CodeEditor({
       )}
     >
       <CodeMirror
+        theme="dark"
         basicSetup={{
           lineNumbers: true,
           foldGutter: true,
