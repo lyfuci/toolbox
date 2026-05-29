@@ -1028,6 +1028,7 @@
         "paste": "粘贴",
         "pasteInPlace": "原位粘贴",
         "fill": "填充",
+        "contentAwareFill": "内容识别填充",
         "stroke": "描边",
         "blendingOptions": "混合选项",
         "zoomIn": "放大",
@@ -1495,6 +1496,12 @@
         "saturation": "饱和度",
         "color": "颜色",
         "luminosity": "明度"
+      },
+      "caf": {
+        "needSelection": "请先建立选区 —— 内容识别填充会替换所选区域。",
+        "working": "填充中…",
+        "done": "已应用内容识别填充",
+        "layerName": "内容识别填充"
       },
       "annoLabel": {
         "rect": "矩形",

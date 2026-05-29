@@ -105,6 +105,8 @@ type Props = {
     pasteInPlace?: () => void
     fill?: () => void
     stroke?: () => void
+    contentAwareFill?: () => void
+    canContentAwareFill?: boolean
     canPaste?: boolean
     mergeDown?: () => void
     mergeVisible?: () => void
@@ -297,6 +299,12 @@ export function MenuBar({ handlers }: Props) {
             label: t('pages.imageEditor.menu.fill') + '…',
             shortcut: '⇧F5',
             onClick: handlers.fill,
+          },
+          {
+            id: 'contentAwareFill',
+            label: t('pages.imageEditor.menu.contentAwareFill'),
+            onClick: handlers.contentAwareFill,
+            disabled: !handlers.canContentAwareFill,
           },
           {
             id: 'stroke',

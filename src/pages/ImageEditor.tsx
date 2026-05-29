@@ -56,6 +56,7 @@ import { DEFAULT_BRUSH_OPTIONS, DEFAULT_TEXT_OPTIONS, initialState, PREVIEW_MAX 
 import { fillSelection, strokeSelection, type StrokePosition } from '@/lib/image-editor/edit-ops'
 import { buildSelectionMaskCanvas } from '@/lib/image-editor/selection-mask'
 import { smoothSelection, growSelection, rasterizePolygonMask } from '@/lib/image-editor/selection-modify'
+import { contentAwareFill } from '@/lib/image-editor/content-aware-fill'
 import { selectSubject } from '@/lib/image-editor/select-subject'
 import { ColorRangeDialog } from '@/components/image-editor/ColorRangeDialog'
 import { ReplaceColorDialog } from '@/components/image-editor/ReplaceColorDialog'
@@ -2565,6 +2566,110 @@ export function ImageEditorPage() {
     toast.success(t('pages.imageEditor.selectMenu.removeBackground'))
   }, [renderPreviewComposite, image, state, ensureImage, history, t])
 
+  // ── Content-Aware Fill ─────────────────────────────────────────────────
+  // Synthesize over the current selection from the surrounding image (PS
+  // Edit > Content-Aware Fill). Reads the composite, rasterizes the selection
+  // as the "hole", PatchMatch-fills it, then commits the result clipped to the
+  // (feathered) selection as an image layer on top — covering whatever was
+  // selected with synthesized background.
+  const canContentAwareFill = !!(
+    state.selection ||
+    (state.selectionPath && state.selectionPath.length >= 3)
+  )
+  const handleContentAwareFill = useCallback(async () => {
+    if (!image) return
+    if (
+      !state.selection &&
+      !(state.selectionPath && state.selectionPath.length >= 3)
+    ) {
+      toast.message(t('pages.imageEditor.caf.needSelection'))
+      return
+    }
+    const buf = renderPreviewComposite()
+    if (!buf) {
+      toast.error(t('pages.imageEditor.errBucketRead'))
+      return
+    }
+    const { data, w, h, cropX, cropY } = buf
+    // Hole mask in BUFFER space (selection shifted by the crop offset).
+    const path = state.selectionPath
+      ? state.selectionPath.map((p) => ({ x: p.x - cropX, y: p.y - cropY }))
+      : undefined
+    const rect = state.selection
+      ? {
+          x: state.selection.x - cropX,
+          y: state.selection.y - cropY,
+          w: state.selection.w,
+          h: state.selection.h,
+        }
+      : undefined
+    const hole = rasterizePolygonMask(path, rect, w, h)
+    let holeCount = 0
+    for (let i = 0; i < hole.length; i++) if (hole[i]) holeCount++
+    if (holeCount === 0 || holeCount >= w * h) {
+      toast.message(t('pages.imageEditor.caf.needSelection'))
+      return
+    }
+
+    const id = toast.loading(t('pages.imageEditor.caf.working'))
+    // Yield a frame so the loading toast paints before the synchronous fill.
+    await new Promise((r) => setTimeout(r, 30))
+    const filled = contentAwareFill(data, w, h, hole)
+
+    // Compose: filled buffer at the crop offset, clipped to the feathered
+    // selection so only the selected region is painted (transparent elsewhere).
+    const { w: fw, h: fh } = previewDimsOf(image, state)
+    const result = document.createElement('canvas')
+    result.width = fw
+    result.height = fh
+    const rctx = result.getContext('2d')
+    if (!rctx) {
+      toast.dismiss(id)
+      return
+    }
+    const tmp = document.createElement('canvas')
+    tmp.width = w
+    tmp.height = h
+    const tctx = tmp.getContext('2d')
+    if (!tctx) {
+      toast.dismiss(id)
+      return
+    }
+    const imgData = tctx.createImageData(w, h)
+    imgData.data.set(filled)
+    tctx.putImageData(imgData, 0, 0)
+    rctx.drawImage(tmp, cropX, cropY)
+    const maskCanvas = buildSelectionMaskCanvas({
+      w: fw,
+      h: fh,
+      path: state.selectionPath,
+      rect: state.selection,
+      feather: state.selectionFeather ?? 0,
+    })
+    if (maskCanvas) {
+      rctx.globalCompositeOperation = 'destination-in'
+      rctx.drawImage(maskCanvas, 0, 0)
+      rctx.globalCompositeOperation = 'source-over'
+    }
+    const dataUrl = result.toDataURL('image/png')
+    try {
+      await ensureImage(dataUrl)
+    } catch {
+      /* renders from the cache on the next frame */
+    }
+    toast.dismiss(id)
+    commitLayer({
+      id: crypto.randomUUID(),
+      name: t('pages.imageEditor.caf.layerName'),
+      visible: true,
+      opacity: 100,
+      blend: 'normal',
+      kind: 'annotation',
+      shape: { kind: 'image', x: 0, y: 0, w: fw, h: fh, dataUrl },
+    })
+    toast.success(t('pages.imageEditor.caf.done'))
+  }, [image, state, renderPreviewComposite, ensureImage, commitLayer, t])
+
   // ── Liquify session ────────────────────────────────────────────────────
   /** Snapshot the composite into a working canvas — that canvas becomes the
    *  warpable surface the Canvas overlays on top of the rendered scene. */
@@ -3486,6 +3591,8 @@ export function ImageEditorPage() {
             pasteInPlace: handlePasteInPlace,
             fill: () => setFillOpen(true),
             stroke: () => setStrokeOpen(true),
+            contentAwareFill: handleContentAwareFill,
+            canContentAwareFill,
             canPaste: !!clipboard,
             mergeDown: handleMergeDown,
             mergeVisible: handleMergeVisible,

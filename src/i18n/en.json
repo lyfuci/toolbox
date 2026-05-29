@@ -1028,6 +1028,7 @@
         "paste": "Paste",
         "pasteInPlace": "Paste in Place",
         "fill": "Fill",
+        "contentAwareFill": "Content-Aware Fill",
         "stroke": "Stroke",
         "blendingOptions": "Blending Options",
         "zoomIn": "Zoom In",
@@ -1495,6 +1496,12 @@
         "saturation": "Saturation",
         "color": "Color",
         "luminosity": "Luminosity"
+      },
+      "caf": {
+        "needSelection": "Make a selection first — Content-Aware Fill replaces the selected region.",
+        "working": "Filling…",
+        "done": "Content-Aware Fill applied",
+        "layerName": "Content-Aware Fill"
       },
       "annoLabel": {
         "rect": "Rectangle",
