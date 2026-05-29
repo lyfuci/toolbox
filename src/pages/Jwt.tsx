@@ -1,5 +1,4 @@
 import {
-  Fragment,
   useCallback,
   useMemo,
   useRef,
@@ -27,10 +26,11 @@ import {
   CircleAlert,
   CircleDot,
 } from 'lucide-react'
+import { hoverTooltip, EditorView } from '@codemirror/view'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { FieldTooltip } from '@/components/FieldTooltip'
+import { CodeEditor } from '@/components/CodeEditor'
 import { formatRelative, formatTimestampBreakdown } from '@/lib/time'
 
 const SAMPLE_TOKEN =
@@ -326,6 +326,31 @@ export function JwtPage() {
   const headerParse = useMemo(() => tryParseJson(headerText), [headerText])
   const payloadParse = useMemo(() => tryParseJson(payloadText), [payloadText])
 
+  // Hover annotations layered onto the JSON editors: field-name descriptions
+  // and readable times on time-claim values (see makeJsonHover).
+  const headerHover = useMemo(
+    () =>
+      makeJsonHover({
+        keyPrefix: 'pages.jwt.headerField.',
+        withTime: false,
+        locale,
+        t,
+        hasKey: (k) => i18n.exists(k),
+      }),
+    [locale, t, i18n],
+  )
+  const payloadHover = useMemo(
+    () =>
+      makeJsonHover({
+        keyPrefix: 'pages.jwt.claim.',
+        withTime: true,
+        locale,
+        t,
+        hasKey: (k) => i18n.exists(k),
+      }),
+    [locale, t, i18n],
+  )
+
   const headerObj = headerParse.ok ? headerParse.value : null
   const payloadObj = payloadParse.ok ? payloadParse.value : null
 
@@ -533,25 +558,18 @@ export function JwtPage() {
             title={t('pages.jwt.header')}
             subtitle={t('pages.jwt.algorithm', { alg })}
           >
-            <Textarea
+            <CodeEditor
+              language="json"
               value={headerText}
-              onChange={(e) => onHeaderTextChange(e.target.value)}
-              spellCheck={false}
-              className="min-h-[7rem] resize-y font-mono text-sm leading-relaxed"
+              onChange={onHeaderTextChange}
+              extraExtensions={headerHover}
+              height="7rem"
+              className="rounded-md border border-input text-sm"
             />
             {!headerParse.ok && headerText.trim() && (
               <p className="mt-1 text-xs text-destructive">
                 ⚠ {t('pages.jwt.jsonError')}: {headerParse.error}
               </p>
-            )}
-            {headerObj && (
-              <DecodedFields
-                obj={headerObj}
-                keyPrefix="pages.jwt.headerField."
-                withTime={false}
-                locale={locale}
-                t={t}
-              />
             )}
           </Panel>
 
@@ -562,25 +580,18 @@ export function JwtPage() {
               <ExpStatusPill status={expStatus} locale={locale} t={t} />
             }
           >
-            <Textarea
+            <CodeEditor
+              language="json"
               value={payloadText}
-              onChange={(e) => onPayloadTextChange(e.target.value)}
-              spellCheck={false}
-              className="min-h-[12rem] resize-y font-mono text-sm leading-relaxed"
+              onChange={onPayloadTextChange}
+              extraExtensions={payloadHover}
+              height="12rem"
+              className="rounded-md border border-input text-sm"
             />
             {!payloadParse.ok && payloadText.trim() && (
               <p className="mt-1 text-xs text-destructive">
                 ⚠ {t('pages.jwt.jsonError')}: {payloadParse.error}
               </p>
-            )}
-            {payloadObj && (
-              <DecodedFields
-                obj={payloadObj}
-                keyPrefix="pages.jwt.claim."
-                withTime
-                locale={locale}
-                t={t}
-              />
             )}
           </Panel>
 
@@ -689,105 +700,97 @@ function Panel({
   )
 }
 
-// Time-bearing claims that get a readable-time tooltip + inline relative hint.
+// Time-bearing claims whose value gets a readable-time hover tooltip.
 const TIME_CLAIMS = new Set(['exp', 'nbf', 'iat', 'auth_time'])
 
+/** Small DOM node for a CodeMirror hover tooltip (pre-line keeps the breaks). */
+function hoverDom(text: string): HTMLElement {
+  const dom = document.createElement('div')
+  dom.style.cssText =
+    'padding:6px 8px;font-size:12px;line-height:1.5;max-width:22rem;white-space:pre-line'
+  dom.textContent = text
+  return dom
+}
+
+// CodeMirror's default tooltip is a light card; restyle it with the app's
+// popover tokens so it reads in dark mode.
+const hoverTheme = EditorView.theme({
+  '.cm-tooltip': {
+    background: 'var(--popover)',
+    color: 'var(--popover-foreground)',
+    border: '1px solid var(--border)',
+    borderRadius: '6px',
+  },
+})
+
 /**
- * Read-only decoded view of a header/payload object. Each field NAME is wrapped
- * in a FieldTooltip resolving `${keyPrefix}${name}` — the RFC-sourced claim /
- * header descriptions already in the i18n catalog (unknown keys render plain).
- * With `withTime`, numeric time claims also get a human-readable time tooltip on
- * the VALUE plus an inline relative hint. Editing still happens in the textarea
- * above; this panel is purely an explanatory mirror.
+ * A CodeMirror hover extension that annotates the JSON IN PLACE — no separate
+ * panel. Hovering a field NAME shows its RFC description (resolved from
+ * `${keyPrefix}${name}`; skipped for unknown/custom keys), and — when
+ * `withTime` — hovering a numeric time claim's VALUE shows its local / UTC /
+ * relative time. Pretty-printed JSON keeps one key per line, so a per-line
+ * parse pinpoints the key and value spans without a full JSON syntax tree.
  */
-function DecodedFields({
-  obj,
-  keyPrefix,
-  withTime,
-  locale,
-  t,
-}: {
-  obj: Record<string, unknown>
+function makeJsonHover(args: {
   keyPrefix: string
   withTime: boolean
   locale: string
   t: Translator
+  hasKey: (key: string) => boolean
 }) {
-  const entries = Object.entries(obj)
-  if (entries.length === 0) return null
-  return (
-    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5 text-xs">
-      {entries.map(([k, v]) => (
-        <Fragment key={k}>
-          <dt className="font-mono font-medium text-muted-foreground">
-            <FieldTooltip body={`${keyPrefix}${k}`} bodyIsKey>
-              {k}
-            </FieldTooltip>
-          </dt>
-          <dd className="min-w-0 break-all font-mono text-foreground">
-            <FieldValue
-              fieldKey={k}
-              value={v}
-              withTime={withTime}
-              locale={locale}
-              t={t}
-            />
-          </dd>
-        </Fragment>
-      ))}
-    </dl>
-  )
-}
+  const { keyPrefix, withTime, locale, t, hasKey } = args
+  const ext = hoverTooltip((view, pos) => {
+    const line = view.state.doc.lineAt(pos)
+    const m = /^(\s*)"([^"]+)"(\s*:\s*)(.*?)(,?\s*)$/.exec(line.text)
+    if (!m) return null
+    const indent = m[1].length
+    const key = m[2]
+    const keyStart = indent // opening quote
+    const keyEnd = indent + 1 + key.length + 1 // just past the closing quote
+    const valueStart = keyEnd + m[3].length
+    const valueEnd = valueStart + m[4].length
+    const col = pos - line.from
 
-function FieldValue({
-  fieldKey,
-  value,
-  withTime,
-  locale,
-  t,
-}: {
-  fieldKey: string
-  value: unknown
-  withTime: boolean
-  locale: string
-  t: Translator
-}) {
-  if (
-    withTime &&
-    TIME_CLAIMS.has(fieldKey) &&
-    typeof value === 'number' &&
-    Number.isFinite(value)
-  ) {
-    const date = new Date(value * 1000)
-    // Guard nonsensical timestamps (e.g. a pasted 99999999999999) — don't show
-    // an "Invalid Date" tooltip; fall through to the raw-number rendering.
-    if (!Number.isNaN(date.getTime())) {
-      const { utc, local, relative } = formatTimestampBreakdown(value, locale)
-      const body = (
-        <span className="block space-y-0.5">
-          <span className="block">
-            {t('pages.jwt.timeLocal')}: {local}
-          </span>
-          <span className="block">
-            {t('pages.jwt.timeUtc')}: {utc}
-          </span>
-          <span className="block">
-            {t('pages.jwt.timeRelative')}: {relative}
-          </span>
-        </span>
-      )
-      return (
-        <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <FieldTooltip body={body}>{String(value)}</FieldTooltip>
-          <span className="inline-flex items-center gap-1 text-[0.7rem] text-muted-foreground">
-            <Clock className="h-3 w-3" />
-            {relative}
-          </span>
-        </span>
-      )
+    // Field name → description.
+    if (col >= keyStart && col <= keyEnd) {
+      const dk = keyPrefix + key
+      if (!hasKey(dk)) return null
+      return {
+        pos: line.from + keyStart,
+        end: line.from + keyEnd,
+        above: true,
+        create: () => ({ dom: hoverDom(t(dk)) }),
+      }
     }
-  }
-  return <>{typeof value === 'string' ? value : JSON.stringify(value)}</>
+    // Numeric time value → readable time.
+    if (
+      withTime &&
+      TIME_CLAIMS.has(key) &&
+      col >= valueStart &&
+      col <= valueEnd
+    ) {
+      const num = Number(m[4])
+      if (Number.isFinite(num)) {
+        const d = new Date(num * 1000)
+        // Guard nonsensical timestamps — no "Invalid Date" tooltip.
+        if (!Number.isNaN(d.getTime())) {
+          const { utc, local, relative } = formatTimestampBreakdown(num, locale)
+          const body =
+            `${t('pages.jwt.timeLocal')}: ${local}\n` +
+            `${t('pages.jwt.timeUtc')}: ${utc}\n` +
+            `${t('pages.jwt.timeRelative')}: ${relative}`
+          return {
+            pos: line.from + valueStart,
+            end: line.from + valueEnd,
+            above: true,
+            create: () => ({ dom: hoverDom(body) }),
+          }
+        }
+      }
+    }
+    return null
+  })
+  return [ext, hoverTheme]
 }
 
 function ExpStatusPill({
