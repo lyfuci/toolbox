@@ -503,7 +503,19 @@
       "includeNumber": "附加一位数字"
     },
     "qr": {
-      "description": "生成二维码（SVG / PNG）。本地渲染，输入内容不出浏览器。类型选项卡可组合 URL / WiFi / vCard / Email / SMS / GeoURI 等载荷。",
+      "description": "生成二维码（SVG / PNG），或从图片中解码二维码。全部在本地完成，内容不出浏览器。类型选项卡可组合 URL / WiFi / vCard / Email / SMS / GeoURI 等载荷。",
+      "viewGenerate": "生成",
+      "viewDecode": "解码",
+      "decode": {
+        "drop": "将二维码图片拖到这里，或点击选择",
+        "hint": "PNG / JPEG / WebP / GIF —— 本地解码，不会上传",
+        "decoding": "解码中…",
+        "result": "解码内容",
+        "copied": "已复制解码内容",
+        "open": "打开链接",
+        "notFound": "未在图片中识别到二维码。",
+        "notImage": "请选择图片文件。"
+      },
       "content": "内容",
       "contentPlaceholder": "URL / 文本 / vCard…",
       "size": "尺寸 (px)",
