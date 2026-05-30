@@ -352,7 +352,9 @@
         "checking": "Checking…",
         "found": "Found in {{times}} known breaches — pick a different password.",
         "notFound": "Not found in any known breach (this is not a strength guarantee).",
-        "error": "Lookup failed: {{message}}"
+        "error": "Lookup failed: {{message}}",
+        "emailHint": "Want to know which breaches an account is in?",
+        "emailLink": "Look up an email on Have I Been Pwned"
       }
     },
     "hmac": {
