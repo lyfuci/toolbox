@@ -126,6 +126,10 @@
       "name": "Timestamp",
       "description": "Timestamp ↔ date (Unix / ISO / RFC) + multi-zone clock, compose, batch"
     },
+    "cron": {
+      "name": "Cron",
+      "description": "Explain a cron expression in plain English and preview its next run times."
+    },
     "color": {
       "name": "Color",
       "description": "HEX / RGB / HSL / OKLCH + WCAG contrast + palettes"
@@ -376,6 +380,32 @@
       "verifyPlaceholder": "Paste expected signature…",
       "verifyMatch": "Matches",
       "verifyMismatch": "Does not match"
+    },
+    "cron": {
+      "description": "Paste a cron expression to see what it means in plain English and when it will next run.",
+      "expression": "Cron expression",
+      "meaning": "Meaning",
+      "enterHint": "Enter a cron expression above to see its meaning.",
+      "invalid": "Invalid cron expression",
+      "timezone": "Timezone",
+      "nextRuns": "Next runs",
+      "fields": {
+        "minute": "minute",
+        "hour": "hour",
+        "dom": "day (month)",
+        "month": "month",
+        "dow": "day (week)"
+      },
+      "presets": {
+        "everyMinute": "Every minute",
+        "every15": "Every 15 min",
+        "hourly": "Hourly",
+        "daily": "Daily",
+        "weekdays9": "Weekdays 9am",
+        "weekly": "Weekly",
+        "monthly": "Monthly",
+        "yearly": "Yearly"
+      }
     },
     "timestamp": {
       "description": "Convert between timestamps and dates. Supports Unix seconds / milliseconds / ISO 8601 / RFC 2822. Includes a discrete-fields composer, batch conversion, and Windows FILETIME / Excel-serial outputs.",
