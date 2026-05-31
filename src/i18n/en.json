@@ -130,6 +130,30 @@
       "name": "Cron",
       "description": "Explain a cron expression in plain English and preview its next run times."
     },
+    "escape": {
+      "name": "String Escape",
+      "description": "Escape / unescape strings for JSON, HTML, URL, CSV and \\u Unicode."
+    },
+    "unicode": {
+      "name": "Unicode Inspector",
+      "description": "Break text into codepoints with UTF-8 / UTF-16 bytes and names."
+    },
+    "chmod": {
+      "name": "Chmod Calculator",
+      "description": "Unix permissions: octal ↔ symbolic ↔ checkboxes, with explanation."
+    },
+    "json-to-ts": {
+      "name": "JSON → TypeScript",
+      "description": "Generate TypeScript interfaces from a JSON sample."
+    },
+    "text-stats": {
+      "name": "Text Stats",
+      "description": "Character, word, line, sentence counts + byte size and reading time."
+    },
+    "markdown": {
+      "name": "Markdown Preview",
+      "description": "Live Markdown → sanitized HTML preview, side by side."
+    },
     "color": {
       "name": "Color",
       "description": "HEX / RGB / HSL / OKLCH + WCAG contrast + palettes"
@@ -406,6 +430,84 @@
         "monthly": "Monthly",
         "yearly": "Yearly"
       }
+    },
+    "escape": {
+      "description": "Escape or unescape text for a target syntax. Everything runs locally.",
+      "inputLabel": "Input",
+      "outputLabel": "Output",
+      "escape": "Escape",
+      "unescape": "Unescape",
+      "swap": "Swap direction",
+      "copied": "Copied output",
+      "modes": {
+        "json": "JSON / JS",
+        "html": "HTML",
+        "url": "URL",
+        "csv": "CSV",
+        "unicode": "Unicode \\u"
+      }
+    },
+    "unicode": {
+      "description": "Inspect each character: codepoint, UTF-8 / UTF-16 bytes, category and name.",
+      "inputLabel": "Text",
+      "placeholder": "Type or paste text to inspect…",
+      "count": "{{count}} code points",
+      "empty": "Type something above to inspect it.",
+      "colChar": "Char",
+      "colCode": "Code point",
+      "colDec": "Decimal",
+      "colUtf8": "UTF-8",
+      "colUtf16": "UTF-16",
+      "colCategory": "Category",
+      "colName": "Name / block"
+    },
+    "chmod": {
+      "description": "Compute Unix file permissions. Toggle the checkboxes or type an octal value; the symbolic form and a plain-English summary update live.",
+      "class": "Class",
+      "owner": "Owner",
+      "group": "Group",
+      "other": "Other",
+      "perm": {
+        "r": "Read",
+        "w": "Write",
+        "x": "Execute"
+      },
+      "setuid": "setuid",
+      "setgid": "setgid",
+      "sticky": "sticky",
+      "reset": "Reset",
+      "octal": "Octal",
+      "symbolic": "Symbolic",
+      "commandLabel": "Command",
+      "invalid": "invalid"
+    },
+    "jsonToTs": {
+      "description": "Generate TypeScript interfaces from a JSON sample. Object shapes inside an array are merged, with keys absent from some elements marked optional.",
+      "rootName": "Root type name",
+      "jsonLabel": "JSON",
+      "tsLabel": "TypeScript",
+      "enterHint": "Paste JSON on the left to generate types.",
+      "copied": "Copied TypeScript"
+    },
+    "textStats": {
+      "description": "Live counts for your text. Words use Unicode segmentation (so CJK counts sensibly); byte size is UTF-8.",
+      "inputLabel": "Text",
+      "placeholder": "Type or paste text…",
+      "chars": "Characters",
+      "charsNoSpaces": "No spaces",
+      "words": "Words",
+      "sentences": "Sentences",
+      "lines": "Lines",
+      "paragraphs": "Paragraphs",
+      "bytes": "Bytes (UTF-8)",
+      "readingTime": "Reading time"
+    },
+    "markdown": {
+      "description": "Render Markdown to HTML as you type. Output is sanitized, so pasted Markdown can't inject scripts.",
+      "sourceLabel": "Markdown",
+      "previewLabel": "Preview",
+      "copyHtml": "Copy HTML",
+      "copiedHtml": "Copied HTML"
     },
     "timestamp": {
       "description": "Convert between timestamps and dates. Supports Unix seconds / milliseconds / ISO 8601 / RFC 2822. Includes a discrete-fields composer, batch conversion, and Windows FILETIME / Excel-serial outputs.",

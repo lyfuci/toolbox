@@ -88,3 +88,78 @@
     color-scheme: dark;
   }
 }
+
+/* Markdown tool preview — minimal prose styling using semantic tokens, since
+   we don't pull the Tailwind typography plugin. */
+.markdown-preview > :first-child {
+  margin-top: 0;
+}
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3,
+.markdown-preview h4 {
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 1.2em 0 0.6em;
+}
+.markdown-preview h1 { font-size: 1.6em; }
+.markdown-preview h2 { font-size: 1.35em; }
+.markdown-preview h3 { font-size: 1.15em; }
+.markdown-preview p,
+.markdown-preview ul,
+.markdown-preview ol,
+.markdown-preview blockquote,
+.markdown-preview pre,
+.markdown-preview table {
+  margin: 0.6em 0;
+}
+.markdown-preview ul,
+.markdown-preview ol {
+  padding-left: 1.5em;
+}
+.markdown-preview ul { list-style: disc; }
+.markdown-preview ol { list-style: decimal; }
+.markdown-preview a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+.markdown-preview code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: color-mix(in oklab, var(--muted) 60%, transparent);
+  padding: 0.1em 0.35em;
+  border-radius: 0.25rem;
+}
+.markdown-preview pre {
+  background: color-mix(in oklab, var(--muted) 60%, transparent);
+  padding: 0.8em 1em;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+}
+.markdown-preview pre code {
+  background: none;
+  padding: 0;
+}
+.markdown-preview blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 1em;
+  color: var(--muted-foreground);
+}
+.markdown-preview table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.markdown-preview th,
+.markdown-preview td {
+  border: 1px solid var(--border);
+  padding: 0.4em 0.7em;
+  text-align: left;
+}
+.markdown-preview hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 1.2em 0;
+}
+.markdown-preview img {
+  max-width: 100%;
+}

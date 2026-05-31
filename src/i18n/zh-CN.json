@@ -130,6 +130,30 @@
       "name": "Cron",
       "description": "用大白话解释 cron 表达式，并预览接下来的执行时间。"
     },
+    "escape": {
+      "name": "字符串转义",
+      "description": "针对 JSON、HTML、URL、CSV 和 \\u Unicode 转义 / 反转义字符串。"
+    },
+    "unicode": {
+      "name": "Unicode 检查器",
+      "description": "把文本拆成码位，显示 UTF-8 / UTF-16 字节与名称。"
+    },
+    "chmod": {
+      "name": "Chmod 计算器",
+      "description": "Unix 权限：八进制 ↔ 符号 ↔ 勾选框，并附带说明。"
+    },
+    "json-to-ts": {
+      "name": "JSON → TypeScript",
+      "description": "从 JSON 示例生成 TypeScript 接口。"
+    },
+    "text-stats": {
+      "name": "文本统计",
+      "description": "字符、单词、行、句子计数 + 字节大小与阅读时长。"
+    },
+    "markdown": {
+      "name": "Markdown 预览",
+      "description": "Markdown → 净化后的 HTML 实时预览，左右并排。"
+    },
     "color": {
       "name": "Color",
       "description": "HEX / RGB / HSL / OKLCH + WCAG 对比度 + 配色方案"
@@ -406,6 +430,84 @@
         "monthly": "每月",
         "yearly": "每年"
       }
+    },
+    "escape": {
+      "description": "针对目标语法转义或反转义文本。全部在本地完成。",
+      "inputLabel": "输入",
+      "outputLabel": "输出",
+      "escape": "转义",
+      "unescape": "反转义",
+      "swap": "切换方向",
+      "copied": "已复制输出",
+      "modes": {
+        "json": "JSON / JS",
+        "html": "HTML",
+        "url": "URL",
+        "csv": "CSV",
+        "unicode": "Unicode \\u"
+      }
+    },
+    "unicode": {
+      "description": "检查每个字符：码位、UTF-8 / UTF-16 字节、类别与名称。",
+      "inputLabel": "文本",
+      "placeholder": "输入或粘贴要检查的文本…",
+      "count": "{{count}} 个码位",
+      "empty": "在上方输入内容以进行检查。",
+      "colChar": "字符",
+      "colCode": "码位",
+      "colDec": "十进制",
+      "colUtf8": "UTF-8",
+      "colUtf16": "UTF-16",
+      "colCategory": "类别",
+      "colName": "名称 / 区块"
+    },
+    "chmod": {
+      "description": "计算 Unix 文件权限。勾选复选框或输入八进制值，符号形式与中文说明会实时更新。",
+      "class": "类别",
+      "owner": "所有者",
+      "group": "组",
+      "other": "其他",
+      "perm": {
+        "r": "读",
+        "w": "写",
+        "x": "执行"
+      },
+      "setuid": "setuid",
+      "setgid": "setgid",
+      "sticky": "sticky",
+      "reset": "重置",
+      "octal": "八进制",
+      "symbolic": "符号",
+      "commandLabel": "命令",
+      "invalid": "无效"
+    },
+    "jsonToTs": {
+      "description": "从 JSON 示例生成 TypeScript 接口。数组内的对象结构会被合并，部分元素缺少的键标记为可选。",
+      "rootName": "根类型名",
+      "jsonLabel": "JSON",
+      "tsLabel": "TypeScript",
+      "enterHint": "在左侧粘贴 JSON 以生成类型。",
+      "copied": "已复制 TypeScript"
+    },
+    "textStats": {
+      "description": "对文本进行实时统计。单词使用 Unicode 分词（CJK 也能合理计数）；字节大小为 UTF-8。",
+      "inputLabel": "文本",
+      "placeholder": "输入或粘贴文本…",
+      "chars": "字符数",
+      "charsNoSpaces": "不含空格",
+      "words": "单词数",
+      "sentences": "句子数",
+      "lines": "行数",
+      "paragraphs": "段落数",
+      "bytes": "字节（UTF-8）",
+      "readingTime": "阅读时长"
+    },
+    "markdown": {
+      "description": "边输入边把 Markdown 渲染成 HTML。输出经过净化，粘贴的 Markdown 无法注入脚本。",
+      "sourceLabel": "Markdown",
+      "previewLabel": "预览",
+      "copyHtml": "复制 HTML",
+      "copiedHtml": "已复制 HTML"
     },
     "timestamp": {
       "description": "时间戳与日期相互转换。支持 Unix 秒 / 毫秒 / ISO 8601 / RFC 2822。内含分字段合成、批量转换以及 Windows FILETIME / Excel 序列数输出。",

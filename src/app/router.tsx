@@ -61,6 +61,30 @@ export const router = createBrowserRouter([
         lazy: async () => ({ Component: (await import('@/pages/Cron')).CronPage }),
       },
       {
+        path: 'escape',
+        lazy: async () => ({ Component: (await import('@/pages/StringEscape')).StringEscapePage }),
+      },
+      {
+        path: 'chmod',
+        lazy: async () => ({ Component: (await import('@/pages/Chmod')).ChmodPage }),
+      },
+      {
+        path: 'json-to-ts',
+        lazy: async () => ({ Component: (await import('@/pages/JsonToTs')).JsonToTsPage }),
+      },
+      {
+        path: 'text-stats',
+        lazy: async () => ({ Component: (await import('@/pages/TextStats')).TextStatsPage }),
+      },
+      {
+        path: 'unicode',
+        lazy: async () => ({ Component: (await import('@/pages/UnicodeInspect')).UnicodeInspectPage }),
+      },
+      {
+        path: 'markdown',
+        lazy: async () => ({ Component: (await import('@/pages/Markdown')).MarkdownPage }),
+      },
+      {
         path: 'color',
         lazy: async () => ({ Component: (await import('@/pages/Color')).ColorPage }),
       },
