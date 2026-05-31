@@ -126,6 +126,10 @@
       "name": "Timestamp",
       "description": "时间戳 ↔ 日期（Unix / ISO / RFC）+ 多时区时钟、分字段合成、批量"
     },
+    "cron": {
+      "name": "Cron",
+      "description": "用大白话解释 cron 表达式，并预览接下来的执行时间。"
+    },
     "color": {
       "name": "Color",
       "description": "HEX / RGB / HSL / OKLCH + WCAG 对比度 + 配色方案"
