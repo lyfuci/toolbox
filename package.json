@@ -25,6 +25,8 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "cron-parser": "^5.5.0",
+    "cronstrue": "^3.14.0",
     "diff": "^9.0.0",
     "i18next": "^26.0.6",
     "i18next-browser-languagedetector": "^8.2.1",

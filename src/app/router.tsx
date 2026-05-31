@@ -57,6 +57,10 @@ export const router = createBrowserRouter([
         lazy: async () => ({ Component: (await import('@/pages/Timestamp')).TimestampPage }),
       },
       {
+        path: 'cron',
+        lazy: async () => ({ Component: (await import('@/pages/Cron')).CronPage }),
+      },
+      {
         path: 'color',
         lazy: async () => ({ Component: (await import('@/pages/Color')).ColorPage }),
       },
