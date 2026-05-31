@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import QRCode, { type QRCodeErrorCorrectionLevel } from 'qrcode'
-import { Download } from 'lucide-react'
+import { Copy, Download, ExternalLink, ScanLine } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { toast } from 'sonner'
+import { FileDrop } from '@/components/FileDrop'
+import { decodeQrFromBlob } from '@/lib/qr-decode'
 
 const ERROR_LEVELS = ['L', 'M', 'Q', 'H'] as const satisfies readonly QRCodeErrorCorrectionLevel[]
 type ShortLevel = (typeof ERROR_LEVELS)[number]
@@ -78,9 +80,25 @@ function buildGeo(lat: string, lng: string): string {
   return `geo:${lat},${lng}`
 }
 
+type View = 'generate' | 'decode'
+
+type DecodeState =
+  | { kind: 'idle' }
+  | { kind: 'decoding' }
+  | { kind: 'done'; text: string }
+  | { kind: 'empty' } // image decoded, but no QR found
+  | { kind: 'error'; message: string }
+
+function looksLikeUrl(s: string): boolean {
+  return /^https?:\/\/\S+$/i.test(s.trim())
+}
+
 export function QrCodePage() {
   const { t } = useTranslation()
+  const [view, setView] = useState<View>('generate')
   const [mode, setMode] = useState<Mode>('text')
+  // Decode side — local file → canvas → jsQR; nothing leaves the browser.
+  const [decoded, setDecoded] = useState<DecodeState>({ kind: 'idle' })
 
   // Text / URL
   const [text, setText] = useState('https://toolbox.seansun.net')
@@ -214,6 +232,25 @@ export function QrCodePage() {
     }
   }
 
+  const handleDecodeFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setDecoded({ kind: 'error', message: t('pages.qr.decode.notImage') })
+      return
+    }
+    setDecoded({ kind: 'decoding' })
+    try {
+      const result = await decodeQrFromBlob(file)
+      setDecoded(result ? { kind: 'done', text: result.text } : { kind: 'empty' })
+    } catch (err) {
+      setDecoded({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
+    }
+  }
+
+  const handleCopyDecoded = async (value: string) => {
+    await navigator.clipboard.writeText(value)
+    toast.success(t('pages.qr.decode.copied'))
+  }
+
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <header className="mb-6">
@@ -221,6 +258,68 @@ export function QrCodePage() {
         <p className="mt-1 text-sm text-muted-foreground">{t('pages.qr.description')}</p>
       </header>
 
+      <div className="mb-4 flex rounded-md border border-input bg-transparent text-sm w-fit">
+        {(['generate', 'decode'] as View[]).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setView(v)}
+            className={`px-3 py-1.5 transition-colors ${
+              view === v
+                ? 'bg-accent text-accent-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {v === 'generate' ? t('pages.qr.viewGenerate') : t('pages.qr.viewDecode')}
+          </button>
+        ))}
+      </div>
+
+      {view === 'decode' ? (
+        <div className="space-y-4">
+          <FileDrop
+            onFile={handleDecodeFile}
+            accept="image/*"
+            label={t('pages.qr.decode.drop')}
+            hint={t('pages.qr.decode.hint')}
+          />
+          {decoded.kind === 'decoding' ? (
+            <p className="text-sm text-muted-foreground">{t('pages.qr.decode.decoding')}</p>
+          ) : null}
+          {decoded.kind === 'empty' ? (
+            <p className="text-sm text-destructive">⚠ {t('pages.qr.decode.notFound')}</p>
+          ) : null}
+          {decoded.kind === 'error' ? (
+            <p className="text-sm text-destructive">⚠ {decoded.message}</p>
+          ) : null}
+          {decoded.kind === 'done' ? (
+            <div className="rounded-lg border border-border bg-card/40 p-4">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <ScanLine className="h-4 w-4 text-muted-foreground" />
+                  {t('pages.qr.decode.result')}
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => handleCopyDecoded(decoded.text)}>
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <pre className="whitespace-pre-wrap break-all font-mono text-sm">{decoded.text}</pre>
+              {looksLikeUrl(decoded.text) ? (
+                <a
+                  href={decoded.text}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                >
+                  {t('pages.qr.decode.open')}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+      <>
       <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
         <TabsList>
           <TabsTrigger value="text">{t('pages.qr.tabText')}</TabsTrigger>
@@ -430,6 +529,8 @@ export function QrCodePage() {
       </div>
 
       <a ref={linkRef} className="hidden" />
+      </>
+      )}
     </div>
   )
 }

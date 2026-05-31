@@ -505,7 +505,19 @@
       "includeNumber": "Append a number"
     },
     "qr": {
-      "description": "Generate a QR code (SVG / PNG). Rendered locally; content never leaves your browser. Type tabs compose URL / WiFi / vCard / Email / SMS / GeoURI payloads.",
+      "description": "Generate a QR code (SVG / PNG) or decode one from an image. Everything runs locally; content never leaves your browser. Type tabs compose URL / WiFi / vCard / Email / SMS / GeoURI payloads.",
+      "viewGenerate": "Generate",
+      "viewDecode": "Decode",
+      "decode": {
+        "drop": "Drop a QR image here, or click to choose",
+        "hint": "PNG / JPEG / WebP / GIF — decoded locally with no upload",
+        "decoding": "Decoding…",
+        "result": "Decoded content",
+        "copied": "Copied decoded content",
+        "open": "Open link",
+        "notFound": "No QR code found in this image.",
+        "notImage": "Please choose an image file."
+      },
       "content": "Content",
       "contentPlaceholder": "URL / text / vCard…",
       "size": "Size (px)",
