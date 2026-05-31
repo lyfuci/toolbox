@@ -126,6 +126,10 @@
       "name": "Timestamp",
       "description": "时间戳 ↔ 日期（Unix / ISO / RFC）+ 多时区时钟、分字段合成、批量"
     },
+    "cron": {
+      "name": "Cron",
+      "description": "用大白话解释 cron 表达式，并预览接下来的执行时间。"
+    },
     "color": {
       "name": "Color",
       "description": "HEX / RGB / HSL / OKLCH + WCAG 对比度 + 配色方案"
@@ -376,6 +380,32 @@
       "verifyPlaceholder": "粘贴期望签名…",
       "verifyMatch": "匹配",
       "verifyMismatch": "不匹配"
+    },
+    "cron": {
+      "description": "粘贴一个 cron 表达式，查看它的大白话含义以及接下来的执行时间。",
+      "expression": "Cron 表达式",
+      "meaning": "含义",
+      "enterHint": "在上方输入 cron 表达式以查看其含义。",
+      "invalid": "无效的 cron 表达式",
+      "timezone": "时区",
+      "nextRuns": "接下来的执行时间",
+      "fields": {
+        "minute": "分钟",
+        "hour": "小时",
+        "dom": "日（月）",
+        "month": "月",
+        "dow": "星期"
+      },
+      "presets": {
+        "everyMinute": "每分钟",
+        "every15": "每 15 分钟",
+        "hourly": "每小时",
+        "daily": "每天",
+        "weekdays9": "工作日 9 点",
+        "weekly": "每周",
+        "monthly": "每月",
+        "yearly": "每年"
+      }
     },
     "timestamp": {
       "description": "时间戳与日期相互转换。支持 Unix 秒 / 毫秒 / ISO 8601 / RFC 2822。内含分字段合成、批量转换以及 Windows FILETIME / Excel 序列数输出。",
