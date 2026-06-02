@@ -61,6 +61,18 @@ export const router = createBrowserRouter([
         lazy: async () => ({ Component: (await import('@/pages/Cron')).CronPage }),
       },
       {
+        path: 'dotenv',
+        lazy: async () => ({ Component: (await import('@/pages/DotEnv')).DotEnvPage }),
+      },
+      {
+        path: 'slugify',
+        lazy: async () => ({ Component: (await import('@/pages/Slugify')).SlugifyPage }),
+      },
+      {
+        path: 'http-status',
+        lazy: async () => ({ Component: (await import('@/pages/HttpStatus')).HttpStatusPage }),
+      },
+      {
         path: 'escape',
         lazy: async () => ({ Component: (await import('@/pages/StringEscape')).StringEscapePage }),
       },
