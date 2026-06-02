@@ -130,6 +130,18 @@
       "name": "Cron",
       "description": "用大白话解释 cron 表达式，并预览接下来的执行时间。"
     },
+    "dotenv": {
+      "name": ".env ↔ JSON",
+      "description": "在 .env 文件和 JSON 之间双向转换。"
+    },
+    "slugify": {
+      "name": "Slug 生成",
+      "description": "把文本转成干净的 URL slug（支持 Unicode）。"
+    },
+    "http-status": {
+      "name": "HTTP 状态码",
+      "description": "可搜索的 HTTP 状态码及含义速查。"
+    },
     "escape": {
       "name": "字符串转义",
       "description": "针对 JSON、HTML、URL、CSV 和 \\u Unicode 转义 / 反转义字符串。"
@@ -429,6 +441,70 @@
         "weekly": "每周",
         "monthly": "每月",
         "yearly": "每年"
+      }
+    },
+    "dotenv": {
+      "description": "在 .env 文件和 JSON 对象之间转换。处理引号、转义、注释和 export 前缀；JSON 值会被转成字符串。",
+      "envToJson": ".env → JSON",
+      "jsonToEnv": "JSON → .env",
+      "swap": "切换方向",
+      "envLabel": ".env",
+      "jsonLabel": "JSON",
+      "copied": "已复制输出",
+      "enterHint": "在左侧输入内容以转换。",
+      "errNotObject": "JSON 根必须是一个对象。",
+      "errNested": "“{{key}}”的值是对象/数组 —— .env 只能存放扁平的字符串。",
+      "errBadKey": "“{{key}}”不是合法的环境变量名。"
+    },
+    "slugify": {
+      "description": "把任意文本转成干净、URL 安全的 slug。去除变音符号；一行输入一个 slug（多行输入则逐行生成）。",
+      "inputLabel": "文本",
+      "placeholder": "输入或粘贴文本…",
+      "separator": "分隔符",
+      "lowercase": "小写",
+      "keepUnicode": "保留 Unicode",
+      "maxLength": "最大长度",
+      "copied": "已复制 slug",
+      "batchLabel": "逐行 slug",
+      "copyAll": "全部复制"
+    },
+    "httpStatus": {
+      "description": "可搜索的 HTTP 响应状态码速查，按类别分组。可按代码或名称筛选。",
+      "searchPlaceholder": "按代码或名称搜索（如 404、forbidden）…",
+      "noResults": "没有匹配的状态码。",
+      "category": {
+        "1": "信息",
+        "2": "成功",
+        "3": "重定向",
+        "4": "客户端错误",
+        "5": "服务器错误"
+      },
+      "desc": {
+        "200": "请求成功。",
+        "201": "请求成功并创建了新资源。",
+        "204": "成功，但没有返回内容。",
+        "301": "资源已永久迁移到新地址。",
+        "302": "资源临时位于另一个地址。",
+        "304": "缓存仍然有效，不返回正文。",
+        "307": "临时重定向；请求方法不能改变。",
+        "308": "永久重定向；请求方法不能改变。",
+        "400": "服务器无法理解该请求（语法错误）。",
+        "401": "需要身份认证，或认证失败。",
+        "403": "已认证但无权访问该资源。",
+        "404": "找不到请求的资源。",
+        "405": "该资源不允许此 HTTP 方法。",
+        "408": "服务器等待请求超时。",
+        "409": "请求与资源的当前状态冲突。",
+        "410": "资源已永久删除。",
+        "418": "我是茶壶 —— 来自 RFC 2324 的愚人节玩笑。",
+        "422": "请求格式正确但语义无效。",
+        "429": "请求过多 —— 被限流了。",
+        "451": "因法律原因不可用。",
+        "500": "服务器内部发生了通用错误。",
+        "501": "服务器不支持所需的功能。",
+        "502": "上游服务器返回了无效响应。",
+        "503": "服务器暂时不可用（过载或宕机）。",
+        "504": "上游服务器未能及时响应。"
       }
     },
     "escape": {

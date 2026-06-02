@@ -130,6 +130,18 @@
       "name": "Cron",
       "description": "Explain a cron expression in plain English and preview its next run times."
     },
+    "dotenv": {
+      "name": ".env ↔ JSON",
+      "description": "Convert between .env files and JSON, both directions."
+    },
+    "slugify": {
+      "name": "Slugify",
+      "description": "Turn text into a clean URL slug (Unicode-aware)."
+    },
+    "http-status": {
+      "name": "HTTP Status Codes",
+      "description": "Searchable reference of HTTP status codes and their meaning."
+    },
     "escape": {
       "name": "String Escape",
       "description": "Escape / unescape strings for JSON, HTML, URL, CSV and \\u Unicode."
@@ -429,6 +441,70 @@
         "weekly": "Weekly",
         "monthly": "Monthly",
         "yearly": "Yearly"
+      }
+    },
+    "dotenv": {
+      "description": "Convert between a .env file and a JSON object. Handles quotes, escapes, comments and the export prefix; JSON values are coerced to strings.",
+      "envToJson": ".env → JSON",
+      "jsonToEnv": "JSON → .env",
+      "swap": "Swap direction",
+      "envLabel": ".env",
+      "jsonLabel": "JSON",
+      "copied": "Copied output",
+      "enterHint": "Enter input on the left to convert.",
+      "errNotObject": "JSON root must be an object.",
+      "errNested": "Value of \"{{key}}\" is an object/array — .env only holds flat strings.",
+      "errBadKey": "\"{{key}}\" is not a valid env variable name."
+    },
+    "slugify": {
+      "description": "Turn arbitrary text into a clean, URL-safe slug. Diacritics are stripped; one line in, one slug out (multi-line input produces a slug per line).",
+      "inputLabel": "Text",
+      "placeholder": "Type or paste text…",
+      "separator": "Separator",
+      "lowercase": "Lowercase",
+      "keepUnicode": "Keep Unicode",
+      "maxLength": "Max length",
+      "copied": "Copied slug",
+      "batchLabel": "Per-line slugs",
+      "copyAll": "Copy all"
+    },
+    "httpStatus": {
+      "description": "A searchable reference of HTTP response status codes, grouped by class. Filter by code or name.",
+      "searchPlaceholder": "Search by code or name (e.g. 404, forbidden)…",
+      "noResults": "No matching status code.",
+      "category": {
+        "1": "Informational",
+        "2": "Success",
+        "3": "Redirection",
+        "4": "Client Error",
+        "5": "Server Error"
+      },
+      "desc": {
+        "200": "The request succeeded.",
+        "201": "The request succeeded and a new resource was created.",
+        "204": "Success, but there is no content to return.",
+        "301": "The resource has permanently moved to a new URL.",
+        "302": "The resource temporarily resides at a different URL.",
+        "304": "Cached copy is still valid; no body returned.",
+        "307": "Temporary redirect; method must not change.",
+        "308": "Permanent redirect; method must not change.",
+        "400": "The server could not understand the request (malformed syntax).",
+        "401": "Authentication is required or has failed.",
+        "403": "Authenticated but not allowed to access this resource.",
+        "404": "The requested resource could not be found.",
+        "405": "The HTTP method is not allowed for this resource.",
+        "408": "The server timed out waiting for the request.",
+        "409": "The request conflicts with the current state of the resource.",
+        "410": "The resource is permanently gone.",
+        "418": "I'm a teapot — an April Fools' joke from RFC 2324.",
+        "422": "The request was well-formed but semantically invalid.",
+        "429": "Too many requests — you are being rate limited.",
+        "451": "Unavailable for legal reasons.",
+        "500": "A generic server-side error occurred.",
+        "501": "The server does not support the functionality required.",
+        "502": "Invalid response from an upstream server.",
+        "503": "The server is temporarily unavailable (overloaded or down).",
+        "504": "An upstream server failed to respond in time."
       }
     },
     "escape": {
