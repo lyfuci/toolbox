@@ -35,7 +35,9 @@
     "toggleLanguage": "Toggle language"
   },
   "sidebar": {
-    "brand": "Toolbox"
+    "brand": "Toolbox",
+    "collapseAll": "Collapse all",
+    "expandAll": "Expand all"
   },
   "home": {
     "title": "Toolbox",
