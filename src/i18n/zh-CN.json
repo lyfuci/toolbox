@@ -35,7 +35,9 @@
     "toggleLanguage": "切换语言"
   },
   "sidebar": {
-    "brand": "Toolbox"
+    "brand": "Toolbox",
+    "collapseAll": "全部折叠",
+    "expandAll": "全部展开"
   },
   "home": {
     "title": "Toolbox",
