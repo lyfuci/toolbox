@@ -1952,7 +1952,7 @@
     "tsPastSeconds": "{{n}} 秒前"
   },
   "media": {
-    "description": "剪辑、拼接、压缩、缩放、格式转换、转 GIF、旋转、抽帧、提取音轨。基于 ffmpeg.wasm，每一步都在浏览器本地完成，文件不会上传。",
+    "description": "多轨视频编辑器：把片段拖到时间线上，在视频轨 + 音频轨上裁剪、排列，实时预览,再导出为 MP4。全部在浏览器本地完成（ffmpeg.wasm），文件不会上传。",
     "dropZoneTitle": "拖拽音视频文件到这里，或点击选择",
     "dropZoneSub": "所有处理都在浏览器本地完成，文件不会上传",
     "outputDownload": "下载",
@@ -2009,6 +2009,23 @@
     "errNeedTwoFiles": "需要至少 2 个文件",
     "errConcat": "拼接失败。可以先把各片段裁剪到相近分辨率再试。",
     "errGif": "GIF 转换失败",
-    "errUnexpectedString": "意外的字符串输出"
+    "errUnexpectedString": "意外的字符串输出",
+    "timeline": {
+      "sources": "素材",
+      "addMedia": "添加",
+      "appendClip": "追加到时间线",
+      "clipProps": "片段",
+      "volume": "音量",
+      "deleteClip": "删除片段",
+      "addVideoTrack": "视频轨",
+      "addAudioTrack": "音频轨",
+      "muteTrack": "静音 / 取消静音",
+      "zoomIn": "放大",
+      "zoomOut": "缩小",
+      "export": "导出视频",
+      "exporting": "导出中… {{percent}}%",
+      "errNotMedia": "{{name}} 不是音视频文件。",
+      "errEmpty": "请先往时间线添加一个片段。"
+    }
   }
 }
