@@ -104,6 +104,18 @@ describe('buildTimelineExport — audio', () => {
   })
 })
 
+describe('buildTimelineExport — wasm safety', () => {
+  it('always forces -threads 1 (core-mt deadlocks on multi-input filter_complex)', () => {
+    const p = baseProject([
+      { id: 'v', kind: 'video', clips: [{ id: 'c1', sourceId: 'A', timelineStart: 0, sourceIn: 0, sourceOut: 2 }] },
+    ])
+    const { args } = buildTimelineExport(p, [{ sourceId: 'A', name: 'a.mp4' }], { output: 'out.mp4' })
+    const i = args.indexOf('-threads')
+    expect(i).toBe(0)
+    expect(args[i + 1]).toBe('1')
+  })
+})
+
 describe('buildTimelineExport — bounds', () => {
   it('sets -t to the project duration', () => {
     const p = baseProject([

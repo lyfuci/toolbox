@@ -1952,7 +1952,7 @@
     "tsPastSeconds": "{{n}}s ago"
   },
   "media": {
-    "description": "Trim, concat, compress, resize, convert, GIF, rotate, frame-grab and extract audio. Powered by ffmpeg.wasm — every operation runs locally; nothing is uploaded.",
+    "description": "Multi-track video editor: drop clips onto a timeline, trim and arrange them on video + audio tracks, preview live, then export to MP4. Everything runs locally (ffmpeg.wasm); nothing is uploaded.",
     "dropZoneTitle": "Drag audio / video files here, or click to pick",
     "dropZoneSub": "All processing runs locally; nothing is uploaded",
     "outputDownload": "Download",
@@ -2009,6 +2009,23 @@
     "errNeedTwoFiles": "Need at least 2 files",
     "errConcat": "Concat failed. Try trimming clips to similar resolutions first.",
     "errGif": "GIF conversion failed",
-    "errUnexpectedString": "Unexpected string output"
+    "errUnexpectedString": "Unexpected string output",
+    "timeline": {
+      "sources": "Media",
+      "addMedia": "Add",
+      "appendClip": "Append to timeline",
+      "clipProps": "Clip",
+      "volume": "Volume",
+      "deleteClip": "Delete clip",
+      "addVideoTrack": "Video track",
+      "addAudioTrack": "Audio track",
+      "muteTrack": "Mute / unmute track",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "export": "Export video",
+      "exporting": "Exporting… {{percent}}%",
+      "errNotMedia": "{{name}} is not an audio/video file.",
+      "errEmpty": "Add a clip to the timeline first."
+    }
   }
 }

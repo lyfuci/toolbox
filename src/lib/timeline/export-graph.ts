@@ -135,7 +135,13 @@ export function buildTimelineExport(
   const filterComplex = chains.join(';')
 
   // ── Assemble argv ──────────────────────────────────────────────────────────
-  const args: string[] = []
+  // `-threads 1` is REQUIRED: the multi-threaded ffmpeg.wasm core (core-mt)
+  // deadlocks on a multi-input filter_complex (it reaches frame=1 then wedges
+  // at fps=0). Forcing single-threaded filtering avoids the deadlock; the graph
+  // is small so the speed cost is negligible. Verified: with -threads 1 the
+  // exact composite graph completes in ~0.5s in the browser core, vs hanging
+  // indefinitely without it. (Native ffmpeg accepts the graph either way.)
+  const args: string[] = ['-threads', '1']
   for (const f of inputFiles) args.push('-i', f.name)
   args.push('-filter_complex', filterComplex)
   if (hasVideo) args.push('-map', `[${lastVideoLabel}]`)
