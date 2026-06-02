@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Loader2, Play, Pause, Download, Trash2, Plus, Film, Music, ZoomIn, ZoomOut } from 'lucide-react'
+import { Loader2, Play, Pause, Download, Trash2, Plus, Film, Music, ZoomIn, ZoomOut, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { DropZone } from '@/components/media/DropZone'
 import { OutputView, type OutputResult } from '@/components/media/OutputView'
+import { QuickToolsDialog } from '@/components/media/QuickToolsDialog'
 import { useTimeline } from '@/components/media/timeline/useTimeline'
 import { useTimelinePlayer } from '@/components/media/timeline/useTimelinePlayer'
 import { Timeline } from '@/components/media/timeline/Timeline'
@@ -29,6 +30,7 @@ export function MediaPage() {
   const [exp, setExp] = useState<ExportState>({ kind: 'idle' })
   const [output, setOutput] = useState<OutputResult | null>(null)
   const [crf, setCrf] = useState(23)
+  const [quickOpen, setQuickOpen] = useState(false)
 
   useEffect(() => {
     return () => {
@@ -96,10 +98,18 @@ export function MediaPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-12">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">{t('tools.media.name')}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t('media.description')}</p>
+      <header className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{t('tools.media.name')}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t('media.description')}</p>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => setQuickOpen(true)} className="shrink-0">
+          <Wand2 className="mr-1 h-4 w-4" />
+          {t('media.quick.title')}
+        </Button>
       </header>
+
+      <QuickToolsDialog open={quickOpen} onOpenChange={setQuickOpen} />
 
       {!hasContent ? (
         <DropZone onFiles={onFiles} />

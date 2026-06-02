@@ -2026,6 +2026,26 @@
       "exporting": "Exporting… {{percent}}%",
       "errNotMedia": "{{name}} is not an audio/video file.",
       "errEmpty": "Add a clip to the timeline first."
+    },
+    "quick": {
+      "title": "Quick tools",
+      "description": "One-shot operations on a single file — no timeline needed. Everything runs locally.",
+      "pickFile": "Choose an audio / video file…",
+      "run": "Run",
+      "errPickFile": "Choose a file first.",
+      "muteHint": "Remove the audio track (video copied, no re-encode where possible).",
+      "loudnormHint": "Normalize loudness to EBU R128 (−16 LUFS).",
+      "op": {
+        "compress": "Compress",
+        "convert": "Convert",
+        "gif": "GIF",
+        "audio": "Extract audio",
+        "loudnorm": "Loudnorm",
+        "resize": "Resize",
+        "mute": "Mute",
+        "rotate": "Rotate / Flip",
+        "frame": "Frame grab"
+      }
     }
   }
 }

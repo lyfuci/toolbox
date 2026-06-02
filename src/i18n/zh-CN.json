@@ -2026,6 +2026,26 @@
       "exporting": "导出中… {{percent}}%",
       "errNotMedia": "{{name}} 不是音视频文件。",
       "errEmpty": "请先往时间线添加一个片段。"
+    },
+    "quick": {
+      "title": "快速工具",
+      "description": "对单个文件的一次性操作 —— 不需要时间线。全部在本地完成。",
+      "pickFile": "选择一个音视频文件…",
+      "run": "运行",
+      "errPickFile": "请先选择一个文件。",
+      "muteHint": "去掉音轨（尽量直接复制视频、不重编码）。",
+      "loudnormHint": "把响度标准化到 EBU R128（−16 LUFS）。",
+      "op": {
+        "compress": "压缩",
+        "convert": "格式转换",
+        "gif": "转 GIF",
+        "audio": "提取音轨",
+        "loudnorm": "响度标准化",
+        "resize": "缩放",
+        "mute": "静音",
+        "rotate": "旋转 / 翻转",
+        "frame": "抽帧"
+      }
     }
   }
 }
