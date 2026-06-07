@@ -918,10 +918,10 @@
     "dns": {
       "description": "基于 DoH 的 DNS 查询。默认解析器为 Cloudflare；勾选「对比解析器」会同时查 Google + Quad9。点击查询才会发起请求。",
       "typeLabel": "类型",
-      "status": "Status",
-      "answers": "{{n}} answers",
-      "noAnswers": "no answers",
-      "noDirect": "No direct answer; authority: {{authority}}",
+      "status": "状态",
+      "answers": "{{n}} 条记录",
+      "noAnswers": "无记录",
+      "noDirect": "无直接答案；授权服务器：{{authority}}",
       "empty": "填入域名 + 选择记录类型，点击 <1>查询</1>",
       "compareResolvers": "对比解析器",
       "txt": {
