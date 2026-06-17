@@ -355,9 +355,9 @@ function LayerRow({
         onSelect()
         onContextMenu(e.clientX, e.clientY)
       }}
-      className={`flex cursor-pointer items-center gap-2 rounded border px-2 py-1 text-xs ${
+      className={`pf-layer-row flex cursor-pointer items-center gap-2 rounded border px-2 py-1 text-xs ${
         selected
-          ? 'border-primary bg-accent/40'
+          ? 'pf-layer-selected border-primary bg-accent/40'
           : 'border-border/60 bg-background/40 hover:bg-accent/20'
       }`}
       style={{ paddingLeft: padLeft }}

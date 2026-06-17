@@ -581,3 +581,21 @@
 .pf-context-menu-danger {
   color: #f87171;
 }
+
+/*
+ * CC 2026: the active layer row uses the red "selected" accent (Photoshop's
+ * selected-layer red), overriding the Tailwind border-primary/bg-accent the
+ * row carries by default. Scoped to .pf-root so it only applies in the editor.
+ */
+.pf-root .pf-layer-row.pf-layer-selected {
+  background: var(--pf-selected);
+  border-color: var(--pf-selected);
+  color: #fff;
+}
+.pf-root .pf-layer-row.pf-layer-selected:hover {
+  background: var(--pf-selected);
+}
+.pf-root .pf-layer-row.pf-layer-selected,
+.pf-root .pf-layer-row.pf-layer-selected * {
+  color: #fff;
+}
