@@ -238,7 +238,7 @@ export function ToolsPalette({
   return (
     <div className="pf-tools">
       {GROUPS.map((group, gi) => (
-        <div key={gi}>
+        <div key={gi} className="pf-tool-group">
           {gi > 0 && <div className="pf-tool-sep" />}
           {group.map((td) => {
             const active = !td.stub && tool === td.id
