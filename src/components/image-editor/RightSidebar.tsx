@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ActionsPanel } from './ActionsPanel'
 import { AdjustPanel } from './AdjustPanel'
@@ -11,6 +11,7 @@ import { LayersPanel } from './LayersPanel'
 import { PathsPanel } from './PathsPanel'
 import { PropertiesPanel } from './PropertiesPanel'
 import type { ImageCache } from '@/lib/image-editor/drawing'
+import { renderEditorToCanvas } from '@/lib/image-editor/composite-ops'
 import type { Action, Adjustments, BrushOptions, EditorState, Layer, LayerColorTag, LayerComp, Transforms } from '@/lib/image-editor/types'
 
 const LAYERS_HEIGHT_KEY = 'pf-layers-h'
@@ -275,7 +276,9 @@ export function RightSidebar({
             />
           </div>
         )}
-        {g3 === 'navigator' && <NavigatorStub zoom={zoom} />}
+        {g3 === 'navigator' && (
+          <NavigatorStub zoom={zoom} image={image} state={state} imageCache={imageCache} />
+        )}
         {g3 === 'comps' && (
           <LayerCompsPanel
             state={state}
@@ -365,18 +368,71 @@ function StubPanel({ msg }: { msg: string }) {
   )
 }
 
-function NavigatorStub({ zoom }: { zoom: number }) {
+function NavigatorStub({
+  zoom,
+  image,
+  state,
+  imageCache,
+}: {
+  zoom: number
+  image: HTMLImageElement | null
+  state: EditorState
+  imageCache: ImageCache | undefined
+}) {
   const { t } = useTranslation()
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+
+  // Paint a live composite thumbnail whenever the document changes. Renders the
+  // full editor composite at scale=1, then down-fits it into a fixed-height
+  // preview box (letterboxed). Cheap: only re-runs when image/state/zoom move.
+  useEffect(() => {
+    const cv = canvasRef.current
+    if (!cv) return
+    const ctx = cv.getContext('2d')
+    if (!ctx) return
+    const BOX_W = cv.width
+    const BOX_H = cv.height
+    ctx.clearRect(0, 0, BOX_W, BOX_H)
+    if (!image) return
+    let composite: HTMLCanvasElement
+    try {
+      composite = renderEditorToCanvas(image, state, imageCache)
+    } catch {
+      return
+    }
+    if (composite.width === 0 || composite.height === 0) return
+    const scale = Math.min(BOX_W / composite.width, BOX_H / composite.height)
+    const dw = composite.width * scale
+    const dh = composite.height * scale
+    try {
+      ctx.drawImage(composite, (BOX_W - dw) / 2, (BOX_H - dh) / 2, dw, dh)
+    } catch {
+      /* composite may briefly be untaintable / empty */
+    }
+  }, [image, state, imageCache, zoom])
+
   return (
     <div className="pf-panel-body" style={{ padding: 8 }}>
       <div
         style={{
-          height: 80,
+          height: 96,
           background: 'var(--pf-bg-canvas)',
           border: '1px solid var(--pf-line)',
           marginBottom: 6,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
         }}
-      />
+      >
+        {image ? (
+          <canvas ref={canvasRef} width={252} height={94} style={{ maxWidth: '100%', maxHeight: '100%' }} />
+        ) : (
+          <span style={{ color: 'var(--pf-fg-dim)', fontSize: 11 }}>
+            {t('pages.imageEditor.navigator.empty')}
+          </span>
+        )}
+      </div>
       <div style={{ color: 'var(--pf-fg-mid)', fontSize: 11 }}>
         {t('pages.imageEditor.zoom')}: {Math.round(zoom * 100)}%
       </div>
