@@ -128,6 +128,7 @@ import type {
   FilterParams,
   GroupLayer,
   Layer,
+  LayerColorTag,
   LayerEffect,
   LayerEffectKind,
   OutputFormat,
@@ -287,6 +288,9 @@ export function ImageEditorPage() {
   const [liquifySize, setLiquifySize] = useState(60)
   const [liquifyStrength, setLiquifyStrength] = useState(50) // %
   const [selectedLayerId, setSelectedLayerId] = useState<string>('image')
+  // Which layer row is in inline-rename mode (LayersPanel double-click / context
+  // menu Rename). null = none editing.
+  const [renamingLayerId, setRenamingLayerId] = useState<string | null>(null)
 
   const [outFormat, setOutFormat] = useState<OutputFormat>('png')
   const [outQuality, setOutQuality] = useState<number>(92)
@@ -1471,6 +1475,118 @@ export function ImageEditorPage() {
     setSelectedLayerId(merged.id)
     toast.success(t('pages.imageEditor.smartObject.converted'))
   }, [image, selectedLayerId, state, imageCache, ensureImage, history, t])
+
+  /**
+   * Rasterize Layer — bake the selected layer (post effects / clip / opacity)
+   * into a plain image-shape layer at the same id/bbox. The prototype exposes
+   * this as a placeholder; the lib helper (rasterizeLayer) already existed and
+   * was only used internally by Convert-to-Smart-Object. Pixel-emitting layers
+   * (annotation / smartObject / group) qualify; the image background and pure
+   * adjustment/filter/mask layers have no standalone silhouette to bake.
+   */
+  const handleRasterizeLayer = useCallback(() => {
+    if (!image || !selectedLayerId || selectedLayerId === 'image') return
+    const layer = findLayerById(state.layers, selectedLayerId)
+    if (!layer) return
+    if (
+      layer.kind === 'mask' ||
+      layer.kind === 'adjustment' ||
+      layer.kind === 'filter'
+    ) {
+      toast.message(t('pages.imageEditor.rasterize.unsupportedKind'))
+      return
+    }
+    if (layer.kind === 'annotation' && layer.shape.kind === 'image' && !layer.effects?.length && !layer.shadow) {
+      toast.message(t('pages.imageEditor.rasterize.alreadyRaster'))
+      return
+    }
+    const bbox = getLayerBBox(layer)
+    if (!bbox || bbox.w <= 0 || bbox.h <= 0) {
+      toast.message(t('pages.imageEditor.rasterize.noBbox'))
+      return
+    }
+    const rast = rasterizeLayer({ image, state, imageCache, layerId: layer.id, crop: bbox })
+    if (!rast) {
+      toast.error(t('pages.imageEditor.rasterize.failed'))
+      return
+    }
+    const replacement = buildImageShapeLayer({
+      dataUrl: rast.dataUrl,
+      bbox: rast.bbox,
+      name: layer.name,
+    })
+    // Keep id + display fields; effects/shadow are now baked into the pixels.
+    const merged: Layer = {
+      ...replacement,
+      id: layer.id,
+      name: layer.name,
+      visible: layer.visible,
+      opacity: layer.opacity,
+      blend: layer.blend,
+      colorTag: layer.colorTag,
+    }
+    ensureImage(rast.dataUrl).catch(() => {})
+    history.set({ ...state, layers: mapLayerById(state.layers, layer.id, () => merged) })
+    setSelectedLayerId(merged.id)
+    toast.success(t('pages.imageEditor.rasterize.done'))
+  }, [image, selectedLayerId, state, imageCache, ensureImage, history, t])
+
+  // ── Layer Style clipboard (Copy / Paste / Clear) ───────────────────────
+  // Prototype exposes these as placeholders. We move the existing fx stack
+  // between layers; no render-pipeline change. The clipboard is a ref (does
+  // not need to trigger re-render) holding a deep-cloned effects array.
+  const layerStyleClipboard = useRef<LayerEffect[] | null>(null)
+  const handleCopyLayerStyle = useCallback(() => {
+    if (!selectedLayerId || selectedLayerId === 'image') return
+    const layer = findLayerById(state.layers, selectedLayerId)
+    if (!layer) return
+    const fx = layer.effects ?? []
+    if (fx.length === 0 && !layer.shadow) {
+      toast.message(t('pages.imageEditor.layerStyleClip.empty'))
+      return
+    }
+    // Deep clone so paste targets don't alias the source's gradient/id objects.
+    layerStyleClipboard.current = JSON.parse(JSON.stringify(fx)) as LayerEffect[]
+    toast.success(t('pages.imageEditor.layerStyleClip.copied'))
+  }, [selectedLayerId, state.layers, t])
+  const handlePasteLayerStyle = useCallback(() => {
+    if (!selectedLayerId || selectedLayerId === 'image') return
+    const fx = layerStyleClipboard.current
+    if (!fx) {
+      toast.message(t('pages.imageEditor.layerStyleClip.nothingToPaste'))
+      return
+    }
+    patchLayer(selectedLayerId, {
+      effects: JSON.parse(JSON.stringify(fx)) as LayerEffect[],
+      shadow: undefined,
+    })
+    toast.success(t('pages.imageEditor.layerStyleClip.pasted'))
+  }, [selectedLayerId, patchLayer, t])
+  const handleClearLayerStyle = useCallback(() => {
+    if (!selectedLayerId || selectedLayerId === 'image') return
+    const layer = findLayerById(state.layers, selectedLayerId)
+    if (!layer) return
+    if ((layer.effects?.length ?? 0) === 0 && !layer.shadow) {
+      toast.message(t('pages.imageEditor.layerStyleClip.empty'))
+      return
+    }
+    patchLayer(selectedLayerId, { effects: [], shadow: undefined })
+    toast.success(t('pages.imageEditor.layerStyleClip.cleared'))
+  }, [selectedLayerId, state.layers, patchLayer, t])
+
+  // ── Rename + Color Tag ─────────────────────────────────────────────────
+  const handleRenameLayer = useCallback(
+    (id: string, name: string) => {
+      const trimmed = name.trim()
+      if (!trimmed) return
+      patchLayer(id, { name: trimmed })
+    },
+    [patchLayer],
+  )
+  const handleSetLayerColorTag = useCallback(
+    (id: string, colorTag: LayerColorTag | undefined) => patchLayer(id, { colorTag }),
+    [patchLayer],
+  )
 
   /**
    * Replace Contents — pick a new image file, update the SO's source dataUrl
@@ -2959,6 +3075,11 @@ export function ImageEditorPage() {
         },
         { sep: true },
         {
+          id: 'rename',
+          label: t('pages.imageEditor.menu.renameLayer') + '…',
+          onClick: () => setRenamingLayerId(id),
+        },
+        {
           id: 'dup',
           label: t('pages.imageEditor.menu.duplicateLayer'),
           shortcut: '⌘J',
@@ -2972,6 +3093,43 @@ export function ImageEditorPage() {
           danger: true,
         },
         { sep: true },
+        {
+          id: 'copyStyle',
+          label: t('pages.imageEditor.menu.copyLayerStyle'),
+          onClick: () => {
+            setSelectedLayerId(id)
+            handleCopyLayerStyle()
+          },
+          disabled: !canHaveFx,
+        },
+        {
+          id: 'pasteStyle',
+          label: t('pages.imageEditor.menu.pasteLayerStyle'),
+          onClick: () => {
+            setSelectedLayerId(id)
+            handlePasteLayerStyle()
+          },
+          disabled: !canHaveFx,
+        },
+        {
+          id: 'clearStyle',
+          label: t('pages.imageEditor.menu.clearLayerStyle'),
+          onClick: () => {
+            setSelectedLayerId(id)
+            handleClearLayerStyle()
+          },
+          disabled: !canHaveFx,
+        },
+        { sep: true },
+        {
+          id: 'rasterize',
+          label: t('pages.imageEditor.menu.rasterizeLayer'),
+          onClick: () => {
+            setSelectedLayerId(id)
+            handleRasterizeLayer()
+          },
+          disabled: target.kind === 'adjustment' || target.kind === 'filter' || target.kind === 'mask',
+        },
         {
           id: 'convertSO',
           label: t('pages.imageEditor.menu.convertToSmartObject'),
@@ -3000,7 +3158,16 @@ export function ImageEditorPage() {
       ]
       setContextMenu({ x, y, items, header: target.name })
     },
-    [state.layers, t, handleConvertToSmartObject, handleReplaceContents],
+    [
+      state.layers,
+      t,
+      handleConvertToSmartObject,
+      handleReplaceContents,
+      handleRasterizeLayer,
+      handleCopyLayerStyle,
+      handlePasteLayerStyle,
+      handleClearLayerStyle,
+    ],
   )
 
   const handleLayerStyleApply = useCallback(
@@ -3598,6 +3765,10 @@ export function ImageEditorPage() {
             mergeVisible: handleMergeVisible,
             stampVisible: handleStampVisible,
             flatten: handleFlatten,
+            rasterizeLayer: handleRasterizeLayer,
+            copyLayerStyle: handleCopyLayerStyle,
+            pasteLayerStyle: handlePasteLayerStyle,
+            clearLayerStyle: handleClearLayerStyle,
             convertToSmartObject: handleConvertToSmartObject,
             replaceSmartObjectContents: handleReplaceContents,
             isSmartObjectSelected:
@@ -3883,6 +4054,13 @@ export function ImageEditorPage() {
               void handleNewRasterMask()
             }
           }}
+          renamingLayerId={renamingLayerId}
+          onStartRenameLayer={setRenamingLayerId}
+          onCommitRenameLayer={(id, name) => {
+            handleRenameLayer(id, name)
+            setRenamingLayerId(null)
+          }}
+          onSetLayerColorTag={handleSetLayerColorTag}
           image={image}
           imageCache={imageCache}
           history={{

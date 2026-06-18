@@ -112,6 +112,12 @@ type Props = {
     mergeVisible?: () => void
     stampVisible?: () => void
     flatten?: () => void
+    /** Rasterize the selected layer to plain pixels. */
+    rasterizeLayer?: () => void
+    /** Copy / Paste / Clear the selected layer's fx stack. */
+    copyLayerStyle?: () => void
+    pasteLayerStyle?: () => void
+    clearLayerStyle?: () => void
     /** Open Layer Style dialog. `kind` preselects an effect; undefined = "Blending Options" (no preselect). */
     openLayerStyle?: (kind?: LayerEffectKind) => void
     /** PS Type on Path — create a TextLayer that follows the selected path. */
@@ -880,6 +886,29 @@ export function MenuBar({ handlers }: Props) {
             id: 'flatten',
             label: t('pages.imageEditor.menu.flatten'),
             onClick: handlers.flatten,
+          },
+          {
+            id: 'rasterizeLayer',
+            label: t('pages.imageEditor.menu.rasterizeLayer'),
+            onClick: handlers.rasterizeLayer,
+          },
+        ],
+        { sep: true },
+        [
+          {
+            id: 'copyLayerStyle',
+            label: t('pages.imageEditor.menu.copyLayerStyle'),
+            onClick: handlers.copyLayerStyle,
+          },
+          {
+            id: 'pasteLayerStyle',
+            label: t('pages.imageEditor.menu.pasteLayerStyle'),
+            onClick: handlers.pasteLayerStyle,
+          },
+          {
+            id: 'clearLayerStyle',
+            label: t('pages.imageEditor.menu.clearLayerStyle'),
+            onClick: handlers.clearLayerStyle,
           },
         ],
         { sep: true },
