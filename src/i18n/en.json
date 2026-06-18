@@ -1672,6 +1672,9 @@
       "statusLayers": "Layers: {{n}}",
       "statusSelectionBbox": "Selection bbox · origin ({{x}}, {{y}})",
       "zoom": "Zoom",
+      "navigator": {
+        "empty": "Open an image to preview"
+      },
       "cropApply": "Apply crop",
       "cropCancel": "Cancel",
       "cropClear": "Clear crop",

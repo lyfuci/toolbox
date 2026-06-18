@@ -1672,6 +1672,9 @@
       "statusLayers": "图层：{{n}}",
       "statusSelectionBbox": "选区包围盒 · 起点 ({{x}}, {{y}})",
       "zoom": "缩放",
+      "navigator": {
+        "empty": "打开图像以预览"
+      },
       "cropApply": "应用裁剪",
       "cropCancel": "取消",
       "cropClear": "清除裁剪",
