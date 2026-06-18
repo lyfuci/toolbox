@@ -1242,6 +1242,11 @@
         "ungroupLayers": "Ungroup Layer",
         "mergeDown": "Merge Down",
         "mergeVisible": "Merge Visible",
+        "rasterizeLayer": "Rasterize Layer",
+        "renameLayer": "Rename Layer",
+        "copyLayerStyle": "Copy Layer Style",
+        "pasteLayerStyle": "Paste Layer Style",
+        "clearLayerStyle": "Clear Layer Style",
         "stampVisible": "Stamp Visible",
         "flatten": "Flatten Image",
         "convertToSmartObject": "Convert to Smart Object",
@@ -1774,7 +1779,23 @@
         "dropOutside": "Drop here to move out of group",
         "resizeHandle": "Drag to resize Layers panel",
         "editStyle": "Edit Layer Style",
-        "addMask": "Add layer mask"
+        "addMask": "Add layer mask",
+        "colorTag": "Color label",
+        "colorTagNone": "No color"
+      },
+      "rasterize": {
+        "done": "Layer rasterized",
+        "failed": "Could not rasterize layer",
+        "noBbox": "Layer has no pixels to rasterize",
+        "unsupportedKind": "Adjustment, filter, and mask layers can't be rasterized directly.",
+        "alreadyRaster": "Layer is already a plain raster layer"
+      },
+      "layerStyleClip": {
+        "copied": "Layer style copied",
+        "pasted": "Layer style pasted",
+        "cleared": "Layer style cleared",
+        "empty": "This layer has no style to copy",
+        "nothingToPaste": "No layer style on the clipboard"
       },
       "layerStyle": {
         "title": "Layer Style",

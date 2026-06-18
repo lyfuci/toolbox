@@ -11,7 +11,7 @@ import { LayersPanel } from './LayersPanel'
 import { PathsPanel } from './PathsPanel'
 import { PropertiesPanel } from './PropertiesPanel'
 import type { ImageCache } from '@/lib/image-editor/drawing'
-import type { Action, Adjustments, BrushOptions, EditorState, Layer, LayerComp, Transforms } from '@/lib/image-editor/types'
+import type { Action, Adjustments, BrushOptions, EditorState, Layer, LayerColorTag, LayerComp, Transforms } from '@/lib/image-editor/types'
 
 const LAYERS_HEIGHT_KEY = 'pf-layers-h'
 const LAYERS_HEIGHT_DEFAULT = 320
@@ -37,6 +37,11 @@ type Props = {
   /** Inline +Mask button in the layer row — adds an adjustment mask or a
    *  new MaskLayer above, depending on the target layer's kind. */
   onAddMaskToLayer?: (id: string) => void
+  /** Layer rename (inline) + color tag plumbing → LayersPanel. */
+  renamingLayerId?: string | null
+  onStartRenameLayer?: (id: string) => void
+  onCommitRenameLayer?: (id: string, name: string) => void
+  onSetLayerColorTag?: (id: string, tag: LayerColorTag | undefined) => void
   /** Paths panel — convert active selection ↔ vector path layer. */
   onMakeWorkPath?: () => void
   onMakeSelectionFromPath?: () => void
@@ -96,6 +101,10 @@ export function RightSidebar({
   onReplaceSmartObjectContents,
   onLayerContextMenu,
   onAddMaskToLayer,
+  renamingLayerId,
+  onStartRenameLayer,
+  onCommitRenameLayer,
+  onSetLayerColorTag,
   onMakeWorkPath,
   onMakeSelectionFromPath,
   image,
@@ -187,6 +196,10 @@ export function RightSidebar({
               onOpenStyle={onOpenStyle}
               onLayerContextMenu={onLayerContextMenu}
               onAddMask={onAddMaskToLayer}
+              renamingId={renamingLayerId}
+              onStartRename={onStartRenameLayer}
+              onCommitRename={onCommitRenameLayer}
+              onSetColorTag={onSetLayerColorTag}
             />
           </div>
         )}

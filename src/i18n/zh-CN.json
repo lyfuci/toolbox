@@ -1242,6 +1242,11 @@
         "ungroupLayers": "取消图层编组",
         "mergeDown": "向下合并",
         "mergeVisible": "合并可见图层",
+        "rasterizeLayer": "栅格化图层",
+        "renameLayer": "重命名图层",
+        "copyLayerStyle": "拷贝图层样式",
+        "pasteLayerStyle": "粘贴图层样式",
+        "clearLayerStyle": "清除图层样式",
         "stampVisible": "盖印可见图层",
         "flatten": "拼合图像",
         "convertToSmartObject": "转换为智能对象",
@@ -1774,7 +1779,23 @@
         "dropOutside": "拖到此处移出组",
         "resizeHandle": "拖动调整图层面板高度",
         "editStyle": "编辑图层样式",
-        "addMask": "添加图层蒙版"
+        "addMask": "添加图层蒙版",
+        "colorTag": "颜色标签",
+        "colorTagNone": "无颜色"
+      },
+      "rasterize": {
+        "done": "已栅格化图层",
+        "failed": "无法栅格化该图层",
+        "noBbox": "该图层没有可栅格化的像素",
+        "unsupportedKind": "调整、滤镜和蒙版图层不能直接栅格化。",
+        "alreadyRaster": "该图层已经是普通栅格图层"
+      },
+      "layerStyleClip": {
+        "copied": "已拷贝图层样式",
+        "pasted": "已粘贴图层样式",
+        "cleared": "已清除图层样式",
+        "empty": "该图层没有可拷贝的样式",
+        "nothingToPaste": "剪贴板上没有图层样式"
       },
       "layerStyle": {
         "title": "图层样式",

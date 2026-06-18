@@ -565,6 +565,9 @@ export type LayerEffect =
 
 export type LayerEffectKind = LayerEffect['kind']
 
+/** PS-style layer color labels for organising the layer stack. */
+export type LayerColorTag = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'violet' | 'gray'
+
 /** Canonical PS defaults for each effect kind — used when adding via the
  *  Layer Style dialog or Layer > Layer Style menu. */
 export const DEFAULT_EFFECTS: { [K in LayerEffectKind]: Extract<LayerEffect, { kind: K }> } = {
@@ -678,6 +681,13 @@ type LayerCommon = {
   shadow?: Shadow
   /** Modern fx stack. Render order is fixed (PS-aligned); see `effectsOf()`. */
   effects?: LayerEffect[]
+  /**
+   * Optional organisational color tag (PS layer color label). Purely cosmetic —
+   * renders as a small dot on the LayersPanel row; round-trips through serialize
+   * for free since the whole layer object is persisted. One of the named tags
+   * below, or undefined for "none".
+   */
+  colorTag?: LayerColorTag
   /**
    * Optional clip baked in at commit time when a marquee/lasso selection was
    * active. Confines the layer's drawn pixels to this region — matches PS

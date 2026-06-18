@@ -1,4 +1,4 @@
-import { type DragEvent } from 'react'
+import { type DragEvent, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ChevronDown,
@@ -20,7 +20,8 @@ import {
   removeAtPath,
 } from '@/lib/image-editor/layer-tree'
 import { hasEffects } from '@/lib/image-editor/layer-effects'
-import type { EditorState, GroupLayer, Layer } from '@/lib/image-editor/types'
+import type { EditorState, GroupLayer, Layer, LayerColorTag } from '@/lib/image-editor/types'
+import { LAYER_TAG_COLORS, LAYER_TAGS } from '@/lib/image-editor/layer-color-tags'
 
 type Props = {
   state: EditorState
@@ -37,6 +38,14 @@ type Props = {
   /** Add a mask to the given layer. For annotation / SO / group: insert a
    *  new raster MaskLayer above. For adjustment / filter: add maskDataUrl. */
   onAddMask?: (id: string) => void
+  /** Which row is in inline-rename mode (double-click / context menu Rename). */
+  renamingId?: string | null
+  /** Begin inline rename for a row (double-click). */
+  onStartRename?: (id: string) => void
+  /** Commit a rename (Enter / blur) and exit edit mode. */
+  onCommitRename?: (id: string, name: string) => void
+  /** Set / clear a layer's organisational color tag. */
+  onSetColorTag?: (id: string, tag: LayerColorTag | undefined) => void
 }
 
 type DropMode = 'into' | 'sibling' | 'top'
@@ -66,6 +75,10 @@ export function LayersPanel({
   onOpenStyle,
   onLayerContextMenu,
   onAddMask,
+  renamingId,
+  onStartRename,
+  onCommitRename,
+  onSetColorTag,
 }: Props) {
   const { t } = useTranslation()
 
@@ -156,6 +169,10 @@ export function LayersPanel({
           onOpenStyle={onOpenStyle}
           onLayerContextMenu={onLayerContextMenu}
           onAddMask={onAddMask}
+          renamingId={renamingId}
+          onStartRename={onStartRename}
+          onCommitRename={onCommitRename}
+          onSetColorTag={onSetColorTag}
         />
       ))}
 
@@ -225,6 +242,10 @@ function LayerSubtree({
   onOpenStyle,
   onLayerContextMenu,
   onAddMask,
+  renamingId,
+  onStartRename,
+  onCommitRename,
+  onSetColorTag,
 }: {
   layer: Layer
   depth: number
@@ -238,6 +259,10 @@ function LayerSubtree({
   onOpenStyle: (id: string) => void
   onLayerContextMenu?: (id: string, x: number, y: number) => void
   onAddMask?: (id: string) => void
+  renamingId?: string | null
+  onStartRename?: (id: string) => void
+  onCommitRename?: (id: string, name: string) => void
+  onSetColorTag?: (id: string, tag: LayerColorTag | undefined) => void
 }) {
   const group = isGroup(layer) ? layer : null
   return (
@@ -257,6 +282,10 @@ function LayerSubtree({
         onOpenStyle={() => onOpenStyle(layer.id)}
         onContextMenu={(x, y) => onLayerContextMenu?.(layer.id, x, y)}
         onAddMask={onAddMask}
+        renaming={renamingId === layer.id}
+        onStartRename={() => onStartRename?.(layer.id)}
+        onCommitRename={(name) => onCommitRename?.(layer.id, name)}
+        onSetColorTag={(tag) => onSetColorTag?.(layer.id, tag)}
       />
       {group && group.expanded &&
         [...group.children].reverse().map((c) => (
@@ -274,6 +303,10 @@ function LayerSubtree({
             onOpenStyle={onOpenStyle}
             onLayerContextMenu={onLayerContextMenu}
             onAddMask={onAddMask}
+            renamingId={renamingId}
+            onStartRename={onStartRename}
+            onCommitRename={onCommitRename}
+            onSetColorTag={onSetColorTag}
           />
         ))}
     </>
@@ -304,6 +337,10 @@ function LayerRow({
   onOpenStyle,
   onContextMenu,
   onAddMask,
+  renaming,
+  onStartRename,
+  onCommitRename,
+  onSetColorTag,
 }: {
   layer: Layer
   depth: number
@@ -319,10 +356,15 @@ function LayerRow({
   onOpenStyle: () => void
   onContextMenu?: (x: number, y: number) => void
   onAddMask?: (layerId: string) => void
+  renaming?: boolean
+  onStartRename?: () => void
+  onCommitRename?: (name: string) => void
+  onSetColorTag?: (tag: LayerColorTag | undefined) => void
 }) {
   const { t } = useTranslation()
   const showFx = hasEffects(layer)
   const labelKey = layerLabelKey(layer)
+  const [colorMenuOpen, setColorMenuOpen] = useState(false)
   const labelArgs =
     layer.kind === 'annotation' && layer.shape.kind === 'text'
       ? {
@@ -414,7 +456,73 @@ function LayerRow({
           style={{ background: '#000' }}
         />
       )}
-      <span className="flex-1 truncate">{t(labelKey, labelArgs)}</span>
+      {/* Color tag dot — click cycles open a tiny swatch row. */}
+      {onSetColorTag && (
+        <span className="relative flex items-center">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setColorMenuOpen((v) => !v)
+            }}
+            className="h-2.5 w-2.5 rounded-full border border-input"
+            style={{ background: layer.colorTag ? LAYER_TAG_COLORS[layer.colorTag] : 'transparent' }}
+            title={t('pages.imageEditor.layers.colorTag')}
+          />
+          {colorMenuOpen && (
+            <span
+              className="pf-tag-popover absolute left-0 top-4 z-20 flex gap-1 rounded border border-border bg-popover p-1 shadow-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {LAYER_TAGS.map((tag) => (
+                <button
+                  key={tag}
+                  className="h-3.5 w-3.5 rounded-full border border-input"
+                  style={{ background: LAYER_TAG_COLORS[tag] }}
+                  title={tag}
+                  onClick={() => {
+                    onSetColorTag(tag)
+                    setColorMenuOpen(false)
+                  }}
+                />
+              ))}
+              <button
+                className="h-3.5 w-3.5 rounded-full border border-input text-[8px] leading-none text-muted-foreground"
+                title={t('pages.imageEditor.layers.colorTagNone')}
+                onClick={() => {
+                  onSetColorTag(undefined)
+                  setColorMenuOpen(false)
+                }}
+              >
+                ⊘
+              </button>
+            </span>
+          )}
+        </span>
+      )}
+      {renaming ? (
+        <input
+          autoFocus
+          defaultValue={layer.name}
+          className="flex-1 min-w-0 rounded border border-input bg-background px-1 text-xs"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            e.stopPropagation()
+            if (e.key === 'Enter') onCommitRename?.((e.target as HTMLInputElement).value)
+            else if (e.key === 'Escape') onCommitRename?.(layer.name)
+          }}
+          onBlur={(e) => onCommitRename?.(e.target.value)}
+        />
+      ) : (
+        <span
+          className="flex-1 truncate"
+          onDoubleClick={(e) => {
+            e.stopPropagation()
+            onStartRename?.()
+          }}
+        >
+          {layer.name && layer.name !== t(labelKey, labelArgs) ? layer.name : t(labelKey, labelArgs)}
+        </span>
+      )}
       {showFx && (
         <button
           onClick={(e) => {
