@@ -1,0 +1,62 @@
+{
+  "pkg": "toolbox",
+  "globalName": "Toolbox",
+  "projectId": "96a26b6f-cd0b-47c1-89d0-70662bd44655",
+  "shape": "package",
+  "buildCmd": "pnpm build",
+  "entry": ".design-sync/entry.ts",
+  "srcDir": "src/components/ui",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": ".design-sync/.cache/app.css",
+  "readmeHeader": ".design-sync/conventions.md",
+  "componentSrcMap": {
+    "Button": "src/components/ui/button.tsx",
+    "Card": "src/components/ui/card.tsx",
+    "Command": "src/components/ui/command.tsx",
+    "Dialog": "src/components/ui/dialog.tsx",
+    "Input": "src/components/ui/input.tsx",
+    "Label": "src/components/ui/label.tsx",
+    "ScrollArea": "src/components/ui/scroll-area.tsx",
+    "Separator": "src/components/ui/separator.tsx",
+    "Tabs": "src/components/ui/tabs.tsx",
+    "Textarea": "src/components/ui/textarea.tsx",
+    "Toaster": "src/components/ui/sonner.tsx",
+    "Tooltip": "src/components/ui/tooltip.tsx"
+  },
+  "overrides": {
+    "Dialog": { "cardMode": "single", "viewport": "640x480" },
+    "Tooltip": { "cardMode": "single", "viewport": "440x260" },
+    "Command": { "cardMode": "single", "viewport": "480x470" },
+    "Toaster": { "cardMode": "single", "viewport": "460x360" },
+    "Card": { "cardMode": "column" },
+    "Tabs": { "cardMode": "column" }
+  },
+  "docsMap": {
+    "Button": ".design-sync/groups/Button.md",
+    "Input": ".design-sync/groups/Input.md",
+    "Textarea": ".design-sync/groups/Textarea.md",
+    "Label": ".design-sync/groups/Label.md",
+    "Card": ".design-sync/groups/Card.md",
+    "Tabs": ".design-sync/groups/Tabs.md",
+    "Separator": ".design-sync/groups/Separator.md",
+    "ScrollArea": ".design-sync/groups/ScrollArea.md",
+    "Dialog": ".design-sync/groups/Dialog.md",
+    "Tooltip": ".design-sync/groups/Tooltip.md",
+    "Command": ".design-sync/groups/Command.md",
+    "Toaster": ".design-sync/groups/Toaster.md"
+  },
+  "dtsPropsFor": {
+    "Button": "variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';\nsize?: 'default' | 'xs' | 'sm' | 'lg' | 'icon' | 'icon-xs' | 'icon-sm' | 'icon-lg';\n/** Render as the child element (Radix Slot) instead of a <button> — e.g. to make a link look like a button. */\nasChild?: boolean;\nclassName?: string;\nchildren?: React.ReactNode;\ndisabled?: boolean;\ntype?: 'button' | 'submit' | 'reset';\nonClick?: React.MouseEventHandler<HTMLButtonElement>;\n/** Plus every native <button> attribute. */\n[key: string]: unknown;",
+    "Card": "className?: string;\nchildren?: React.ReactNode;\n/** A surface container. Compose with the exported sub-parts: CardHeader, CardTitle, CardDescription, CardAction, CardContent, CardFooter. Accepts every native <div> attribute. */\n[key: string]: unknown;",
+    "Command": "className?: string;\nchildren?: React.ReactNode;\nlabel?: string;\n/** Whether cmdk filters items by the input value (default true). */\nshouldFilter?: boolean;\nfilter?: (value: string, search: string, keywords?: string[]) => number;\nvalue?: string;\nonValueChange?: (value: string) => void;\nloop?: boolean;\n/** Command palette (cmdk). Compose with CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator, CommandShortcut. CommandDialog wraps it in a modal Dialog. */\n[key: string]: unknown;",
+    "Dialog": "open?: boolean;\ndefaultOpen?: boolean;\nonOpenChange?: (open: boolean) => void;\nmodal?: boolean;\nchildren?: React.ReactNode;\n/** Modal dialog (Radix). Compose with DialogTrigger (use asChild around a Button), DialogContent (showCloseButton?: boolean), DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose. */\n[key: string]: unknown;",
+    "Input": "type?: React.HTMLInputTypeAttribute;\nclassName?: string;\nvalue?: string | number | readonly string[];\ndefaultValue?: string | number | readonly string[];\nplaceholder?: string;\ndisabled?: boolean;\n'aria-invalid'?: boolean | 'true' | 'false';\nonChange?: React.ChangeEventHandler<HTMLInputElement>;\n/** Plus every native <input> attribute. Pair with Label via htmlFor/id. */\n[key: string]: unknown;",
+    "Label": "htmlFor?: string;\nclassName?: string;\nchildren?: React.ReactNode;\n/** Accessible form label (Radix). Set htmlFor to the id of the associated control. */\n[key: string]: unknown;",
+    "ScrollArea": "className?: string;\nchildren?: React.ReactNode;\ntype?: 'auto' | 'always' | 'scroll' | 'hover';\nscrollHideDelay?: number;\ndir?: 'ltr' | 'rtl';\n/** Custom-styled scroll container (Radix). Give it a bounded height (className) so its content scrolls; a vertical ScrollBar is rendered automatically. */\n[key: string]: unknown;",
+    "Separator": "orientation?: 'horizontal' | 'vertical';\n/** When true (default), hidden from the accessibility tree. */\ndecorative?: boolean;\nclassName?: string;\n[key: string]: unknown;",
+    "Tabs": "value?: string;\ndefaultValue?: string;\nonValueChange?: (value: string) => void;\norientation?: 'horizontal' | 'vertical';\nclassName?: string;\nchildren?: React.ReactNode;\n/** Tabbed interface (Radix). Compose with TabsList (variant?: 'default' | 'line'), TabsTrigger (value), and TabsContent (value). */\n[key: string]: unknown;",
+    "Textarea": "className?: string;\nvalue?: string | number | readonly string[];\ndefaultValue?: string | number | readonly string[];\nplaceholder?: string;\nrows?: number;\ndisabled?: boolean;\nonChange?: React.ChangeEventHandler<HTMLTextAreaElement>;\n/** Auto-resizing multiline input (field-sizing: content). Plus every native <textarea> attribute. */\n[key: string]: unknown;",
+    "Toaster": "position?: 'top-left' | 'top-center' | 'top-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';\ntheme?: 'light' | 'dark' | 'system';\nrichColors?: boolean;\nexpand?: boolean;\nduration?: number;\ncloseButton?: boolean;\nvisibleToasts?: number;\nclassName?: string;\n/** Toast region (sonner). Mount once near the app root, then trigger toasts imperatively: import { toast } from 'sonner'; toast.success('Saved'). Pre-wired with themed icons and popover-colored surfaces. */\n[key: string]: unknown;",
+    "Tooltip": "open?: boolean;\ndefaultOpen?: boolean;\nonOpenChange?: (open: boolean) => void;\n/** Delay in ms before the tooltip opens (default 0). */\ndelayDuration?: number;\nchildren?: React.ReactNode;\n/** Hover/focus tooltip (Radix). Wrap the app (or the tooltip) in TooltipProvider. Compose with TooltipTrigger (use asChild) and TooltipContent (side?, sideOffset?). */\n[key: string]: unknown;"
+  }
+}
