@@ -94,3 +94,46 @@ unusual shape.
 - **Synth-entry `.d.ts` are weaker** than a real library's. cva components
   (Button, Tabs) may need `dtsPropsFor` overrides — check the emitted
   `.d.ts` on every re-sync.
+
+---
+
+# PixelForge kit (second design system)
+
+A SECOND, separate design system for the image editor's Photoshop-style web UI,
+uploaded to the **"PixelForge — Image Editor UI Kit"** Claude Design project
+(projectId in `pixelforge.config.json`). Built from the SAME repo with a parallel
+config; the base shadcn kit is unaffected.
+
+- **Config:** `pixelforge.config.json` (globalName `PixelForge`, out dir `pf-bundle`,
+  entry `pixelforge-entry.ts`, conventions `pixelforge-conventions.md`).
+- **Shape:** synth-entry, same as base. `srcDir = src/components/image-editor`.
+- **cssEntry:** `cat dist/assets/index-*.css dist/assets/ImageEditor-*.css >
+  .design-sync/.cache/pixelforge.css` — the editor's `pixelforge.css` (`.pf-*`
+  chrome) lives in the ImageEditor route chunk, so BOTH app CSS chunks are needed.
+  Re-sync must rebuild (`pnpm build`) then re-cat before the converter.
+- **i18n:** editor components use `react-i18next` `t()`. `pixelforge-entry.ts`
+  self-initializes the global i18n instance in English (no provider needed) so
+  components render real copy. To add zh-CN, merge that resource in the entry.
+- **Dark:** previews set `html.dark` (Frame `useEffect`) so portaled dialogs are
+  dark too — the editor is dark-only.
+- **dtsPropsFor: intentionally NOT written** for this kit — 30 app-internal
+  components with editor-shaped props (EditorState/LayerEffect[]/handlers) would
+  be very costly + error-prone to hand-model. The `.d.ts` ship as loose index
+  signatures; usage is carried by each `<Name>.prompt.md` (embeds the authored
+  preview) + the conventions header. Add dtsPropsFor in a later re-sync if needed.
+- **Scope:** 28 audited SYNC + 2 smoke = 30 synced. SKIPPED (need live canvas/
+  pixels/state): Canvas, Workspace, RightSidebar, ChannelsPanel, ReplaceColorDialog,
+  ColorRangeDialog. **SaveForWebDialog** ships as a FLOOR CARD (its live <canvas>
+  preview can't paint without the running editor; chrome is real).
+- **Shared dirs:** previews live in the shared `.design-sync/previews/` (disjoint
+  names from the base kit — safe; the other kit's build only warns "stale preview"
+  and never deletes). Always pass `--components` on pf captures so an unscoped run
+  can't prune the base kit's grades.
+- **Re-sync:** `node .ds-sync/resync.mjs --config .design-sync/pixelforge.config.json
+  --node-modules ./node_modules --out ./pf-bundle` (first sync omits --remote), with
+  `DS_CHROMIUM_PATH=/usr/bin/google-chrome`.
+
+## PixelForge re-sync risks
+- Source bug noticed during the sync: a `Duplicate key "toolHint"` esbuild warning
+  (a duplicate object key somewhere in the editor source) — non-fatal, but worth
+  fixing in the app.
