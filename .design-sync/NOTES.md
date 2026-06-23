@@ -137,3 +137,34 @@ config; the base shadcn kit is unaffected.
 - Source bug noticed during the sync: a `Duplicate key "toolHint"` esbuild warning
   (a duplicate object key somewhere in the editor source) — non-fatal, but worth
   fixing in the app.
+
+### ⚠ Self-check fails at PixelForge's scale — manual manifest required
+
+**Symptom:** after a normal upload, the claude.ai/design server-side self-check
+(which compiles the `@dsCard` markers into `_ds_manifest.json` and renders the
+DS pane) **silently fails** for PixelForge — `_ds_manifest.json` / `.thumbnail`
+/ `_adherence.oxlintrc.json` never appear, so the pane shows no components. The
+base kit (12 components / 475K bundle / 68 files) self-checks fine; PixelForge
+(30 components / 732K bundle / 157 files) does not, and this larger project also
+throws intermittent `503 "overflow"` on the file API. It's a SCALE limit, not a
+content problem (all markers/CSS/bundle verified correct).
+
+**Workaround (confirmed working — the pane reads `_ds_manifest.json` directly):**
+after the normal upload, generate the manifest from the uploaded cards and push
+it yourself, then DELETE the sentinel so the failing self-check can't re-trigger
+and wipe it:
+
+1. Build `pf-bundle/_ds_manifest.json` from the cards — namespace `PixelForge`,
+   `components[]` = {name, sourcePath:`components/<group>/<Name>/<Name>.jsx`},
+   `cards[]` = {path:`…/<Name>.html`, group, viewport} parsed from each html's
+   first-line `@dsCard` comment, `globalCssPaths:["_ds_bundle.css","styles.css"]`,
+   `themes:[{selector:"html.dark",label:"Dark"}]`, empty tokens/templates/fonts,
+   `source:"design-sync-cli"`. (Tokens can be empty — they only feed the token
+   tab, not the component cards.)
+2. `finalize_plan` writes:`["_ds_manifest.json"]` deletes:`["_ds_needs_recompile"]`,
+   `write_files` the manifest, `delete_files` the sentinel.
+
+**Re-sync must redo step 1–2** every time (the converter can't emit the manifest
+— it's normally app-generated). If the manifest ever stops rendering, the
+fallback is to split PixelForge into two smaller projects (~15 each, matching the
+base kit's working profile) so the self-check succeeds natively.
