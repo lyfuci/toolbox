@@ -45,3 +45,6 @@ ds-bundle/
 *.njsproj
 *.sln
 *.sw?
+
+# design-sync PixelForge kit (second DS) — regenerated bundle
+pf-bundle/

@@ -1,0 +1,151 @@
+{
+  "pkg": "toolbox",
+  "globalName": "PixelForge",
+  "projectId": "9b036bf8-80bb-46a2-9e3c-7984a4484bce",
+  "shape": "package",
+  "buildCmd": "pnpm build",
+  "entry": ".design-sync/pixelforge-entry.ts",
+  "srcDir": "src/components/image-editor",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": ".design-sync/.cache/pixelforge.css",
+  "readmeHeader": ".design-sync/pixelforge-conventions.md",
+  "componentSrcMap": {
+    "NewDocumentDialog": "src/components/image-editor/NewDocumentDialog.tsx",
+    "ImageSizeDialog": "src/components/image-editor/ImageSizeDialog.tsx",
+    "CanvasSizeDialog": "src/components/image-editor/CanvasSizeDialog.tsx",
+    "SaveForWebDialog": "src/components/image-editor/SaveForWebDialog.tsx",
+    "FillDialog": "src/components/image-editor/FillDialog.tsx",
+    "StrokeDialog": "src/components/image-editor/StrokeDialog.tsx",
+    "AdjustmentDialog": "src/components/image-editor/AdjustmentDialog.tsx",
+    "FilterDialog": "src/components/image-editor/FilterDialog.tsx",
+    "LayerStyleDialog": "src/components/image-editor/LayerStyleDialog.tsx",
+    "WarpTextDialog": "src/components/image-editor/WarpTextDialog.tsx",
+    "RotateArbitraryDialog": "src/components/image-editor/RotateArbitraryDialog.tsx",
+    "SelectModifyDialog": "src/components/image-editor/SelectModifyDialog.tsx",
+    "ColorPickerDialog": "src/components/image-editor/ColorPickerDialog.tsx",
+    "ShortcutsDialog": "src/components/image-editor/ShortcutsDialog.tsx",
+    "MenuBar": "src/components/image-editor/MenuBar.tsx",
+    "OptionsBar": "src/components/image-editor/OptionsBar.tsx",
+    "ToolsPalette": "src/components/image-editor/ToolsPalette.tsx",
+    "StatusBar": "src/components/image-editor/StatusBar.tsx",
+    "LayersPanel": "src/components/image-editor/LayersPanel.tsx",
+    "PropertiesPanel": "src/components/image-editor/PropertiesPanel.tsx",
+    "HistoryPanel": "src/components/image-editor/HistoryPanel.tsx",
+    "ActionsPanel": "src/components/image-editor/ActionsPanel.tsx",
+    "PathsPanel": "src/components/image-editor/PathsPanel.tsx",
+    "LayerCompsPanel": "src/components/image-editor/LayerCompsPanel.tsx",
+    "AdjustPanel": "src/components/image-editor/AdjustPanel.tsx",
+    "BrushesPanel": "src/components/image-editor/BrushesPanel.tsx",
+    "Slider": "src/components/image-editor/Slider.tsx",
+    "CurvesEditor": "src/components/image-editor/CurvesEditor.tsx",
+    "ContextMenu": "src/components/image-editor/ContextMenu.tsx",
+    "DropZone": "src/components/image-editor/DropZone.tsx"
+  },
+  "docsMap": {
+    "NewDocumentDialog": ".design-sync/pf-groups/NewDocumentDialog.md",
+    "ImageSizeDialog": ".design-sync/pf-groups/ImageSizeDialog.md",
+    "CanvasSizeDialog": ".design-sync/pf-groups/CanvasSizeDialog.md",
+    "SaveForWebDialog": ".design-sync/pf-groups/SaveForWebDialog.md",
+    "FillDialog": ".design-sync/pf-groups/FillDialog.md",
+    "StrokeDialog": ".design-sync/pf-groups/StrokeDialog.md",
+    "AdjustmentDialog": ".design-sync/pf-groups/AdjustmentDialog.md",
+    "FilterDialog": ".design-sync/pf-groups/FilterDialog.md",
+    "LayerStyleDialog": ".design-sync/pf-groups/LayerStyleDialog.md",
+    "WarpTextDialog": ".design-sync/pf-groups/WarpTextDialog.md",
+    "RotateArbitraryDialog": ".design-sync/pf-groups/RotateArbitraryDialog.md",
+    "SelectModifyDialog": ".design-sync/pf-groups/SelectModifyDialog.md",
+    "ColorPickerDialog": ".design-sync/pf-groups/ColorPickerDialog.md",
+    "ShortcutsDialog": ".design-sync/pf-groups/ShortcutsDialog.md",
+    "MenuBar": ".design-sync/pf-groups/MenuBar.md",
+    "OptionsBar": ".design-sync/pf-groups/OptionsBar.md",
+    "ToolsPalette": ".design-sync/pf-groups/ToolsPalette.md",
+    "StatusBar": ".design-sync/pf-groups/StatusBar.md",
+    "LayersPanel": ".design-sync/pf-groups/LayersPanel.md",
+    "PropertiesPanel": ".design-sync/pf-groups/PropertiesPanel.md",
+    "HistoryPanel": ".design-sync/pf-groups/HistoryPanel.md",
+    "ActionsPanel": ".design-sync/pf-groups/ActionsPanel.md",
+    "PathsPanel": ".design-sync/pf-groups/PathsPanel.md",
+    "LayerCompsPanel": ".design-sync/pf-groups/LayerCompsPanel.md",
+    "AdjustPanel": ".design-sync/pf-groups/AdjustPanel.md",
+    "BrushesPanel": ".design-sync/pf-groups/BrushesPanel.md",
+    "Slider": ".design-sync/pf-groups/Slider.md",
+    "CurvesEditor": ".design-sync/pf-groups/CurvesEditor.md",
+    "ContextMenu": ".design-sync/pf-groups/ContextMenu.md",
+    "DropZone": ".design-sync/pf-groups/DropZone.md"
+  },
+  "overrides": {
+    "NewDocumentDialog": {
+      "cardMode": "single",
+      "viewport": "560x540"
+    },
+    "ImageSizeDialog": {
+      "cardMode": "single",
+      "viewport": "560x540"
+    },
+    "CanvasSizeDialog": {
+      "cardMode": "single",
+      "viewport": "560x540"
+    },
+    "SaveForWebDialog": {
+      "cardMode": "single",
+      "viewport": "760x560"
+    },
+    "FillDialog": {
+      "cardMode": "single",
+      "viewport": "560x540"
+    },
+    "StrokeDialog": {
+      "cardMode": "single",
+      "viewport": "560x540"
+    },
+    "AdjustmentDialog": {
+      "cardMode": "single",
+      "viewport": "560x540"
+    },
+    "FilterDialog": {
+      "cardMode": "single",
+      "viewport": "560x540"
+    },
+    "LayerStyleDialog": {
+      "cardMode": "single",
+      "viewport": "760x580"
+    },
+    "WarpTextDialog": {
+      "cardMode": "single",
+      "viewport": "560x540"
+    },
+    "RotateArbitraryDialog": {
+      "cardMode": "single",
+      "viewport": "560x540"
+    },
+    "SelectModifyDialog": {
+      "cardMode": "single",
+      "viewport": "560x540"
+    },
+    "ColorPickerDialog": {
+      "cardMode": "single",
+      "viewport": "600x540"
+    },
+    "ShortcutsDialog": {
+      "cardMode": "single",
+      "viewport": "760x620"
+    },
+    "ToolsPalette": {
+      "cardMode": "single",
+      "viewport": "140x560"
+    },
+    "ContextMenu": {
+      "cardMode": "single",
+      "viewport": "280x340"
+    },
+    "MenuBar": {
+      "cardMode": "column"
+    },
+    "OptionsBar": {
+      "cardMode": "column"
+    },
+    "StatusBar": {
+      "cardMode": "column"
+    }
+  }
+}
