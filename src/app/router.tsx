@@ -153,6 +153,10 @@ export const router = createBrowserRouter([
         lazy: async () => ({ Component: (await import('@/pages/Cidr')).CidrPage }),
       },
       {
+        path: 'pdf',
+        lazy: async () => ({ Component: (await import('@/pages/Pdf')).PdfPage }),
+      },
+      {
         path: 'image-editor',
         lazy: async () => ({ Component: (await import('@/pages/ImageEditor')).ImageEditorPage }),
       },

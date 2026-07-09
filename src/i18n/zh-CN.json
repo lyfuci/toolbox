@@ -78,6 +78,10 @@
       "name": "Hash / Crypto",
       "description": "哈希与签名（本地计算）"
     },
+    "file": {
+      "name": "File Convert",
+      "description": "PDF 与文件格式转换（本地）"
+    },
     "media": {
       "name": "Media",
       "description": "音视频处理（本地）"
@@ -223,6 +227,10 @@
     "cidr": {
       "name": "CIDR Calculator",
       "description": "IPv4 子网计算（本地）"
+    },
+    "pdf": {
+      "name": "PDF 转换",
+      "description": "将 PDF 页面转换为 PNG / JPEG / WebP 图片（本地）"
     },
     "media": {
       "name": "多媒体处理",
@@ -1927,6 +1935,29 @@
         "disjoint": "A 与 B 完全不重叠",
         "familyMismatch": "A 与 B 不在同一协议族（IPv4 vs IPv6）"
       }
+    },
+    "pdf": {
+      "description": "将 PDF 各页渲染为 PNG / JPEG / WebP 图片 —— 全部在浏览器本地完成，文件不上传。",
+      "dropLabel": "将 PDF 拖到这里",
+      "dropHint": "或点击选择 —— 文件不会离开本机",
+      "pageCount": "页数：{{n}}",
+      "change": "更换",
+      "format": "格式",
+      "resolution": "分辨率",
+      "pages": "页码",
+      "pagesPlaceholder": "全部页面 —— 例如 1-3, 5, 8-",
+      "quality": "质量 {{value}}%",
+      "convert": "转换为图片",
+      "rendering": "渲染中 {{done}}/{{total}}…",
+      "downloadZip": "打包下载（{{n}}）",
+      "doneToast": "完成，共 {{n}} 张图片",
+      "pageAlt": "第 {{n}} 页预览",
+      "pageLabel": "第 {{n}} 页",
+      "errNotPdf": "这好像不是 PDF 文件。",
+      "errEncrypted": "该 PDF 已加密，暂不支持。",
+      "errLoad": "无法打开 PDF：{{error}}",
+      "errRange": "页码范围无效。",
+      "errRender": "渲染失败：{{error}}"
     }
   },
   "fieldMeta": {
