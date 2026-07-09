@@ -15,6 +15,7 @@ import {
   FileLock,
   FileSpreadsheet,
   FileText,
+  FileImage,
   Film,
   Globe,
   Hash,
@@ -48,6 +49,7 @@ export const categories = [
   { slug: 'format' },
   { slug: 'network' },
   { slug: 'hash' },
+  { slug: 'file' },
   { slug: 'media' },
 ] as const
 
@@ -98,6 +100,7 @@ export const tools: Tool[] = [
   { slug: 'ip-info', path: '/ip-info', icon: Globe, category: 'network' },
   { slug: 'dns', path: '/dns', icon: Network, category: 'network' },
   { slug: 'cidr', path: '/cidr', icon: Network, category: 'network' },
+  { slug: 'pdf', path: '/pdf', icon: FileImage, category: 'file' },
   { slug: 'image-editor', path: '/image-editor', icon: ImageIcon, category: 'media' },
   { slug: 'media', path: '/media', icon: Film, category: 'media' },
 ]

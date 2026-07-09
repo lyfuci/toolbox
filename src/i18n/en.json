@@ -78,6 +78,10 @@
       "name": "Hash / Crypto",
       "description": "Hashing & signing (local)"
     },
+    "file": {
+      "name": "File Convert",
+      "description": "PDF & file format conversion (local)"
+    },
     "media": {
       "name": "Media",
       "description": "Audio / video processing (local)"
@@ -223,6 +227,10 @@
     "cidr": {
       "name": "CIDR Calculator",
       "description": "IPv4 subnet math (local)"
+    },
+    "pdf": {
+      "name": "PDF Convert",
+      "description": "Convert PDF pages to PNG / JPEG / WebP images (local)"
     },
     "media": {
       "name": "Media Studio",
@@ -1927,6 +1935,29 @@
         "disjoint": "A and B are disjoint",
         "familyMismatch": "A and B are in different families (IPv4 vs IPv6)"
       }
+    },
+    "pdf": {
+      "description": "Render PDF pages to PNG / JPEG / WebP images — fully in your browser, nothing uploaded.",
+      "dropLabel": "Drop a PDF here",
+      "dropHint": "or click to choose — stays on your device",
+      "pageCount": "Pages: {{n}}",
+      "change": "Change",
+      "format": "Format",
+      "resolution": "Resolution",
+      "pages": "Pages",
+      "pagesPlaceholder": "All pages — e.g. 1-3, 5, 8-",
+      "quality": "Quality {{value}}%",
+      "convert": "Convert to images",
+      "rendering": "Rendering {{done}}/{{total}}…",
+      "downloadZip": "Download all ({{n}})",
+      "doneToast": "Done — {{n}} images",
+      "pageAlt": "Page {{n}} preview",
+      "pageLabel": "Page {{n}}",
+      "errNotPdf": "That doesn't look like a PDF file.",
+      "errEncrypted": "This PDF is password-protected — not supported yet.",
+      "errLoad": "Couldn't open the PDF: {{error}}",
+      "errRange": "No valid pages in that range.",
+      "errRender": "Rendering failed: {{error}}"
     }
   },
   "fieldMeta": {
