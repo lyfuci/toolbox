@@ -1,21 +1,25 @@
 // PDF rendering helpers built on pdf.js (pdfjs-dist), fully client-side.
 //
-// Runtime assets (cmaps / standard fonts / wasm) are served from `public/pdfjs/`
-// rather than a CDN — the site is COOP/COEP cross-origin-isolated and makes no
-// external calls, so both constraints forbid the pdf.js default CDN URLs. When
-// bumping pdfjs-dist, re-copy those three dirs:
+// Runtime assets (worker + cmaps / standard fonts / wasm) are served from
+// `public/pdfjs/` rather than a CDN — the site is COOP/COEP cross-origin-
+// isolated and makes no external calls, so both constraints forbid the pdf.js
+// default CDN URLs. When bumping pdfjs-dist, re-copy them:
 //   cp -r node_modules/pdfjs-dist/{cmaps,standard_fonts,wasm} public/pdfjs/
+//   cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs public/pdfjs/pdf.worker.min.js
+//
+// The worker is deliberately copied to a `.js` extension (not the source
+// `.mjs`): pdf.js loads it as a module worker regardless of extension, and our
+// nginx serves `.js` as `application/javascript` while `.mjs` falls through to
+// `application/octet-stream`, which browsers refuse to import as a module.
 import * as pdfjsLib from 'pdfjs-dist'
-// Version-matched worker, bundled same-origin (?url gives a hashed asset URL).
-import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 
 export { parsePageRange } from './pdf-range'
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
-
 // Local, self-contained asset roots (trailing slash required by pdf.js).
 const ASSET_BASE = `${import.meta.env.BASE_URL}pdfjs/`
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `${ASSET_BASE}pdf.worker.min.js`
 const DOC_ASSETS = {
   cMapUrl: `${ASSET_BASE}cmaps/`,
   cMapPacked: true,
