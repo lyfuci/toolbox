@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { getFFmpeg, fetchFile, inferMime, run } from '@/lib/ffmpeg'
 import {
+  buildTrimArgs,
   buildCompressArgs,
   buildResizeArgs,
   buildMuteArgs,
@@ -35,6 +36,7 @@ import {
  */
 
 type Op =
+  | 'trim'
   | 'compress'
   | 'convert'
   | 'gif'
@@ -45,13 +47,21 @@ type Op =
   | 'rotate'
   | 'frame'
 
-const OPS: Op[] = ['compress', 'convert', 'gif', 'audio', 'loudnorm', 'resize', 'mute', 'rotate', 'frame']
+const OPS: Op[] = ['trim', 'compress', 'convert', 'gif', 'audio', 'loudnorm', 'resize', 'mute', 'rotate', 'frame']
 
 type AudioCodec = 'libmp3lame' | 'aac' | 'flac' | 'pcm_s16le'
 const AUDIO_EXT: Record<AudioCodec, string> = { libmp3lame: 'mp3', aac: 'aac', flac: 'flac', pcm_s16le: 'wav' }
 
+type TrimMode = 'fast' | 'precise'
+
 const stripExt = (name: string) => name.replace(/\.[^./]+$/, '')
 const getExt = (name: string) => name.split('.').pop()?.toLowerCase() ?? 'bin'
+
+// Video container extensions — used as a fallback when a file's MIME type is
+// blank so precise (re-encode) trim only kicks in for video (audio stream-copy
+// is already sample-accurate, so it never needs re-encoding).
+const VIDEO_EXTS = new Set(['mp4', 'mov', 'mkv', 'webm', 'avi', 'm4v', 'ts', 'flv', 'wmv', 'mpg', 'mpeg', '3gp'])
+const isVideoFile = (f: File) => f.type.startsWith('video/') || VIDEO_EXTS.has(getExt(f.name))
 
 type Result = { url: string; filename: string; size: number } | null
 type Status = { kind: 'idle' } | { kind: 'loading' } | { kind: 'running'; progress: number }
@@ -59,12 +69,15 @@ type Status = { kind: 'idle' } | { kind: 'loading' } | { kind: 'running'; progre
 export function QuickToolsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const { t } = useTranslation()
   const [file, setFile] = useState<File | null>(null)
-  const [op, setOp] = useState<Op>('compress')
+  const [op, setOp] = useState<Op>('trim')
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const [result, setResult] = useState<Result>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Option state.
+  const [trimStart, setTrimStart] = useState(0)
+  const [trimEnd, setTrimEnd] = useState(5)
+  const [trimMode, setTrimMode] = useState<TrimMode>('fast')
   const [crf, setCrf] = useState(28)
   const [convertTarget, setConvertTarget] = useState<'mp4' | 'webm' | 'mov' | 'mkv'>('mp4')
   const [resizeWidth, setResizeWidth] = useState(1280)
@@ -126,6 +139,26 @@ export function QuickToolsDialog({ open, onOpenChange }: { open: boolean; onOpen
     })
 
   const handlers: Record<Op, () => void> = {
+    trim: () => {
+      if (!file) {
+        toast.error(t('media.quick.errPickFile'))
+        return
+      }
+      if (!(trimEnd > trimStart) || trimStart < 0) {
+        toast.error(t('media.quick.errTrimRange'))
+        return
+      }
+      // Fast mode stream-copies into the original container (works for audio
+      // and video alike). Precise mode re-encodes for a frame-accurate video
+      // cut → normalize to MP4; audio always stream-copies (already accurate).
+      const reencode = trimMode === 'precise' && isVideoFile(file)
+      const outExt = reencode ? 'mp4' : getExt(file.name)
+      single(
+        ({ input, output }) => buildTrimArgs({ input, output, startSec: trimStart, endSec: trimEnd, reencode }),
+        outExt,
+        '_trim',
+      )
+    },
     compress: () => single(({ input, output }) => buildCompressArgs({ input, output, crf, preset: 'medium' }), 'mp4', '_compressed'),
     convert: () => single(({ input, output }) => buildConvertArgs({ input, output, target: convertTarget }), convertTarget, ''),
     audio: () => single(({ input, output }) => buildExtractAudioArgs({ input, output, codec: audioCodec }), AUDIO_EXT[audioCodec], ''),
@@ -210,6 +243,42 @@ export function QuickToolsDialog({ open, onOpenChange }: { open: boolean; onOpen
 
         {/* Per-op options */}
         <div className="min-h-[2.25rem] text-sm">
+          {op === 'trim' && (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                <Row label={t('media.trimStart')}>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.5}
+                    value={trimStart}
+                    onChange={(e) => setTrimStart(Math.max(0, Number(e.target.value)))}
+                    className="h-8 w-24 font-mono text-sm"
+                  />
+                </Row>
+                <Row label={t('media.trimEnd')}>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.5}
+                    value={trimEnd}
+                    onChange={(e) => setTrimEnd(Math.max(0, Number(e.target.value)))}
+                    className="h-8 w-24 font-mono text-sm"
+                  />
+                </Row>
+              </div>
+              {file && isVideoFile(file) && (
+                <Row label={t('media.trimMode')}>
+                  <Seg
+                    value={trimMode}
+                    onChange={setTrimMode}
+                    options={[['fast', t('media.quick.trimFast')], ['precise', t('media.quick.trimPrecise')]]}
+                  />
+                </Row>
+              )}
+              <p className="text-xs text-muted-foreground">{t('media.quick.trimHint')}</p>
+            </div>
+          )}
           {op === 'compress' && (
             <Row label={t('media.crf')}>
               <input type="range" min={18} max={34} value={crf} onChange={(e) => setCrf(Number(e.target.value))} className="w-40 accent-primary" />
