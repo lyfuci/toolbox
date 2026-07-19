@@ -19,7 +19,8 @@ import {
 describe('buildTrimArgs', () => {
   it('stream-copies by default with start/end', () => {
     const a = buildTrimArgs({ input: 'in.mp4', output: 'out.mp4', startSec: 1.5, endSec: 4 })
-    expect(a).toEqual(['-ss', '00:00:01.500', '-to', '00:00:04.000', '-i', 'in.mp4', '-c', 'copy', 'out.mp4'])
+    // -ss before -i (fast seek), -t DURATION after -i (unambiguous end−start).
+    expect(a).toEqual(['-ss', '00:00:01.500', '-i', 'in.mp4', '-t', '00:00:02.500', '-c', 'copy', 'out.mp4'])
   })
   it('re-encodes when asked', () => {
     const a = buildTrimArgs({ input: 'in.mp4', output: 'out.mp4', startSec: 0, endSec: 2, reencode: true })

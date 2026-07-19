@@ -14,7 +14,14 @@
 import { toFFTime } from '@/lib/ffmpeg'
 
 // ── Trim ──────────────────────────────────────────────────────────────────
-// Stream-copy when possible (fast, lossless); the page falls back to this.
+// Cut `[startSec, endSec)` out of the input. Stream-copies by default (fast,
+// lossless, container-preserving); pass `reencode` for frame-accurate video.
+//
+// We seek with `-ss` *before* `-i` (fast input seek) and bound the output with
+// `-t DURATION` (= end − start) *after* `-i`. `-t` is an unambiguous output-side
+// duration across ffmpeg builds; the alternative `-ss … -to …` both placed
+// before `-i` is version-dependent (some builds read `-to` as absolute, others
+// as relative to the seek point), so we avoid it.
 export function buildTrimArgs(opts: {
   input: string
   output: string
@@ -23,7 +30,8 @@ export function buildTrimArgs(opts: {
   reencode?: boolean
 }): string[] {
   const { input, output, startSec, endSec, reencode } = opts
-  const args = ['-ss', toFFTime(startSec), '-to', toFFTime(endSec), '-i', input]
+  const duration = Math.max(0, endSec - startSec)
+  const args = ['-ss', toFFTime(startSec), '-i', input, '-t', toFFTime(duration)]
   if (reencode) {
     args.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-c:a', 'aac')
   } else {
