@@ -385,6 +385,13 @@ export function useTimeline() {
     [commit],
   )
 
+  const setResolution = useCallback(
+    (width: number, height: number) => {
+      commit((p) => (p.width === width && p.height === height ? p : { ...p, width, height }))
+    },
+    [commit],
+  )
+
   const addMarker = useCallback(
     (t: number) => {
       commit((p) => ({ ...p, markers: [...(p.markers ?? []), { id: newId('mk'), time: t }] }))
@@ -427,6 +434,7 @@ export function useTimeline() {
     toggleTrackLock,
     removeTrack,
     addTrack,
+    setResolution,
     addMarker,
     removeMarker,
     beginInteraction,

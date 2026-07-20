@@ -32,6 +32,14 @@ type ExportState =
 // third of a frame so Up/Down don't get stuck re-selecting the current edge.
 const EPS = 0.001
 
+// Project resolution presets (aspect ratios common to web + social).
+const RATIOS: { label: string; w: number; h: number }[] = [
+  { label: '16:9', w: 1280, h: 720 },
+  { label: '9:16', w: 720, h: 1280 },
+  { label: '1:1', w: 1080, h: 1080 },
+  { label: '4:3', w: 960, h: 720 },
+]
+
 export function MediaPage() {
   const { t } = useTranslation()
   const tl = useTimeline()
@@ -549,6 +557,28 @@ export function MediaPage() {
             <Button size="sm" variant="outline" onClick={() => tl.addTrack('audio')}>
               <Music className="mr-1 h-4 w-4" /> {t('media.timeline.addAudioTrack')}
             </Button>
+            <div className="flex items-center gap-1.5">
+              <Label className="text-xs text-muted-foreground">{t('media.timeline.ratio')}</Label>
+              <select
+                value={`${tl.project.width}x${tl.project.height}`}
+                onChange={(e) => {
+                  const [w, h] = e.target.value.split('x').map(Number)
+                  tl.setResolution(w, h)
+                }}
+                className="h-8 rounded-md border border-input bg-transparent px-2 text-xs"
+              >
+                {!RATIOS.some((r) => `${r.w}x${r.h}` === `${tl.project.width}x${tl.project.height}`) && (
+                  <option value={`${tl.project.width}x${tl.project.height}`}>
+                    {tl.project.width}×{tl.project.height}
+                  </option>
+                )}
+                {RATIOS.map((r) => (
+                  <option key={r.label} value={`${r.w}x${r.h}`}>
+                    {r.label} ({r.w}×{r.h})
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="ml-auto flex items-center gap-2">
               <Label className="text-xs text-muted-foreground">{t('media.crf')}</Label>
               <input type="range" min={18} max={32} value={crf} onChange={(e) => setCrf(Number(e.target.value))} className="w-28 accent-primary" disabled={busy} />

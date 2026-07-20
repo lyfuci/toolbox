@@ -2129,6 +2129,7 @@
       "lock": "锁定轨道",
       "unlock": "解锁轨道",
       "removeTrack": "删除轨道",
+      "ratio": "比例",
       "split": "切割",
       "snap": "吸附",
       "markIn": "标入点",
