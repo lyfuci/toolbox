@@ -1,23 +1,35 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Loader2, Play, Pause, Download, Trash2, Plus, Film, Music, ZoomIn, ZoomOut, Wand2 } from 'lucide-react'
+import {
+  Loader2, Play, Pause, Download, Trash2, Plus, Film, Music, ZoomIn, ZoomOut, Wand2,
+  ChevronFirst, ChevronLast, StepBack, StepForward, Maximize2, Minimize2, Keyboard,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
 import { DropZone } from '@/components/media/DropZone'
 import { OutputView, type OutputResult } from '@/components/media/OutputView'
 import { QuickToolsDialog } from '@/components/media/QuickToolsDialog'
+import { MediaShortcutsDialog } from '@/components/media/MediaShortcutsDialog'
 import { useTimeline } from '@/components/media/timeline/useTimeline'
 import { useTimelinePlayer } from '@/components/media/timeline/useTimelinePlayer'
+import { useMediaShortcuts } from '@/components/media/timeline/useMediaShortcuts'
 import { Timeline } from '@/components/media/timeline/Timeline'
 import { probeSource } from '@/components/media/timeline/probe-source'
-import { getFFmpeg, fmtTime } from '@/lib/ffmpeg'
+import { getFFmpeg } from '@/lib/ffmpeg'
+import { formatTC, frameDuration } from '@/lib/timeline/timecode'
+import { clipDuration } from '@/lib/timeline/model'
 import { runTimelineExport } from '@/lib/timeline/run-export'
 
 type ExportState =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'exporting'; progress: number }
+
+// Snap epsilon for boundary navigation — treats "at a boundary" as within a
+// third of a frame so Up/Down don't get stuck re-selecting the current edge.
+const EPS = 0.001
 
 export function MediaPage() {
   const { t } = useTranslation()
@@ -31,6 +43,8 @@ export function MediaPage() {
   const [output, setOutput] = useState<OutputResult | null>(null)
   const [crf, setCrf] = useState(23)
   const [quickOpen, setQuickOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [focused, setFocused] = useState(false)
 
   useEffect(() => {
     return () => {
@@ -41,6 +55,20 @@ export function MediaPage() {
   }, [])
 
   const sourceList = useMemo(() => Object.values(tl.sources), [tl.sources])
+  const fps = tl.project.fps
+  const hasContent = sourceList.length > 0
+
+  // All distinct clip edges (+ 0 and end) for Up/Down playhead navigation.
+  const boundaries = useMemo(() => {
+    const set = new Set<number>([0, tl.duration])
+    for (const tr of tl.project.tracks) {
+      for (const c of tr.clips) {
+        set.add(c.timelineStart)
+        set.add(c.timelineStart + clipDuration(c))
+      }
+    }
+    return [...set].filter((n) => n >= 0).sort((a, b) => a - b)
+  }, [tl.project, tl.duration])
 
   const onFiles = async (files: File[]) => {
     for (const file of files) {
@@ -53,6 +81,38 @@ export function MediaPage() {
       tl.addClipFromSource(src)
     }
   }
+
+  // ── Transport ──────────────────────────────────────────────────────────
+  const stepFrame = (dir: 1 | -1) => seek(time + dir * frameDuration(fps))
+  const stepSecond = (dir: 1 | -1) => seek(time + dir)
+  const goStart = () => seek(0)
+  // Land one frame shy of the very end so the last real frame shows (clipAt
+  // treats clip ends as exclusive, so exactly-at-duration paints black).
+  const goEnd = () => seek(Math.max(0, playerDuration - frameDuration(fps)))
+  const stepBoundary = (dir: 1 | -1) => {
+    const next =
+      dir === 1
+        ? boundaries.find((b) => b > time + EPS)
+        : [...boundaries].reverse().find((b) => b < time - EPS)
+    if (next != null) seek(next)
+  }
+  const zoom = (dir: 1 | -1) => setPxPerSec((p) => Math.min(160, Math.max(10, p + dir * 10)))
+  const togglePlay = () => (playing ? pause() : play())
+
+  useMediaShortcuts({
+    enabled: hasContent,
+    focused,
+    onPlayPause: togglePlay,
+    onStepFrame: stepFrame,
+    onStepSecond: stepSecond,
+    onStepClipBoundary: stepBoundary,
+    onGoStart: goStart,
+    onGoEnd: goEnd,
+    onZoom: zoom,
+    onToggleFullscreen: () => setFocused((v) => !v),
+    onExitFullscreen: () => setFocused(false),
+    onToggleHelp: () => setShortcutsOpen((v) => !v),
+  })
 
   const doExport = async () => {
     if (exp.kind !== 'idle') return
@@ -94,49 +154,118 @@ export function MediaPage() {
   }, [tl.project, tl.selectedClipId])
 
   const busy = exp.kind !== 'idle'
-  const hasContent = sourceList.length > 0
+
+  // Blur transport buttons after click so a following Space hits the global
+  // play/pause handler instead of re-activating the focused button.
+  const tap = (fn: () => void) => (e: React.MouseEvent<HTMLButtonElement>) => {
+    fn()
+    e.currentTarget.blur()
+  }
+
+  const rootClass = focused
+    ? 'fixed inset-0 z-50 flex flex-col bg-background'
+    : 'mx-auto max-w-7xl px-8 py-12'
 
   return (
-    <div className="mx-auto max-w-7xl px-8 py-12">
-      <header className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t('tools.media.name')}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t('media.description')}</p>
+    <div className={rootClass} data-nle="">
+      <header
+        className={cn(
+          'flex items-start justify-between gap-4',
+          focused ? 'shrink-0 border-b border-border px-4 py-2' : 'mb-6',
+        )}
+      >
+        <div className="min-w-0">
+          <h1 className={cn('font-semibold tracking-tight', focused ? 'text-base' : 'text-2xl')}>
+            {t('tools.media.name')}
+          </h1>
+          {!focused && <p className="mt-1 text-sm text-muted-foreground">{t('media.description')}</p>}
         </div>
-        <Button size="sm" variant="outline" onClick={() => setQuickOpen(true)} className="shrink-0">
-          <Wand2 className="mr-1 h-4 w-4" />
-          {t('media.quick.title')}
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setShortcutsOpen(true)}
+            title={t('media.shortcuts.title') + ' (?)'}
+          >
+            <Keyboard className="h-4 w-4" />
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setQuickOpen(true)}>
+            <Wand2 className="mr-1 h-4 w-4" />
+            {t('media.quick.title')}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setFocused((v) => !v)}
+            title={t(focused ? 'media.exitFullscreen' : 'media.fullscreen') + ' (F)'}
+          >
+            {focused ? <Minimize2 className="mr-1 h-4 w-4" /> : <Maximize2 className="mr-1 h-4 w-4" />}
+            {t(focused ? 'media.exitFullscreen' : 'media.fullscreen')}
+          </Button>
+        </div>
       </header>
 
       <QuickToolsDialog open={quickOpen} onOpenChange={setQuickOpen} />
+      <MediaShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
 
       {!hasContent ? (
-        <DropZone onFiles={onFiles} />
+        <div className={cn(focused && 'min-h-0 flex-1 overflow-auto p-4')}>
+          <DropZone onFiles={onFiles} />
+        </div>
       ) : (
-        <div className="space-y-4">
+        <div className={cn('space-y-4', focused && 'flex min-h-0 flex-1 flex-col overflow-hidden p-4')}>
           {/* Preview + transport */}
-          <div className="grid gap-4 lg:grid-cols-[1fr_260px]">
-            <div className="flex flex-col items-center rounded-lg border border-border bg-black/60 p-3">
-              <canvas
-                ref={canvasRef}
-                width={tl.project.width}
-                height={tl.project.height}
-                className="max-h-[360px] w-auto max-w-full rounded bg-black"
-                style={{ aspectRatio: `${tl.project.width} / ${tl.project.height}` }}
-              />
-              <div className="mt-3 flex w-full items-center gap-3">
-                <Button size="icon" variant="secondary" onClick={() => (playing ? pause() : play())}>
-                  {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                </Button>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {fmtTime(time)} / {fmtTime(playerDuration)}
+          <div
+            className={cn(
+              'grid gap-4',
+              focused ? 'min-h-0 flex-1 lg:grid-cols-[1fr_280px]' : 'lg:grid-cols-[1fr_260px]',
+            )}
+          >
+            <div
+              className={cn(
+                'flex flex-col items-center rounded-lg border border-border bg-black/60 p-3',
+                focused && 'min-h-0',
+              )}
+            >
+              <div className={cn('flex w-full items-center justify-center', focused && 'min-h-0 flex-1')}>
+                <canvas
+                  ref={canvasRef}
+                  width={tl.project.width}
+                  height={tl.project.height}
+                  className={cn(
+                    'w-auto max-w-full rounded bg-black object-contain',
+                    focused ? 'max-h-full' : 'max-h-[360px]',
+                  )}
+                  style={{ aspectRatio: `${tl.project.width} / ${tl.project.height}` }}
+                />
+              </div>
+              <div className="mt-3 flex w-full items-center gap-2">
+                <div className="flex items-center gap-0.5">
+                  <Button size="icon" variant="ghost" onClick={tap(goStart)} title={t('media.transport.start')}>
+                    <ChevronFirst className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={tap(() => stepFrame(-1))} title={t('media.transport.stepBack')}>
+                    <StepBack className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="secondary" onClick={tap(togglePlay)} title={t('media.transport.playPause')}>
+                    {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={tap(() => stepFrame(1))} title={t('media.transport.stepFwd')}>
+                    <StepForward className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={tap(goEnd)} title={t('media.transport.end')}>
+                    <ChevronLast className="h-4 w-4" />
+                  </Button>
+                </div>
+                <span className="ml-1 font-mono text-xs tabular-nums text-foreground/90">
+                  {formatTC(time, fps)}
+                  <span className="text-muted-foreground"> / {formatTC(playerDuration, fps)}</span>
                 </span>
-                <div className="ml-auto flex items-center gap-1">
-                  <Button size="icon" variant="ghost" onClick={() => setPxPerSec((p) => Math.max(10, p - 10))} title={t('media.timeline.zoomOut')}>
+                <div className="ml-auto flex items-center gap-0.5">
+                  <Button size="icon" variant="ghost" onClick={() => zoom(-1)} title={t('media.timeline.zoomOut')}>
                     <ZoomOut className="h-4 w-4" />
                   </Button>
-                  <Button size="icon" variant="ghost" onClick={() => setPxPerSec((p) => Math.min(160, p + 10))} title={t('media.timeline.zoomIn')}>
+                  <Button size="icon" variant="ghost" onClick={() => zoom(1)} title={t('media.timeline.zoomIn')}>
                     <ZoomIn className="h-4 w-4" />
                   </Button>
                 </div>
@@ -144,7 +273,7 @@ export function MediaPage() {
             </div>
 
             {/* Source bin + clip inspector */}
-            <div className="space-y-3">
+            <div className={cn('space-y-3', focused && 'min-h-0 overflow-y-auto')}>
               <div className="rounded-lg border border-border bg-card/40 p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <Label className="text-xs text-muted-foreground">{t('media.timeline.sources')}</Label>
@@ -207,21 +336,23 @@ export function MediaPage() {
           </div>
 
           {/* Timeline */}
-          <Timeline
-            project={tl.project}
-            sources={tl.sources}
-            pxPerSec={pxPerSec}
-            time={time}
-            selectedClipId={tl.selectedClipId}
-            onSeek={seek}
-            onSelectClip={tl.setSelectedClipId}
-            onMoveClip={tl.moveClip}
-            onTrimClip={tl.trimClip}
-            onToggleMute={tl.toggleTrackMute}
-          />
+          <div className={cn(focused && 'shrink-0')}>
+            <Timeline
+              project={tl.project}
+              sources={tl.sources}
+              pxPerSec={pxPerSec}
+              time={time}
+              selectedClipId={tl.selectedClipId}
+              onSeek={seek}
+              onSelectClip={tl.setSelectedClipId}
+              onMoveClip={tl.moveClip}
+              onTrimClip={tl.trimClip}
+              onToggleMute={tl.toggleTrackMute}
+            />
+          </div>
 
           {/* Add-track + export */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className={cn('flex flex-wrap items-center gap-3', focused && 'shrink-0')}>
             <Button size="sm" variant="outline" onClick={() => tl.addTrack('video')}>
               <Film className="mr-1 h-4 w-4" /> {t('media.timeline.addVideoTrack')}
             </Button>

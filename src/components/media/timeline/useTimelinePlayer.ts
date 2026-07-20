@@ -22,6 +22,20 @@ export function useTimelinePlayer(project: Project, sources: Record<string, Load
   const startTimeRef = useRef(0)
   const duration = projectDuration(project)
 
+  // Mirror the latest playing/time into refs so async video frame callbacks
+  // (which fire after a seek resolves) can repaint against current values
+  // without being torn down/recreated. `renderAtRef` breaks the chicken-and-egg
+  // of a repaint callback that needs to call the very function defining it.
+  const playingRef = useRef(playing)
+  const timeRef = useRef(time)
+  const renderAtRef = useRef<(t: number, isPlaying: boolean) => void>(() => {})
+  useEffect(() => {
+    playingRef.current = playing
+  }, [playing])
+  useEffect(() => {
+    timeRef.current = time
+  }, [time])
+
   const getEl = useCallback(
     (sourceId: string): HTMLVideoElement | HTMLAudioElement | null => {
       const existing = mediaEls.current.get(sourceId)
@@ -39,6 +53,27 @@ export function useTimelinePlayer(project: Project, sources: Record<string, Load
     },
     [sources],
   )
+
+  // Setting video.currentTime is ASYNC — the decoded frame isn't ready in the
+  // same tick, so a paused single-frame step would otherwise paint the previous
+  // frame (and disagree with the timecode readout). Schedule ONE repaint once
+  // the frame actually lands, keyed to the latest time (not a captured one) so
+  // rapid steps converge instead of bouncing back. Deduped per element.
+  const scheduleRepaint = useCallback((v: HTMLVideoElement) => {
+    type VEl = HTMLVideoElement & {
+      __repaintPending?: boolean
+      requestVideoFrameCallback?: (cb: () => void) => number
+    }
+    const vv = v as VEl
+    if (vv.__repaintPending) return
+    vv.__repaintPending = true
+    const run = () => {
+      vv.__repaintPending = false
+      if (!playingRef.current) renderAtRef.current(timeRef.current, false)
+    }
+    if (typeof vv.requestVideoFrameCallback === 'function') vv.requestVideoFrameCallback(run)
+    else v.addEventListener('seeked', run, { once: true })
+  }, [])
 
   // Paint the active video frame for time t and sync audio elements.
   const renderAt = useCallback(
@@ -64,7 +99,10 @@ export function useTimelinePlayer(project: Project, sources: Record<string, Load
 
         if (track.kind === 'video' && src.hasVideo && canvas && ctx) {
           const v = el as HTMLVideoElement
-          if (!isPlaying && Math.abs(v.currentTime - srcTime) > 0.05) v.currentTime = srcTime
+          if (!isPlaying && Math.abs(v.currentTime - srcTime) > 0.05) {
+            v.currentTime = srcTime
+            scheduleRepaint(v)
+          }
           // Letterbox-fit draw.
           const vw = v.videoWidth || src.width || canvas.width
           const vh = v.videoHeight || src.height || canvas.height
@@ -98,8 +136,13 @@ export function useTimelinePlayer(project: Project, sources: Record<string, Load
         void sid
       }
     },
-    [project, sources, getEl],
+    [project, sources, getEl, scheduleRepaint],
   )
+
+  // Keep the ref pointing at the latest renderAt for async repaint callbacks.
+  useEffect(() => {
+    renderAtRef.current = renderAt
+  }, [renderAt])
 
   const stopRaf = () => {
     if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
