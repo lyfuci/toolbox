@@ -36,6 +36,11 @@ export type MediaShortcutHandlers = {
   onAddMarker: () => void
   onUndo: () => void
   onRedo: () => void
+  onCopy: () => void
+  onCut: () => void
+  onPaste: () => void
+  onDuplicate: () => void
+  onNudge: (dir: 1 | -1, big: boolean) => void
   onToggleFullscreen: () => void
   onExitFullscreen: () => void
   onToggleHelp: () => void
@@ -102,6 +107,15 @@ export function useMediaShortcuts(handlers: MediaShortcutHandlers) {
         if (e.shiftKey) h.onRedo()
         else h.onUndo()
         return
+      }
+      // Clipboard + duplicate (editor hijacks these; the input guard above keeps
+      // native copy/paste working inside text fields).
+      if (mod && !e.altKey && !e.shiftKey) {
+        const k = e.key.toLowerCase()
+        if (k === 'c') { e.preventDefault(); h.onCopy(); return }
+        if (k === 'x') { e.preventDefault(); h.onCut(); return }
+        if (k === 'v') { e.preventDefault(); h.onPaste(); return }
+        if (k === 'd') { e.preventDefault(); h.onDuplicate(); return }
       }
       // Leave the remaining Cmd/Ctrl/Alt combos to the browser/app for now.
       if (mod || e.altKey) return
@@ -193,6 +207,23 @@ export function useMediaShortcuts(handlers: MediaShortcutHandlers) {
         case 'Z': // Shift+Z = zoom timeline to fit.
           e.preventDefault()
           h.onZoomFit()
+          break
+        // Nudge the selected clip: , / . one frame, < / > one second.
+        case ',':
+          e.preventDefault()
+          h.onNudge(-1, false)
+          break
+        case '.':
+          e.preventDefault()
+          h.onNudge(1, false)
+          break
+        case '<':
+          e.preventDefault()
+          h.onNudge(-1, true)
+          break
+        case '>':
+          e.preventDefault()
+          h.onNudge(1, true)
           break
       }
     }

@@ -49,6 +49,10 @@ export function MediaPage() {
   const [snap, setSnap] = useState(true)
   const [inPoint, setInPoint] = useState<number | null>(null)
   const [outPoint, setOutPoint] = useState<number | null>(null)
+  const [clipboard, setClipboard] = useState<
+    | { data: { sourceId: string; sourceIn: number; sourceOut: number; volume?: number }; kind: 'video' | 'audio' }
+    | null
+  >(null)
   const timelineWrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -118,6 +122,33 @@ export function MediaPage() {
     if (tl.selectedClipId) tl.rippleRemoveClip(tl.selectedClipId)
   }
 
+  // ── Clipboard / duplicate / nudge ────────────────────────────────────────
+  const copySelected = () => {
+    for (const tr of tl.project.tracks) {
+      const c = tr.clips.find((x) => x.id === tl.selectedClipId)
+      if (c) {
+        setClipboard({
+          data: { sourceId: c.sourceId, sourceIn: c.sourceIn, sourceOut: c.sourceOut, volume: c.volume },
+          kind: tr.kind,
+        })
+        return
+      }
+    }
+  }
+  const cutSelected = () => {
+    copySelected()
+    if (tl.selectedClipId) tl.removeClip(tl.selectedClipId)
+  }
+  const pasteClip = () => {
+    if (clipboard) tl.insertClip(clipboard.kind, clipboard.data, time)
+  }
+  const duplicateSelected = () => {
+    if (tl.selectedClipId) tl.duplicateClip(tl.selectedClipId)
+  }
+  const nudgeSelected = (dir: 1 | -1, big: boolean) => {
+    if (tl.selectedClipId) tl.nudgeClip(tl.selectedClipId, dir * (big ? 1 : frameDuration(fps)))
+  }
+
   // ── Marking ────────────────────────────────────────────────────────────
   const markIn = () => setInPoint(time)
   const markOut = () => setOutPoint(time)
@@ -159,6 +190,11 @@ export function MediaPage() {
     onAddMarker: () => tl.addMarker(time),
     onUndo: tl.undo,
     onRedo: tl.redo,
+    onCopy: copySelected,
+    onCut: cutSelected,
+    onPaste: pasteClip,
+    onDuplicate: duplicateSelected,
+    onNudge: nudgeSelected,
     onToggleFullscreen: () => setFocused((v) => !v),
     onExitFullscreen: () => setFocused(false),
     onToggleHelp: () => setShortcutsOpen((v) => !v),

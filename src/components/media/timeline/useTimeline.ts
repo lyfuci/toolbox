@@ -254,6 +254,77 @@ export function useTimeline() {
     [commit],
   )
 
+  // Nudge a clip by a signed delta on its own track (keyboard , / .).
+  const nudgeClip = useCallback(
+    (clipId: string, deltaSec: number) => {
+      commit((p) => {
+        const tracks = p.tracks.map((t) => ({ ...t, clips: [...t.clips] }))
+        let moving: Clip | undefined
+        let srcTrack: (typeof tracks)[number] | undefined
+        for (const t of tracks) {
+          const i = t.clips.findIndex((c) => c.id === clipId)
+          if (i >= 0) {
+            moving = t.clips[i]
+            srcTrack = t
+            t.clips.splice(i, 1)
+            break
+          }
+        }
+        if (!moving || !srcTrack) return p
+        const start = resolveDropStart(srcTrack, moving, Math.max(0, moving.timelineStart + deltaSec))
+        srcTrack.clips.push({ ...moving, timelineStart: start })
+        return { ...p, tracks }
+      })
+    },
+    [commit],
+  )
+
+  // Duplicate a clip immediately after itself on the same track; selects the copy.
+  const duplicateClip = useCallback(
+    (clipId: string) => {
+      let placedId: string | null = null
+      commit((p) => {
+        const tracks = p.tracks.map((t) => ({ ...t, clips: [...t.clips] }))
+        for (const t of tracks) {
+          const src = t.clips.find((c) => c.id === clipId)
+          if (!src) continue
+          const copy: Clip = { ...src, id: newId('clip'), timelineStart: src.timelineStart + clipDuration(src) }
+          const start = resolveDropStart(t, copy, copy.timelineStart)
+          const placed = { ...copy, timelineStart: start }
+          t.clips.push(placed)
+          placedId = placed.id
+          return { ...p, tracks }
+        }
+        return p
+      })
+      if (placedId) setSelectedClipId(placedId)
+    },
+    [commit],
+  )
+
+  // Insert a clip (from the clipboard) onto the first track of `kind` at `atTime`.
+  const insertClip = useCallback(
+    (kind: Track['kind'], data: Pick<Clip, 'sourceId' | 'sourceIn' | 'sourceOut' | 'volume'>, atTime: number) => {
+      let placedId: string | null = null
+      commit((p) => {
+        const tracks = p.tracks.map((t) => ({ ...t, clips: [...t.clips] }))
+        let track = tracks.find((t) => t.kind === kind)
+        if (!track) {
+          track = { id: newId('trk'), kind, clips: [] }
+          tracks.push(track)
+        }
+        const clip: Clip = { ...data, id: newId('clip'), timelineStart: 0 }
+        const start = resolveDropStart(track, clip, Math.max(0, atTime))
+        const placed = { ...clip, timelineStart: start }
+        track.clips.push(placed)
+        placedId = placed.id
+        return { ...p, tracks }
+      })
+      if (placedId) setSelectedClipId(placedId)
+    },
+    [commit],
+  )
+
   // Volume is a slider drag — transient; the slider brackets it with
   // begin/endInteraction so the whole drag is one undo entry.
   const setClipVolume = useCallback(
@@ -319,6 +390,9 @@ export function useTimeline() {
     removeClip,
     splitAtPlayhead,
     rippleRemoveClip,
+    nudgeClip,
+    duplicateClip,
+    insertClip,
     setClipVolume,
     toggleTrackMute,
     addTrack,
