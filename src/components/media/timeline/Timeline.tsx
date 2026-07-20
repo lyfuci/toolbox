@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Volume2, VolumeX } from 'lucide-react'
 import { type Project, type Clip, type Track, type Marker, clipDuration, clipEnd, snapStart } from '@/lib/timeline/model'
 import type { LoadedSource } from './useTimeline'
+import { WaveformClip } from './WaveformClip'
 import { cn } from '@/lib/utils'
 
 const TRACK_H = 60
@@ -237,6 +238,7 @@ function TrackRow({
           trackId={track.id}
           isVideo={track.kind === 'video'}
           name={sources[clip.sourceId]?.name ?? '?'}
+          source={sources[clip.sourceId]}
           pxPerSec={pxPerSec}
           selected={clip.id === selectedClipId}
           snap={snap}
@@ -257,6 +259,7 @@ function TimelineClipView({
   trackId,
   isVideo,
   name,
+  source,
   pxPerSec,
   selected,
   snap,
@@ -271,6 +274,7 @@ function TimelineClipView({
   trackId: string
   isVideo: boolean
   name: string
+  source?: LoadedSource
   pxPerSec: number
   selected: boolean
   snap: boolean
@@ -325,7 +329,7 @@ function TimelineClipView({
     <div
       data-clip-id={clip.id}
       className={cn(
-        'absolute top-[7px] flex h-[46px] items-stretch overflow-hidden rounded-[2px] text-[11px] select-none',
+        'absolute top-[7px] isolate flex h-[46px] items-stretch overflow-hidden rounded-[2px] text-[11px] select-none',
         isVideo
           ? 'bg-[var(--nle-clip-video)] shadow-[inset_0_1px_0_var(--nle-clip-video-top)]'
           : 'bg-[var(--nle-clip-audio)] shadow-[inset_0_1px_0_var(--nle-clip-audio-top)]',
@@ -335,21 +339,33 @@ function TimelineClipView({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
+      {/* Audio waveform, behind the handles/label */}
+      {!isVideo && source?.hasAudio && (
+        <WaveformClip
+          sourceId={clip.sourceId}
+          file={source.file}
+          sourceIn={clip.sourceIn}
+          sourceOut={clip.sourceOut}
+          srcDuration={source.duration}
+          width={w}
+          height={46}
+        />
+      )}
       {/* Left trim handle */}
       <div
-        className="w-1.5 shrink-0 cursor-ew-resize bg-black/30 hover:bg-black/50"
+        className="relative z-10 w-1.5 shrink-0 cursor-ew-resize bg-black/30 hover:bg-black/50"
         onPointerDown={onPointerDown('in')}
       />
       {/* Body (move). Label sits bottom-left so the floating track badge (top-
-          left) never covers it, and the upper area stays free for a waveform. */}
-      <div className="relative flex-1 cursor-grab" onPointerDown={onPointerDown('move')}>
+          left) never covers it, and the upper area stays free for the waveform. */}
+      <div className="relative z-10 flex-1 cursor-grab" onPointerDown={onPointerDown('move')}>
         <span className="pointer-events-none absolute bottom-0.5 left-1 right-1 truncate text-white/95 [text-shadow:0_1px_1px_rgba(0,0,0,0.7)]">
           {name}
         </span>
       </div>
       {/* Right trim handle */}
       <div
-        className="h-full w-1.5 shrink-0 cursor-ew-resize bg-black/30 hover:bg-black/50"
+        className="relative z-10 h-full w-1.5 shrink-0 cursor-ew-resize bg-black/30 hover:bg-black/50"
         onPointerDown={onPointerDown('out')}
       />
     </div>
