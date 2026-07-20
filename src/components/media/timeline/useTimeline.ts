@@ -171,6 +171,14 @@ export function useTimeline() {
     setProject((p) => ({ ...p, tracks: [...p.tracks, { id: newId('trk'), kind, clips: [] }] }))
   }, [])
 
+  const addMarker = useCallback((t: number) => {
+    setProject((p) => ({ ...p, markers: [...(p.markers ?? []), { id: newId('mk'), time: t }] }))
+  }, [])
+
+  const removeMarker = useCallback((id: string) => {
+    setProject((p) => ({ ...p, markers: (p.markers ?? []).filter((m) => m.id !== id) }))
+  }, [])
+
   const reset = useCallback(() => {
     setProject(emptyProject())
     setSources({})
@@ -192,6 +200,8 @@ export function useTimeline() {
     setClipVolume,
     toggleTrackMute,
     addTrack,
+    addMarker,
+    removeMarker,
     reset,
     duration: projectDuration(project),
     clipDuration,

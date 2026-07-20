@@ -22,10 +22,18 @@ export type MediaShortcutHandlers = {
   onGoStart: () => void
   onGoEnd: () => void
   onZoom: (dir: 1 | -1) => void
+  onZoomFit: () => void
   onSplit: () => void
   onDelete: () => void
   onRippleDelete: () => void
   onToggleSnap: () => void
+  onMarkIn: () => void
+  onMarkOut: () => void
+  onGotoIn: () => void
+  onGotoOut: () => void
+  onMarkClip: () => void
+  onClearInOut: () => void
+  onAddMarker: () => void
   onToggleFullscreen: () => void
   onExitFullscreen: () => void
   onToggleHelp: () => void
@@ -78,6 +86,12 @@ export function useMediaShortcuts(handlers: MediaShortcutHandlers) {
       if (mod && !e.altKey && (e.key === 'b' || e.key === 'B')) {
         e.preventDefault()
         h.onSplit()
+        return
+      }
+      // Alt/Opt+X = clear in & out points.
+      if (e.altKey && !mod && (e.key === 'x' || e.key === 'X')) {
+        e.preventDefault()
+        h.onClearInOut()
         return
       }
       // Leave the remaining Cmd/Ctrl/Alt combos to the browser/app for now.
@@ -140,6 +154,36 @@ export function useMediaShortcuts(handlers: MediaShortcutHandlers) {
           e.preventDefault()
           if (e.shiftKey) h.onRippleDelete()
           else h.onDelete()
+          break
+        // Marking — lowercase = set, uppercase (Shift) = go to.
+        case 'i':
+          e.preventDefault()
+          h.onMarkIn()
+          break
+        case 'I':
+          e.preventDefault()
+          h.onGotoIn()
+          break
+        case 'o':
+          e.preventDefault()
+          h.onMarkOut()
+          break
+        case 'O':
+          e.preventDefault()
+          h.onGotoOut()
+          break
+        case 'x':
+          e.preventDefault()
+          h.onMarkClip()
+          break
+        case 'm':
+        case 'M':
+          e.preventDefault()
+          h.onAddMarker()
+          break
+        case 'Z': // Shift+Z = zoom timeline to fit.
+          e.preventDefault()
+          h.onZoomFit()
           break
       }
     }

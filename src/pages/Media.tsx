@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Loader2, Play, Pause, Download, Trash2, Plus, Film, Music, ZoomIn, ZoomOut, Wand2,
   ChevronFirst, ChevronLast, StepBack, StepForward, Maximize2, Minimize2, Keyboard,
-  Scissors, Magnet,
+  Scissors, Magnet, Flag, X, Scan,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -20,7 +20,7 @@ import { Timeline } from '@/components/media/timeline/Timeline'
 import { probeSource } from '@/components/media/timeline/probe-source'
 import { getFFmpeg } from '@/lib/ffmpeg'
 import { formatTC, frameDuration } from '@/lib/timeline/timecode'
-import { clipDuration } from '@/lib/timeline/model'
+import { clipDuration, clipEnd, clipAt } from '@/lib/timeline/model'
 import { runTimelineExport } from '@/lib/timeline/run-export'
 
 type ExportState =
@@ -47,6 +47,9 @@ export function MediaPage() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [focused, setFocused] = useState(false)
   const [snap, setSnap] = useState(true)
+  const [inPoint, setInPoint] = useState<number | null>(null)
+  const [outPoint, setOutPoint] = useState<number | null>(null)
+  const timelineWrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     return () => {
@@ -99,6 +102,11 @@ export function MediaPage() {
     if (next != null) seek(next)
   }
   const zoom = (dir: 1 | -1) => setPxPerSec((p) => Math.min(160, Math.max(10, p + dir * 10)))
+  const zoomFit = () => {
+    const w = timelineWrapRef.current?.clientWidth ?? 0
+    const total = Math.max(tl.duration, 1)
+    if (w > 0) setPxPerSec(Math.min(160, Math.max(10, (w - 24) / total)))
+  }
   const togglePlay = () => (playing ? pause() : play())
 
   // ── Editing ────────────────────────────────────────────────────────────
@@ -108,6 +116,23 @@ export function MediaPage() {
   }
   const rippleDeleteSelected = () => {
     if (tl.selectedClipId) tl.rippleRemoveClip(tl.selectedClipId)
+  }
+
+  // ── Marking ────────────────────────────────────────────────────────────
+  const markIn = () => setInPoint(time)
+  const markOut = () => setOutPoint(time)
+  const gotoIn = () => { if (inPoint != null) seek(inPoint) }
+  const gotoOut = () => { if (outPoint != null) seek(outPoint) }
+  const clearInOut = () => { setInPoint(null); setOutPoint(null) }
+  const markClipUnderPlayhead = () => {
+    for (const tr of tl.project.tracks) {
+      const c = clipAt(tr, time)
+      if (c) {
+        setInPoint(c.timelineStart)
+        setOutPoint(clipEnd(c))
+        return
+      }
+    }
   }
 
   useMediaShortcuts({
@@ -120,10 +145,18 @@ export function MediaPage() {
     onGoStart: goStart,
     onGoEnd: goEnd,
     onZoom: zoom,
+    onZoomFit: zoomFit,
     onSplit: splitAtPlayhead,
     onDelete: deleteSelected,
     onRippleDelete: rippleDeleteSelected,
     onToggleSnap: () => setSnap((v) => !v),
+    onMarkIn: markIn,
+    onMarkOut: markOut,
+    onGotoIn: gotoIn,
+    onGotoOut: gotoOut,
+    onMarkClip: markClipUnderPlayhead,
+    onClearInOut: clearInOut,
+    onAddMarker: () => tl.addMarker(time),
     onToggleFullscreen: () => setFocused((v) => !v),
     onExitFullscreen: () => setFocused(false),
     onToggleHelp: () => setShortcutsOpen((v) => !v),
@@ -351,7 +384,7 @@ export function MediaPage() {
           </div>
 
           {/* Timeline toolbar + timeline */}
-          <div className={cn('space-y-1.5', focused && 'shrink-0')}>
+          <div ref={timelineWrapRef} className={cn('space-y-1.5', focused && 'shrink-0')}>
             <div className="flex items-center gap-1">
               <Button
                 size="sm"
@@ -374,6 +407,25 @@ export function MediaPage() {
                 <Magnet className="mr-1 h-3.5 w-3.5" />
                 {t('media.timeline.snap')}
               </Button>
+              <div className="mx-1 h-4 w-px bg-border" />
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 font-mono text-xs" onClick={markIn} title={t('media.timeline.markIn') + ' (I)'}>
+                [
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 font-mono text-xs" onClick={markOut} title={t('media.timeline.markOut') + ' (O)'}>
+                ]
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => tl.addMarker(time)} title={t('media.timeline.addMarker') + ' (M)'}>
+                <Flag className="h-3.5 w-3.5" />
+              </Button>
+              {(inPoint != null || outPoint != null) && (
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground" onClick={clearInOut} title={t('media.timeline.clearInOut') + ' (⌥X)'}>
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" className="ml-auto h-7 px-2 text-xs text-muted-foreground" onClick={zoomFit} title={t('media.timeline.zoomFit') + ' (⇧Z)'}>
+                <Scan className="mr-1 h-3.5 w-3.5" />
+                {t('media.timeline.zoomFit')}
+              </Button>
             </div>
             <Timeline
               project={tl.project}
@@ -382,11 +434,15 @@ export function MediaPage() {
               time={time}
               selectedClipId={tl.selectedClipId}
               snap={snap}
+              markers={tl.project.markers ?? []}
+              inPoint={inPoint}
+              outPoint={outPoint}
               onSeek={seek}
               onSelectClip={tl.setSelectedClipId}
               onMoveClip={tl.moveClip}
               onTrimClip={tl.trimClip}
               onToggleMute={tl.toggleTrackMute}
+              onRemoveMarker={tl.removeMarker}
             />
           </div>
 

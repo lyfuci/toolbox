@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Volume2, VolumeX } from 'lucide-react'
-import { type Project, type Clip, type Track, clipDuration, clipEnd, snapStart } from '@/lib/timeline/model'
+import { type Project, type Clip, type Track, type Marker, clipDuration, clipEnd, snapStart } from '@/lib/timeline/model'
 import type { LoadedSource } from './useTimeline'
 import { cn } from '@/lib/utils'
 
@@ -23,11 +23,15 @@ type Props = {
   time: number
   selectedClipId: string | null
   snap: boolean
+  markers: Marker[]
+  inPoint: number | null
+  outPoint: number | null
   onSeek: (t: number) => void
   onSelectClip: (id: string | null) => void
   onMoveClip: (clipId: string, trackId: string, start: number) => void
   onTrimClip: (clipId: string, edge: 'in' | 'out', deltaSec: number) => void
   onToggleMute: (trackId: string) => void
+  onRemoveMarker: (id: string) => void
 }
 
 export function Timeline({
@@ -37,11 +41,15 @@ export function Timeline({
   time,
   selectedClipId,
   snap,
+  markers,
+  inPoint,
+  outPoint,
   onSeek,
   onSelectClip,
   onMoveClip,
   onTrimClip,
   onToggleMute,
+  onRemoveMarker,
 }: Props) {
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -88,6 +96,32 @@ export function Timeline({
               <span className="ml-1 font-mono text-[10px] tabular-nums text-muted-foreground">{tcLabel(s)}</span>
             </div>
           ))}
+          {/* In/out range band */}
+          {(inPoint != null || outPoint != null) && (
+            <div
+              data-inout-band=""
+              className="pointer-events-none absolute top-0 h-full"
+              style={{
+                left: (inPoint ?? 0) * pxPerSec,
+                width: Math.max(0, (outPoint ?? total) - (inPoint ?? 0)) * pxPerSec,
+                backgroundColor: 'color-mix(in oklab, var(--nle-selection) 22%, transparent)',
+                borderLeft: inPoint != null ? '2px solid var(--nle-selection)' : undefined,
+                borderRight: outPoint != null ? '2px solid var(--nle-selection)' : undefined,
+              }}
+            />
+          )}
+          {/* Markers — click to seek, double-click to remove */}
+          {markers.map((m) => (
+            <div
+              key={m.id}
+              data-marker=""
+              className="absolute top-0 z-10 h-0 w-0 -translate-x-1/2 cursor-pointer border-l-[4px] border-r-[4px] border-t-[7px] border-l-transparent border-r-transparent"
+              style={{ left: m.time * pxPerSec, borderTopColor: '#f5c542' }}
+              onPointerDown={(e) => { e.stopPropagation(); onSeek(m.time) }}
+              onDoubleClick={(e) => { e.stopPropagation(); onRemoveMarker(m.id) }}
+              title={t('media.timeline.marker')}
+            />
+          ))}
           {/* Playhead — near-white line + downward triangle handle */}
           <div
             className="pointer-events-none absolute top-0 z-20 h-full w-px bg-[var(--nle-playhead)] shadow-[0_0_2px_rgba(0,0,0,0.9)]"
@@ -102,6 +136,19 @@ export function Timeline({
 
         {/* Tracks */}
         <div className="relative">
+          {/* In/out edge lines across tracks */}
+          {inPoint != null && (
+            <div
+              className="pointer-events-none absolute top-0 z-10 w-px"
+              style={{ left: inPoint * pxPerSec, height: project.tracks.length * TRACK_H, backgroundColor: 'var(--nle-selection)' }}
+            />
+          )}
+          {outPoint != null && (
+            <div
+              className="pointer-events-none absolute top-0 z-10 w-px"
+              style={{ left: outPoint * pxPerSec, height: project.tracks.length * TRACK_H, backgroundColor: 'var(--nle-selection)' }}
+            />
+          )}
           {/* Playhead line across tracks */}
           <div
             className="pointer-events-none absolute top-0 z-20 w-px bg-[var(--nle-playhead)] shadow-[0_0_2px_rgba(0,0,0,0.9)]"

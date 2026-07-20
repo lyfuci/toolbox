@@ -45,11 +45,18 @@ export type Track = {
   hidden?: boolean
 }
 
+export type Marker = {
+  id: string
+  time: number
+  label?: string
+}
+
 export type Project = {
   width: number
   height: number
   fps: number
   tracks: Track[]
+  markers?: Marker[]
 }
 
 export const clipDuration = (c: Clip): number => Math.max(0, c.sourceOut - c.sourceIn)
