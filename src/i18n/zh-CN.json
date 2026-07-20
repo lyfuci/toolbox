@@ -2015,7 +2015,10 @@
       "stepBack": "后退一帧（←）",
       "playPause": "播放 / 暂停（空格）",
       "stepFwd": "前进一帧（→）",
-      "end": "跳到结尾（End）"
+      "end": "跳到结尾（End）",
+      "loop": "循环播放",
+      "playRange": "仅播放入/出点区间",
+      "snapshot": "把当前帧保存为 PNG"
     },
     "shortcuts": {
       "title": "键盘快捷键",

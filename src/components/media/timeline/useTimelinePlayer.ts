@@ -12,7 +12,13 @@ import type { LoadedSource } from './useTimeline'
  * Media elements are created lazily per source and cached. The caller renders
  * the returned `mediaRefs` as hidden elements and the canvas.
  */
-export function useTimelinePlayer(project: Project, sources: Record<string, LoadedSource>) {
+export type PlayerOptions = { loop?: boolean; rangeStart?: number | null; rangeEnd?: number | null }
+
+export function useTimelinePlayer(
+  project: Project,
+  sources: Record<string, LoadedSource>,
+  opts: PlayerOptions = {},
+) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const mediaEls = useRef<Map<string, HTMLVideoElement | HTMLAudioElement>>(new Map())
   const [playing, setPlaying] = useState(false)
@@ -21,6 +27,12 @@ export function useTimelinePlayer(project: Project, sources: Record<string, Load
   const startWallRef = useRef(0)
   const startTimeRef = useRef(0)
   const duration = projectDuration(project)
+
+  // Latest loop/range options for the rAF tick to read without re-creating play.
+  const optsRef = useRef(opts)
+  useEffect(() => {
+    optsRef.current = opts
+  })
 
   // Mirror the latest playing/time into refs so async video frame callbacks
   // (which fire after a seek resolves) can repaint against current values
@@ -167,17 +179,35 @@ export function useTimelinePlayer(project: Project, sources: Record<string, Load
 
   const play = useCallback(() => {
     if (duration <= 0) return
+    const o = optsRef.current
+    const rStart = o.rangeStart ?? 0
+    const rEnd = o.rangeEnd ?? duration
+    if (rEnd <= rStart) return
     setPlaying(true)
+    // Begin at the current playhead if it's inside the (possibly in/out) range,
+    // otherwise from the range start.
+    const from = timeRef.current < rStart || timeRef.current >= rEnd ? rStart : timeRef.current
     startWallRef.current = performance.now()
-    startTimeRef.current = time >= duration ? 0 : time
-    if (time >= duration) setTime(0)
+    startTimeRef.current = from
+    if (from !== timeRef.current) setTime(from)
 
     const tick = () => {
+      const oo = optsRef.current
+      const end = oo.rangeEnd ?? duration
+      const start = oo.rangeStart ?? 0
       const elapsed = (performance.now() - startWallRef.current) / 1000
       const t = startTimeRef.current + elapsed
-      if (t >= duration) {
-        setTime(duration)
-        renderAt(duration, false)
+      if (t >= end) {
+        if (oo.loop && end > start) {
+          startTimeRef.current = start
+          startWallRef.current = performance.now()
+          setTime(start)
+          renderAt(start, true)
+          rafRef.current = requestAnimationFrame(tick)
+          return
+        }
+        setTime(end)
+        renderAt(end, false)
         setPlaying(false)
         for (const el of mediaEls.current.values()) el.pause()
         stopRaf()
@@ -188,7 +218,7 @@ export function useTimelinePlayer(project: Project, sources: Record<string, Load
       rafRef.current = requestAnimationFrame(tick)
     }
     rafRef.current = requestAnimationFrame(tick)
-  }, [duration, time, renderAt])
+  }, [duration, renderAt])
 
   // Repaint a still frame when paused and the project/time changes.
   useEffect(() => {

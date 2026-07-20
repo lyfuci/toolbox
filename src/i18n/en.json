@@ -2015,7 +2015,10 @@
       "stepBack": "Step back 1 frame (←)",
       "playPause": "Play / Pause (Space)",
       "stepFwd": "Step forward 1 frame (→)",
-      "end": "Go to end (End)"
+      "end": "Go to end (End)",
+      "loop": "Loop playback",
+      "playRange": "Play in/out range only",
+      "snapshot": "Save current frame as PNG"
     },
     "shortcuts": {
       "title": "Keyboard shortcuts",

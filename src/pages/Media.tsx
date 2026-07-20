@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   Loader2, Play, Pause, Download, Trash2, Plus, Film, Music, ZoomIn, ZoomOut, Wand2,
   ChevronFirst, ChevronLast, StepBack, StepForward, Maximize2, Minimize2, Keyboard,
-  Scissors, Magnet, Flag, X, Scan, Undo2, Redo2,
+  Scissors, Magnet, Flag, X, Scan, Undo2, Redo2, Repeat, Brackets, Camera,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -35,9 +35,14 @@ const EPS = 0.001
 export function MediaPage() {
   const { t } = useTranslation()
   const tl = useTimeline()
+  const [inPoint, setInPoint] = useState<number | null>(null)
+  const [outPoint, setOutPoint] = useState<number | null>(null)
+  const [loop, setLoop] = useState(false)
+  const [playRange, setPlayRange] = useState(false)
   const { canvasRef, playing, time, duration: playerDuration, play, pause, seek } = useTimelinePlayer(
     tl.project,
     tl.sources,
+    { loop, rangeStart: playRange ? inPoint : null, rangeEnd: playRange ? outPoint : null },
   )
   const [pxPerSec, setPxPerSec] = useState(40)
   const [exp, setExp] = useState<ExportState>({ kind: 'idle' })
@@ -47,8 +52,6 @@ export function MediaPage() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [focused, setFocused] = useState(false)
   const [snap, setSnap] = useState(true)
-  const [inPoint, setInPoint] = useState<number | null>(null)
-  const [outPoint, setOutPoint] = useState<number | null>(null)
   const [clipboard, setClipboard] = useState<
     | { data: { sourceId: string; sourceIn: number; sourceOut: number; volume?: number }; kind: 'video' | 'audio' }
     | null
@@ -104,6 +107,19 @@ export function MediaPage() {
         ? boundaries.find((b) => b > time + EPS)
         : [...boundaries].reverse().find((b) => b < time - EPS)
     if (next != null) seek(next)
+  }
+  const snapshot = () => {
+    const c = canvasRef.current
+    if (!c) return
+    c.toBlob((blob) => {
+      if (!blob) return
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `frame-${formatTC(time, fps).replace(/:/g, '-')}.png`
+      a.click()
+      URL.revokeObjectURL(url)
+    }, 'image/png')
   }
   const zoom = (dir: 1 | -1) => setPxPerSec((p) => Math.min(160, Math.max(10, p + dir * 10)))
   const zoomFit = () => {
@@ -358,6 +374,30 @@ export function MediaPage() {
                   <span className="text-muted-foreground"> / {formatTC(playerDuration, fps)}</span>
                 </span>
                 <div className="ml-auto flex items-center gap-0.5">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className={cn(loop && 'text-primary')}
+                    onClick={() => setLoop((v) => !v)}
+                    title={t('media.transport.loop')}
+                    aria-pressed={loop}
+                  >
+                    <Repeat className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className={cn(playRange && 'text-primary')}
+                    onClick={() => setPlayRange((v) => !v)}
+                    title={t('media.transport.playRange')}
+                    aria-pressed={playRange}
+                  >
+                    <Brackets className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={snapshot} title={t('media.transport.snapshot')}>
+                    <Camera className="h-4 w-4" />
+                  </Button>
+                  <div className="mx-1 h-4 w-px bg-border" />
                   <Button size="icon" variant="ghost" onClick={() => zoom(-1)} title={t('media.timeline.zoomOut')}>
                     <ZoomOut className="h-4 w-4" />
                   </Button>
