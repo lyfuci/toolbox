@@ -1,12 +1,15 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Volume2, VolumeX } from 'lucide-react'
-import { type Project, type Clip, type Track, clipDuration } from '@/lib/timeline/model'
+import { type Project, type Clip, type Track, clipDuration, clipEnd, snapStart } from '@/lib/timeline/model'
 import type { LoadedSource } from './useTimeline'
 import { cn } from '@/lib/utils'
 
 const TRACK_H = 60
 const RULER_H = 26
+// Pointer distance (px) within which a dragged clip edge clicks onto a snap
+// target (adjacent clip edges + the playhead).
+const SNAP_PX = 8
 
 // Compact ruler label — ticks land on whole seconds, so MM:SS reads cleaner
 // than a full HH:MM:SS:FF timecode (the transport readout carries the frames).
@@ -19,6 +22,7 @@ type Props = {
   pxPerSec: number
   time: number
   selectedClipId: string | null
+  snap: boolean
   onSeek: (t: number) => void
   onSelectClip: (id: string | null) => void
   onMoveClip: (clipId: string, trackId: string, start: number) => void
@@ -32,6 +36,7 @@ export function Timeline({
   pxPerSec,
   time,
   selectedClipId,
+  snap,
   onSeek,
   onSelectClip,
   onMoveClip,
@@ -42,6 +47,19 @@ export function Timeline({
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const total = Math.max(project.tracks.reduce((m, tr) => Math.max(m, tr.clips.reduce((mm, c) => Math.max(mm, c.timelineStart + clipDuration(c)), 0)), 0), 10)
   const width = total * pxPerSec
+
+  // Snap candidates: every clip edge + the playhead + 0. Captured per drag at
+  // pointer-down (the dragged clip excludes its own edges) so it stays stable.
+  const snapTargets = useMemo(() => {
+    const set = new Set<number>([0, time])
+    for (const tr of project.tracks) {
+      for (const c of tr.clips) {
+        set.add(c.timelineStart)
+        set.add(clipEnd(c))
+      }
+    }
+    return [...set]
+  }, [project, time])
 
   // Ruler ticks every second (label every 5s when dense).
   const ticks = []
@@ -96,6 +114,8 @@ export function Timeline({
               sources={sources}
               pxPerSec={pxPerSec}
               selectedClipId={selectedClipId}
+              snap={snap}
+              snapTargets={snapTargets}
               onSelectClip={onSelectClip}
               onMoveClip={onMoveClip}
               onTrimClip={onTrimClip}
@@ -114,6 +134,8 @@ function TrackRow({
   sources,
   pxPerSec,
   selectedClipId,
+  snap,
+  snapTargets,
   onSelectClip,
   onMoveClip,
   onTrimClip,
@@ -124,6 +146,8 @@ function TrackRow({
   sources: Record<string, LoadedSource>
   pxPerSec: number
   selectedClipId: string | null
+  snap: boolean
+  snapTargets: number[]
   onSelectClip: (id: string | null) => void
   onMoveClip: (clipId: string, trackId: string, start: number) => void
   onTrimClip: (clipId: string, edge: 'in' | 'out', deltaSec: number) => void
@@ -158,6 +182,8 @@ function TrackRow({
           name={sources[clip.sourceId]?.name ?? '?'}
           pxPerSec={pxPerSec}
           selected={clip.id === selectedClipId}
+          snap={snap}
+          snapTargets={snapTargets}
           onSelectClip={onSelectClip}
           onMoveClip={onMoveClip}
           onTrimClip={onTrimClip}
@@ -174,6 +200,8 @@ function TimelineClipView({
   name,
   pxPerSec,
   selected,
+  snap,
+  snapTargets,
   onSelectClip,
   onMoveClip,
   onTrimClip,
@@ -184,11 +212,13 @@ function TimelineClipView({
   name: string
   pxPerSec: number
   selected: boolean
+  snap: boolean
+  snapTargets: number[]
   onSelectClip: (id: string | null) => void
   onMoveClip: (clipId: string, trackId: string, start: number) => void
   onTrimClip: (clipId: string, edge: 'in' | 'out', deltaSec: number) => void
 }) {
-  const [drag, setDrag] = useState<null | { mode: 'move' | 'in' | 'out'; startX: number }>(null)
+  const [drag, setDrag] = useState<null | { mode: 'move' | 'in' | 'out'; startX: number; cands: number[] }>(null)
   const left = clip.timelineStart * pxPerSec
   const w = Math.max(8, clipDuration(clip) * pxPerSec)
 
@@ -196,14 +226,24 @@ function TimelineClipView({
     e.stopPropagation()
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
     onSelectClip(clip.id)
-    setDrag({ mode, startX: e.clientX })
+    // Capture snap candidates once, excluding this clip's own edges so it
+    // doesn't stick to where it started.
+    const cands =
+      mode === 'move' && snap
+        ? snapTargets.filter(
+            (x) => Math.abs(x - clip.timelineStart) > 1e-4 && Math.abs(x - clipEnd(clip)) > 1e-4,
+          )
+        : []
+    setDrag({ mode, startX: e.clientX, cands })
   }
   const onPointerMove = (e: ReactPointerEvent) => {
     if (!drag) return
     const dxSec = (e.clientX - drag.startX) / pxPerSec
     if (Math.abs(e.clientX - drag.startX) < 2) return
     if (drag.mode === 'move') {
-      onMoveClip(clip.id, trackId, Math.max(0, clip.timelineStart + dxSec))
+      let ns = clip.timelineStart + dxSec
+      if (drag.cands.length) ns = snapStart(ns, clipDuration(clip), drag.cands, SNAP_PX / pxPerSec)
+      onMoveClip(clip.id, trackId, Math.max(0, ns))
     } else {
       onTrimClip(clip.id, drag.mode, dxSec)
     }
@@ -216,6 +256,7 @@ function TimelineClipView({
 
   return (
     <div
+      data-clip-id={clip.id}
       className={cn(
         'absolute top-[7px] flex h-[46px] items-stretch overflow-hidden rounded-[2px] text-[11px] select-none',
         isVideo

@@ -22,6 +22,10 @@ export type MediaShortcutHandlers = {
   onGoStart: () => void
   onGoEnd: () => void
   onZoom: (dir: 1 | -1) => void
+  onSplit: () => void
+  onDelete: () => void
+  onRippleDelete: () => void
+  onToggleSnap: () => void
   onToggleFullscreen: () => void
   onExitFullscreen: () => void
   onToggleHelp: () => void
@@ -68,7 +72,15 @@ export function useMediaShortcuts(handlers: MediaShortcutHandlers) {
       }
 
       if (!h.enabled) return
-      // Leave Cmd/Ctrl/Alt combos to the browser/app for this phase.
+
+      // Cmd/Ctrl+B = split at playhead (DaVinci "Razor"). Handled before the
+      // blanket mod-combo drop below.
+      if (mod && !e.altKey && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault()
+        h.onSplit()
+        return
+      }
+      // Leave the remaining Cmd/Ctrl/Alt combos to the browser/app for now.
       if (mod || e.altKey) return
 
       switch (e.key) {
@@ -112,6 +124,22 @@ export function useMediaShortcuts(handlers: MediaShortcutHandlers) {
         case '_':
           e.preventDefault()
           h.onZoom(-1)
+          break
+        case 'b':
+        case 'B':
+          e.preventDefault()
+          h.onSplit()
+          break
+        case 'n':
+        case 'N':
+          e.preventDefault()
+          h.onToggleSnap()
+          break
+        case 'Delete':
+        case 'Backspace':
+          e.preventDefault()
+          if (e.shiftKey) h.onRippleDelete()
+          else h.onDelete()
           break
       }
     }

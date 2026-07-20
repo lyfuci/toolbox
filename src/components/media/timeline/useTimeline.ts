@@ -8,6 +8,8 @@ import {
   newId,
   appendClip,
   resolveDropStart,
+  splitClipAt,
+  rippleDeleteClip,
   clipDuration,
   projectDuration,
 } from '@/lib/timeline/model'
@@ -117,6 +119,37 @@ export function useTimeline() {
     setSelectedClipId((cur) => (cur === clipId ? null : cur))
   }, [])
 
+  // Blade every track's clip that straddles time `t` (DaVinci behaviour). Clips
+  // not under the playhead are left untouched; a cut on an edge is a no-op.
+  const splitAtPlayhead = useCallback((t: number) => {
+    setProject((p) => {
+      let changed = false
+      const tracks = p.tracks.map((tr) => {
+        const clips: Clip[] = []
+        for (const c of tr.clips) {
+          const parts = splitClipAt(c, t)
+          if (parts) {
+            clips.push(parts[0], parts[1])
+            changed = true
+          } else {
+            clips.push(c)
+          }
+        }
+        return changed ? { ...tr, clips } : tr
+      })
+      return changed ? { ...p, tracks } : p
+    })
+  }, [])
+
+  // Ripple delete — remove the clip and close the gap on its track.
+  const rippleRemoveClip = useCallback((clipId: string) => {
+    setProject((p) => ({
+      ...p,
+      tracks: p.tracks.map((t) => (t.clips.some((c) => c.id === clipId) ? rippleDeleteClip(t, clipId) : t)),
+    }))
+    setSelectedClipId((cur) => (cur === clipId ? null : cur))
+  }, [])
+
   const setClipVolume = useCallback((clipId: string, volume: number) => {
     setProject((p) => ({
       ...p,
@@ -154,6 +187,8 @@ export function useTimeline() {
     moveClip,
     trimClip,
     removeClip,
+    splitAtPlayhead,
+    rippleRemoveClip,
     setClipVolume,
     toggleTrackMute,
     addTrack,

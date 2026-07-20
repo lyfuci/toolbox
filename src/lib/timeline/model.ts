@@ -136,3 +136,62 @@ export function resolveDropStart(track: Track, moving: Clip, requestedStart: num
   }
   return start
 }
+
+const SPLIT_EPS = 1e-4
+
+/**
+ * Split a clip at timeline time `t` into [left, right] sharing the same source
+ * (left keeps the id, right gets a fresh one). Returns null if `t` isn't
+ * strictly inside the clip. Export-safe: two adjacent source windows render as
+ * two independent trims/overlays in export-graph.ts (clipEnd is exclusive, so
+ * the halves never overlap at the cut).
+ */
+export function splitClipAt(clip: Clip, t: number): [Clip, Clip] | null {
+  const start = clip.timelineStart
+  const end = clipEnd(clip)
+  if (t <= start + SPLIT_EPS || t >= end - SPLIT_EPS) return null
+  const srcSplit = clip.sourceIn + (t - start)
+  const left: Clip = { ...clip, sourceOut: srcSplit }
+  const right: Clip = { ...clip, id: newId('clip'), sourceIn: srcSplit, timelineStart: t }
+  return [left, right]
+}
+
+/**
+ * Remove a clip and pull every later clip on the same track left by its
+ * duration, closing the gap (DaVinci "ripple delete"). Pure; returns a new
+ * Track. No-op if the clip isn't on the track.
+ */
+export function rippleDeleteClip(track: Track, clipId: ClipId): Track {
+  const removed = track.clips.find((c) => c.id === clipId)
+  if (!removed) return track
+  const dur = clipDuration(removed)
+  const start = removed.timelineStart
+  const clips = track.clips
+    .filter((c) => c.id !== clipId)
+    .map((c) => (c.timelineStart >= start ? { ...c, timelineStart: Math.max(0, c.timelineStart - dur) } : c))
+  return { ...track, clips }
+}
+
+/**
+ * Snap a clip's proposed start so its leading OR trailing edge lands on the
+ * nearest `candidate` within `threshold` seconds. Returns the adjusted start
+ * (>= 0), unchanged if nothing is close. Pure — used by the drag math so a
+ * moved clip clicks onto the playhead / adjacent clip edges.
+ */
+export function snapStart(start: number, dur: number, candidates: number[], threshold: number): number {
+  let best = start
+  let bestDist = threshold
+  for (const cand of candidates) {
+    const dLead = Math.abs(start - cand)
+    if (dLead < bestDist) {
+      bestDist = dLead
+      best = cand
+    }
+    const dTrail = Math.abs(start + dur - cand)
+    if (dTrail < bestDist) {
+      bestDist = dTrail
+      best = cand - dur
+    }
+  }
+  return Math.max(0, best)
+}

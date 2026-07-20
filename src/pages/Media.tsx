@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   Loader2, Play, Pause, Download, Trash2, Plus, Film, Music, ZoomIn, ZoomOut, Wand2,
   ChevronFirst, ChevronLast, StepBack, StepForward, Maximize2, Minimize2, Keyboard,
+  Scissors, Magnet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -45,6 +46,7 @@ export function MediaPage() {
   const [quickOpen, setQuickOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [focused, setFocused] = useState(false)
+  const [snap, setSnap] = useState(true)
 
   useEffect(() => {
     return () => {
@@ -99,6 +101,15 @@ export function MediaPage() {
   const zoom = (dir: 1 | -1) => setPxPerSec((p) => Math.min(160, Math.max(10, p + dir * 10)))
   const togglePlay = () => (playing ? pause() : play())
 
+  // ── Editing ────────────────────────────────────────────────────────────
+  const splitAtPlayhead = () => tl.splitAtPlayhead(time)
+  const deleteSelected = () => {
+    if (tl.selectedClipId) tl.removeClip(tl.selectedClipId)
+  }
+  const rippleDeleteSelected = () => {
+    if (tl.selectedClipId) tl.rippleRemoveClip(tl.selectedClipId)
+  }
+
   useMediaShortcuts({
     enabled: hasContent,
     focused,
@@ -109,6 +120,10 @@ export function MediaPage() {
     onGoStart: goStart,
     onGoEnd: goEnd,
     onZoom: zoom,
+    onSplit: splitAtPlayhead,
+    onDelete: deleteSelected,
+    onRippleDelete: rippleDeleteSelected,
+    onToggleSnap: () => setSnap((v) => !v),
     onToggleFullscreen: () => setFocused((v) => !v),
     onExitFullscreen: () => setFocused(false),
     onToggleHelp: () => setShortcutsOpen((v) => !v),
@@ -335,14 +350,38 @@ export function MediaPage() {
             </div>
           </div>
 
-          {/* Timeline */}
-          <div className={cn(focused && 'shrink-0')}>
+          {/* Timeline toolbar + timeline */}
+          <div className={cn('space-y-1.5', focused && 'shrink-0')}>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={splitAtPlayhead}
+                title={t('media.timeline.split') + ' (B)'}
+              >
+                <Scissors className="mr-1 h-3.5 w-3.5" />
+                {t('media.timeline.split')}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className={cn('h-7 px-2 text-xs', snap ? 'text-primary' : 'text-muted-foreground')}
+                onClick={() => setSnap((v) => !v)}
+                title={t('media.timeline.snap') + ' (N)'}
+                aria-pressed={snap}
+              >
+                <Magnet className="mr-1 h-3.5 w-3.5" />
+                {t('media.timeline.snap')}
+              </Button>
+            </div>
             <Timeline
               project={tl.project}
               sources={tl.sources}
               pxPerSec={pxPerSec}
               time={time}
               selectedClipId={tl.selectedClipId}
+              snap={snap}
               onSeek={seek}
               onSelectClip={tl.setSelectedClipId}
               onMoveClip={tl.moveClip}

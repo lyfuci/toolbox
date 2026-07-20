@@ -2118,6 +2118,8 @@
       "addVideoTrack": "视频轨",
       "addAudioTrack": "音频轨",
       "muteTrack": "静音 / 取消静音",
+      "split": "切割",
+      "snap": "吸附",
       "zoomIn": "放大",
       "zoomOut": "缩小",
       "export": "导出视频",

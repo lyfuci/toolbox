@@ -2118,6 +2118,8 @@
       "addVideoTrack": "Video track",
       "addAudioTrack": "Audio track",
       "muteTrack": "Mute / unmute track",
+      "split": "Split",
+      "snap": "Snap",
       "zoomIn": "Zoom in",
       "zoomOut": "Zoom out",
       "export": "Export video",
