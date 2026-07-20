@@ -34,6 +34,8 @@ export type MediaShortcutHandlers = {
   onMarkClip: () => void
   onClearInOut: () => void
   onAddMarker: () => void
+  onUndo: () => void
+  onRedo: () => void
   onToggleFullscreen: () => void
   onExitFullscreen: () => void
   onToggleHelp: () => void
@@ -92,6 +94,13 @@ export function useMediaShortcuts(handlers: MediaShortcutHandlers) {
       if (e.altKey && !mod && (e.key === 'x' || e.key === 'X')) {
         e.preventDefault()
         h.onClearInOut()
+        return
+      }
+      // Cmd/Ctrl+Z = undo, Shift+Cmd/Ctrl+Z = redo.
+      if (mod && !e.altKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault()
+        if (e.shiftKey) h.onRedo()
+        else h.onUndo()
         return
       }
       // Leave the remaining Cmd/Ctrl/Alt combos to the browser/app for now.

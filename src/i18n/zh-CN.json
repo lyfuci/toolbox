@@ -2125,6 +2125,8 @@
       "addMarker": "加标记",
       "clearInOut": "清除入出点",
       "zoomFit": "缩放适配",
+      "undo": "撤销",
+      "redo": "重做",
       "marker": "标记 —— 单击跳转，双击删除",
       "zoomIn": "放大",
       "zoomOut": "缩小",

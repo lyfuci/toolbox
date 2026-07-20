@@ -2125,6 +2125,8 @@
       "addMarker": "Add marker",
       "clearInOut": "Clear in / out",
       "zoomFit": "Zoom to fit",
+      "undo": "Undo",
+      "redo": "Redo",
       "marker": "Marker — click to seek, double-click to remove",
       "zoomIn": "Zoom in",
       "zoomOut": "Zoom out",

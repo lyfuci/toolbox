@@ -32,6 +32,8 @@ type Props = {
   onTrimClip: (clipId: string, edge: 'in' | 'out', deltaSec: number) => void
   onToggleMute: (trackId: string) => void
   onRemoveMarker: (id: string) => void
+  onBeginInteraction: () => void
+  onEndInteraction: () => void
 }
 
 export function Timeline({
@@ -50,6 +52,8 @@ export function Timeline({
   onTrimClip,
   onToggleMute,
   onRemoveMarker,
+  onBeginInteraction,
+  onEndInteraction,
 }: Props) {
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -167,6 +171,8 @@ export function Timeline({
               onMoveClip={onMoveClip}
               onTrimClip={onTrimClip}
               onToggleMute={onToggleMute}
+              onBeginInteraction={onBeginInteraction}
+              onEndInteraction={onEndInteraction}
               muteLabel={t('media.timeline.muteTrack')}
             />
           ))}
@@ -187,6 +193,8 @@ function TrackRow({
   onMoveClip,
   onTrimClip,
   onToggleMute,
+  onBeginInteraction,
+  onEndInteraction,
   muteLabel,
 }: {
   track: Track
@@ -199,6 +207,8 @@ function TrackRow({
   onMoveClip: (clipId: string, trackId: string, start: number) => void
   onTrimClip: (clipId: string, edge: 'in' | 'out', deltaSec: number) => void
   onToggleMute: (trackId: string) => void
+  onBeginInteraction: () => void
+  onEndInteraction: () => void
   muteLabel: string
 }) {
   return (
@@ -234,6 +244,8 @@ function TrackRow({
           onSelectClip={onSelectClip}
           onMoveClip={onMoveClip}
           onTrimClip={onTrimClip}
+          onBeginInteraction={onBeginInteraction}
+          onEndInteraction={onEndInteraction}
         />
       ))}
     </div>
@@ -252,6 +264,8 @@ function TimelineClipView({
   onSelectClip,
   onMoveClip,
   onTrimClip,
+  onBeginInteraction,
+  onEndInteraction,
 }: {
   clip: Clip
   trackId: string
@@ -264,6 +278,8 @@ function TimelineClipView({
   onSelectClip: (id: string | null) => void
   onMoveClip: (clipId: string, trackId: string, start: number) => void
   onTrimClip: (clipId: string, edge: 'in' | 'out', deltaSec: number) => void
+  onBeginInteraction: () => void
+  onEndInteraction: () => void
 }) {
   const [drag, setDrag] = useState<null | { mode: 'move' | 'in' | 'out'; startX: number; cands: number[] }>(null)
   const left = clip.timelineStart * pxPerSec
@@ -273,6 +289,7 @@ function TimelineClipView({
     e.stopPropagation()
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
     onSelectClip(clip.id)
+    onBeginInteraction() // snapshot for one coalesced undo entry per drag
     // Capture snap candidates once, excluding this clip's own edges so it
     // doesn't stick to where it started.
     const cands =
@@ -297,7 +314,10 @@ function TimelineClipView({
     setDrag({ ...drag, startX: e.clientX })
   }
   const onPointerUp = (e: ReactPointerEvent) => {
-    if (drag) (e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
+    if (drag) {
+      ;(e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
+      onEndInteraction() // commit the coalesced entry (skips no-op drags)
+    }
     setDrag(null)
   }
 

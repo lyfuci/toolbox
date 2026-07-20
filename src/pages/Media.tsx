@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   Loader2, Play, Pause, Download, Trash2, Plus, Film, Music, ZoomIn, ZoomOut, Wand2,
   ChevronFirst, ChevronLast, StepBack, StepForward, Maximize2, Minimize2, Keyboard,
-  Scissors, Magnet, Flag, X, Scan,
+  Scissors, Magnet, Flag, X, Scan, Undo2, Redo2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -157,6 +157,8 @@ export function MediaPage() {
     onMarkClip: markClipUnderPlayhead,
     onClearInOut: clearInOut,
     onAddMarker: () => tl.addMarker(time),
+    onUndo: tl.undo,
+    onRedo: tl.redo,
     onToggleFullscreen: () => setFocused((v) => !v),
     onExitFullscreen: () => setFocused(false),
     onToggleHelp: () => setShortcutsOpen((v) => !v),
@@ -229,6 +231,16 @@ export function MediaPage() {
           {!focused && <p className="mt-1 text-sm text-muted-foreground">{t('media.description')}</p>}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {hasContent && (
+            <div className="flex items-center">
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={tl.undo} disabled={!tl.canUndo} title={t('media.timeline.undo') + ' (⌘Z)'}>
+                <Undo2 className="h-4 w-4" />
+              </Button>
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={tl.redo} disabled={!tl.canRedo} title={t('media.timeline.redo') + ' (⇧⌘Z)'}>
+                <Redo2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -369,6 +381,8 @@ export function MediaPage() {
                       max={2}
                       step={0.05}
                       value={selectedClip.volume ?? 1}
+                      onPointerDown={tl.beginInteraction}
+                      onPointerUp={tl.endInteraction}
                       onChange={(e) => tl.setClipVolume(selectedClip.id, Number(e.target.value))}
                       className="flex-1 accent-primary"
                     />
@@ -443,6 +457,8 @@ export function MediaPage() {
               onTrimClip={tl.trimClip}
               onToggleMute={tl.toggleTrackMute}
               onRemoveMarker={tl.removeMarker}
+              onBeginInteraction={tl.beginInteraction}
+              onEndInteraction={tl.endInteraction}
             />
           </div>
 
