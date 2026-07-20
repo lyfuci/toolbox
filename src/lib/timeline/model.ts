@@ -43,6 +43,13 @@ export type Track = {
   clips: Clip[]
   muted?: boolean
   hidden?: boolean
+  solo?: boolean
+  locked?: boolean
+}
+
+/** A track is audible if not muted and (nothing soloed, or it is soloed). */
+export function trackAudible(track: Track, anySolo: boolean): boolean {
+  return !track.muted && (!anySolo || !!track.solo)
 }
 
 export type Marker = {

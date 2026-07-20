@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Volume2, VolumeX } from 'lucide-react'
+import { Volume2, VolumeX, Lock, LockOpen, X } from 'lucide-react'
 import { type Project, type Clip, type Track, type Marker, clipDuration, clipEnd, snapStart } from '@/lib/timeline/model'
 import type { LoadedSource } from './useTimeline'
 import { WaveformClip } from './WaveformClip'
@@ -32,6 +32,9 @@ type Props = {
   onMoveClip: (clipId: string, trackId: string, start: number) => void
   onTrimClip: (clipId: string, edge: 'in' | 'out', deltaSec: number) => void
   onToggleMute: (trackId: string) => void
+  onToggleSolo: (trackId: string) => void
+  onToggleLock: (trackId: string) => void
+  onRemoveTrack: (trackId: string) => void
   onRemoveMarker: (id: string) => void
   onBeginInteraction: () => void
   onEndInteraction: () => void
@@ -52,6 +55,9 @@ export function Timeline({
   onMoveClip,
   onTrimClip,
   onToggleMute,
+  onToggleSolo,
+  onToggleLock,
+  onRemoveTrack,
   onRemoveMarker,
   onBeginInteraction,
   onEndInteraction,
@@ -172,9 +178,12 @@ export function Timeline({
               onMoveClip={onMoveClip}
               onTrimClip={onTrimClip}
               onToggleMute={onToggleMute}
+              onToggleSolo={onToggleSolo}
+              onToggleLock={onToggleLock}
+              onRemoveTrack={onRemoveTrack}
               onBeginInteraction={onBeginInteraction}
               onEndInteraction={onEndInteraction}
-              muteLabel={t('media.timeline.muteTrack')}
+              canRemove={project.tracks.length > 1}
             />
           ))}
         </div>
@@ -194,9 +203,12 @@ function TrackRow({
   onMoveClip,
   onTrimClip,
   onToggleMute,
+  onToggleSolo,
+  onToggleLock,
+  onRemoveTrack,
   onBeginInteraction,
   onEndInteraction,
-  muteLabel,
+  canRemove,
 }: {
   track: Track
   sources: Record<string, LoadedSource>
@@ -208,28 +220,42 @@ function TrackRow({
   onMoveClip: (clipId: string, trackId: string, start: number) => void
   onTrimClip: (clipId: string, edge: 'in' | 'out', deltaSec: number) => void
   onToggleMute: (trackId: string) => void
+  onToggleSolo: (trackId: string) => void
+  onToggleLock: (trackId: string) => void
+  onRemoveTrack: (trackId: string) => void
   onBeginInteraction: () => void
   onEndInteraction: () => void
-  muteLabel: string
+  canRemove: boolean
 }) {
+  const { t } = useTranslation()
   return (
     <div
+      data-track-id={track.id}
+      data-track-locked={track.locked ? '1' : '0'}
       className="relative border-b border-border/60"
       style={{ height: TRACK_H }}
       onPointerDown={(e) => {
         if (e.target === e.currentTarget) onSelectClip(null)
       }}
     >
-      {/* Track label / mute */}
-      <button
-        type="button"
-        onClick={() => onToggleMute(track.id)}
-        title={muteLabel}
-        className="absolute left-1 top-1 z-10 flex h-4 items-center gap-1 rounded-[2px] bg-black/55 px-1 font-mono text-[10px] text-white/70 hover:text-white"
-      >
-        {track.muted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
-        {track.kind === 'video' ? 'V' : 'A'}
-      </button>
+      {/* Track header cluster: kind badge + mute / solo / lock / remove */}
+      <div className="absolute left-1 top-1 z-20 flex h-4 items-center gap-1 rounded-[2px] bg-black/65 px-1 font-mono text-[10px] text-white/70">
+        <span className="text-white/90">{track.kind === 'video' ? 'V' : 'A'}</span>
+        <button type="button" onClick={() => onToggleMute(track.id)} title={t('media.timeline.muteTrack')} className={cn('hover:text-white', track.muted && 'text-red-400')}>
+          {track.muted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
+        </button>
+        <button type="button" onClick={() => onToggleSolo(track.id)} title={t('media.timeline.solo')} className={cn('w-3 text-center font-semibold hover:text-white', track.solo ? 'text-amber-400' : '')}>
+          S
+        </button>
+        <button type="button" onClick={() => onToggleLock(track.id)} title={t(track.locked ? 'media.timeline.unlock' : 'media.timeline.lock')} className={cn('hover:text-white', track.locked && 'text-sky-300')}>
+          {track.locked ? <Lock className="h-3 w-3" /> : <LockOpen className="h-3 w-3" />}
+        </button>
+        {canRemove && (
+          <button type="button" onClick={() => onRemoveTrack(track.id)} title={t('media.timeline.removeTrack')} className="hover:text-red-400">
+            <X className="h-3 w-3" />
+          </button>
+        )}
+      </div>
 
       {track.clips.map((clip) => (
         <TimelineClipView
@@ -237,6 +263,7 @@ function TrackRow({
           clip={clip}
           trackId={track.id}
           isVideo={track.kind === 'video'}
+          locked={!!track.locked}
           name={sources[clip.sourceId]?.name ?? '?'}
           source={sources[clip.sourceId]}
           pxPerSec={pxPerSec}
@@ -258,6 +285,7 @@ function TimelineClipView({
   clip,
   trackId,
   isVideo,
+  locked,
   name,
   source,
   pxPerSec,
@@ -273,6 +301,7 @@ function TimelineClipView({
   clip: Clip
   trackId: string
   isVideo: boolean
+  locked: boolean
   name: string
   source?: LoadedSource
   pxPerSec: number
@@ -290,6 +319,7 @@ function TimelineClipView({
   const w = Math.max(8, clipDuration(clip) * pxPerSec)
 
   const onPointerDown = (mode: 'move' | 'in' | 'out') => (e: ReactPointerEvent) => {
+    if (locked) return // locked track — no select/move/trim
     e.stopPropagation()
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
     onSelectClip(clip.id)
@@ -334,6 +364,7 @@ function TimelineClipView({
           ? 'bg-[var(--nle-clip-video)] shadow-[inset_0_1px_0_var(--nle-clip-video-top)]'
           : 'bg-[var(--nle-clip-audio)] shadow-[inset_0_1px_0_var(--nle-clip-audio-top)]',
         selected ? 'ring-2 ring-[var(--nle-selection)]' : 'ring-1 ring-black/30',
+        locked && 'opacity-55',
       )}
       style={{ left, width: w }}
       onPointerMove={onPointerMove}

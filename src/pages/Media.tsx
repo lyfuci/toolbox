@@ -492,6 +492,9 @@ export function MediaPage() {
               onMoveClip={tl.moveClip}
               onTrimClip={tl.trimClip}
               onToggleMute={tl.toggleTrackMute}
+              onToggleSolo={tl.toggleTrackSolo}
+              onToggleLock={tl.toggleTrackLock}
+              onRemoveTrack={tl.removeTrack}
               onRemoveMarker={tl.removeMarker}
               onBeginInteraction={tl.beginInteraction}
               onEndInteraction={tl.endInteraction}

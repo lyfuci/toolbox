@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { type Project, clipAt, timelineToSource, projectDuration } from '@/lib/timeline/model'
+import { type Project, clipAt, timelineToSource, projectDuration, trackAudible } from '@/lib/timeline/model'
 import type { LoadedSource } from './useTimeline'
 
 /**
@@ -87,6 +87,7 @@ export function useTimelinePlayer(project: Project, sources: Record<string, Load
 
       // Track which source elements should be audibly playing this frame.
       const activeAudio = new Set<string>()
+      const anySolo = project.tracks.some((tr) => tr.solo)
 
       for (const track of project.tracks) {
         const clip = clipAt(track, t)
@@ -119,7 +120,7 @@ export function useTimelinePlayer(project: Project, sources: Record<string, Load
         }
 
         // Audio (from audio clips, and video clips that carry audio).
-        if (src.hasAudio && !track.muted) {
+        if (src.hasAudio && trackAudible(track, anySolo)) {
           activeAudio.add(clip.sourceId)
           el.volume = Math.max(0, Math.min(1, clip.volume ?? 1))
           if (isPlaying) {

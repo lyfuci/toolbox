@@ -224,6 +224,7 @@ export function useTimeline() {
       commit((p) => {
         let changed = false
         const tracks = p.tracks.map((tr) => {
+          if (tr.locked) return tr // locked tracks aren't bladed
           const clips: Clip[] = []
           for (const c of tr.clips) {
             const parts = splitClipAt(c, t)
@@ -350,6 +351,33 @@ export function useTimeline() {
     [commit],
   )
 
+  const toggleTrackSolo = useCallback(
+    (trackId: string) => {
+      commit((p) => ({
+        ...p,
+        tracks: p.tracks.map((t) => (t.id === trackId ? { ...t, solo: !t.solo } : t)),
+      }))
+    },
+    [commit],
+  )
+
+  const toggleTrackLock = useCallback(
+    (trackId: string) => {
+      commit((p) => ({
+        ...p,
+        tracks: p.tracks.map((t) => (t.id === trackId ? { ...t, locked: !t.locked } : t)),
+      }))
+    },
+    [commit],
+  )
+
+  const removeTrack = useCallback(
+    (trackId: string) => {
+      commit((p) => (p.tracks.length <= 1 ? p : { ...p, tracks: p.tracks.filter((t) => t.id !== trackId) }))
+    },
+    [commit],
+  )
+
   const addTrack = useCallback(
     (kind: Track['kind']) => {
       commit((p) => ({ ...p, tracks: [...p.tracks, { id: newId('trk'), kind, clips: [] }] }))
@@ -395,6 +423,9 @@ export function useTimeline() {
     insertClip,
     setClipVolume,
     toggleTrackMute,
+    toggleTrackSolo,
+    toggleTrackLock,
+    removeTrack,
     addTrack,
     addMarker,
     removeMarker,
