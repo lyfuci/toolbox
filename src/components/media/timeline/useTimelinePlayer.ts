@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { type Project, clipAt, timelineToSource, projectDuration, trackAudible } from '@/lib/timeline/model'
+import { type Project, clipAt, timelineToSource, projectDuration, trackAudible, fadeFactor } from '@/lib/timeline/model'
 import type { LoadedSource } from './useTimeline'
 
 /**
@@ -123,18 +123,20 @@ export function useTimelinePlayer(
             const scale = Math.min(canvas.width / vw, canvas.height / vh)
             const dw = vw * scale
             const dh = vh * scale
+            ctx.globalAlpha = fadeFactor(clip, t) // fade to/from the black canvas
             try {
               ctx.drawImage(v, (canvas.width - dw) / 2, (canvas.height - dh) / 2, dw, dh)
             } catch {
               /* not yet decodable */
             }
+            ctx.globalAlpha = 1
           }
         }
 
         // Audio (from audio clips, and video clips that carry audio).
         if (src.hasAudio && trackAudible(track, anySolo)) {
           activeAudio.add(clip.sourceId)
-          el.volume = Math.max(0, Math.min(1, clip.volume ?? 1))
+          el.volume = Math.max(0, Math.min(1, (clip.volume ?? 1) * fadeFactor(clip, t)))
           if (isPlaying) {
             if (Math.abs(el.currentTime - srcTime) > 0.25) el.currentTime = srcTime
             if (el.paused) el.play().catch(() => {})

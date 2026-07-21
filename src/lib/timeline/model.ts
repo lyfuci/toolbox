@@ -33,6 +33,23 @@ export type Clip = {
   sourceOut: number
   /** Linear gain for audio of this clip (1 = unchanged). */
   volume?: number
+  /** Fade-in / fade-out durations in seconds (video → from/to black; audio → gain ramp). */
+  fadeIn?: number
+  fadeOut?: number
+}
+
+/** Fade multiplier in [0,1] for a clip at timeline time `t` (1 = no fade here). */
+export function fadeFactor(clip: Clip, t: number): number {
+  const start = clip.timelineStart
+  const end = clipEnd(clip)
+  let f = 1
+  if (clip.fadeIn && clip.fadeIn > 0 && t < start + clip.fadeIn) {
+    f = Math.min(f, Math.max(0, (t - start) / clip.fadeIn))
+  }
+  if (clip.fadeOut && clip.fadeOut > 0 && t > end - clip.fadeOut) {
+    f = Math.min(f, Math.max(0, (end - t) / clip.fadeOut))
+  }
+  return f
 }
 
 export type TrackKind = 'video' | 'audio'

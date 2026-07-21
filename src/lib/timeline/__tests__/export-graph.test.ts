@@ -127,3 +127,44 @@ describe('buildTimelineExport — bounds', () => {
     expect(args[ti + 1]).toBe('4.000')
   })
 })
+
+describe('buildTimelineExport — fades + range (batch F)', () => {
+  it('adds video + audio fade filters when a clip has fadeIn/fadeOut', () => {
+    const p = baseProject([
+      {
+        id: 'v',
+        kind: 'video',
+        clips: [{ id: 'c1', sourceId: 'A', timelineStart: 0, sourceIn: 0, sourceOut: 10, fadeIn: 1, fadeOut: 1 }],
+      },
+    ])
+    const { filterComplex } = buildTimelineExport(p, [{ sourceId: 'A', name: 'a.mp4' }], { output: 'out.mp4' })
+    expect(filterComplex).toContain('fade=t=in:st=0.000:d=1.000')
+    expect(filterComplex).toContain('fade=t=out:st=9.000:d=1.000')
+    expect(filterComplex).toContain('afade=t=in:st=0.000:d=1.000')
+    expect(filterComplex).toContain('afade=t=out:st=9.000:d=1.000')
+  })
+
+  it('trims the output to the in/out range via output-side -ss/-t', () => {
+    const p = baseProject([
+      { id: 'v', kind: 'video', clips: [{ id: 'c1', sourceId: 'A', timelineStart: 0, sourceIn: 0, sourceOut: 10 }] },
+    ])
+    const { args } = buildTimelineExport(p, [{ sourceId: 'A', name: 'a.mp4', hasAudio: false }], {
+      output: 'out.mp4',
+      rangeStart: 2,
+      rangeEnd: 5,
+    })
+    const i = args.indexOf('-ss')
+    expect(i).toBeGreaterThan(-1)
+    expect(args[i + 1]).toBe('2.000')
+    expect(args[args.indexOf('-t') + 1]).toBe('3.000')
+  })
+
+  it('bounds the whole timeline when no range is given', () => {
+    const p = baseProject([
+      { id: 'v', kind: 'video', clips: [{ id: 'c1', sourceId: 'A', timelineStart: 0, sourceIn: 0, sourceOut: 4 }] },
+    ])
+    const { args } = buildTimelineExport(p, [{ sourceId: 'A', name: 'a.mp4', hasAudio: false }], { output: 'out.mp4' })
+    expect(args).not.toContain('-ss')
+    expect(args[args.indexOf('-t') + 1]).toBe('4.000')
+  })
+})

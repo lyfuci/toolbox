@@ -242,6 +242,7 @@ export function MediaPage() {
         {
           crf,
           preset: 'veryfast',
+          ...(exportRange ? { rangeStart: inPoint!, rangeEnd: outPoint! } : {}),
           onProgress: (r) => setExp({ kind: 'exporting', progress: r }),
           onLog: (l) => console.info('[ffmpeg]', l.message),
         },
@@ -265,6 +266,7 @@ export function MediaPage() {
   }, [tl.project, tl.selectedClipId])
 
   const busy = exp.kind !== 'idle'
+  const exportRange = inPoint != null && outPoint != null && outPoint > inPoint
 
   // Blur transport buttons after click so a following Space hits the global
   // play/pause handler instead of re-activating the focused button.
@@ -519,6 +521,26 @@ export function MediaPage() {
                     />
                     <span className="w-8 text-right font-mono text-xs">{((selectedClip.volume ?? 1) * 100).toFixed(0)}%</span>
                   </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground">{t('media.timeline.fadeIn')}</Label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      value={selectedClip.fadeIn ?? 0}
+                      onChange={(e) => tl.setClipFade(selectedClip.id, 'in', Number(e.target.value))}
+                      className="h-7 w-16 rounded border border-input bg-transparent px-1 font-mono text-xs"
+                    />
+                    <Label className="ml-1 text-xs text-muted-foreground">{t('media.timeline.fadeOut')}</Label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      value={selectedClip.fadeOut ?? 0}
+                      onChange={(e) => tl.setClipFade(selectedClip.id, 'out', Number(e.target.value))}
+                      className="h-7 w-16 rounded border border-input bg-transparent px-1 font-mono text-xs"
+                    />
+                  </div>
                   <Button size="sm" variant="ghost" className="mt-2 text-destructive" onClick={() => tl.removeClip(selectedClip.id)}>
                     <Trash2 className="mr-1 h-3.5 w-3.5" />
                     {t('media.timeline.deleteClip')}
@@ -632,9 +654,9 @@ export function MediaPage() {
               <Label className="text-xs text-muted-foreground">{t('media.crf')}</Label>
               <input type="range" min={18} max={32} value={crf} onChange={(e) => setCrf(Number(e.target.value))} className="w-28 accent-primary" disabled={busy} />
               <span className="w-6 font-mono text-xs">{crf}</span>
-              <Button onClick={doExport} disabled={busy}>
+              <Button onClick={doExport} disabled={busy} title={exportRange ? t('media.timeline.exportRangeHint') : undefined}>
                 {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
-                {t('media.timeline.export')}
+                {exportRange ? t('media.timeline.exportRange') : t('media.timeline.export')}
               </Button>
             </div>
           </div>

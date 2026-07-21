@@ -15,6 +15,8 @@ export async function runTimelineExport(
   opts: {
     crf?: number
     preset?: string
+    rangeStart?: number
+    rangeEnd?: number
     onProgress?: (r: number) => void
     onLog?: (line: { type: string; message: string }) => void
   } = {},
@@ -31,7 +33,7 @@ export async function runTimelineExport(
   const { args } = buildTimelineExport(
     project,
     inputFiles.map((f) => ({ sourceId: f.sourceId, name: f.name, hasAudio: f.hasAudio, hasVideo: f.hasVideo })),
-    { output, crf: opts.crf, preset: opts.preset },
+    { output, crf: opts.crf, preset: opts.preset, rangeStart: opts.rangeStart, rangeEnd: opts.rangeEnd },
   )
 
   const ff = await getFFmpeg()

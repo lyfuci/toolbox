@@ -2137,6 +2137,8 @@
       "rippleDelete": "波纹删除",
       "split": "切割",
       "snap": "吸附",
+      "fadeIn": "淡入",
+      "fadeOut": "淡出",
       "markIn": "标入点",
       "markOut": "标出点",
       "addMarker": "加标记",
@@ -2148,6 +2150,8 @@
       "zoomIn": "放大",
       "zoomOut": "缩小",
       "export": "导出视频",
+      "exportRange": "导出区间",
+      "exportRangeHint": "仅导出标记的入/出点区间",
       "exporting": "导出中… {{percent}}%",
       "errNotMedia": "{{name}} 不是音视频文件。",
       "errEmpty": "请先往时间线添加一个片段。"

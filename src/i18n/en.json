@@ -2137,6 +2137,8 @@
       "rippleDelete": "Ripple delete",
       "split": "Split",
       "snap": "Snap",
+      "fadeIn": "Fade in",
+      "fadeOut": "Fade out",
       "markIn": "Mark In",
       "markOut": "Mark Out",
       "addMarker": "Add marker",
@@ -2148,6 +2150,8 @@
       "zoomIn": "Zoom in",
       "zoomOut": "Zoom out",
       "export": "Export video",
+      "exportRange": "Export range",
+      "exportRangeHint": "Only the marked in/out range will be exported",
       "exporting": "Exporting… {{percent}}%",
       "errNotMedia": "{{name}} is not an audio/video file.",
       "errEmpty": "Add a clip to the timeline first."

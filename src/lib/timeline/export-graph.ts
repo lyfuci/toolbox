@@ -31,6 +31,9 @@ export type ExportOptions = {
   crf?: number
   preset?: string
   audioBitrateK?: number
+  /** Export only this timeline range (in/out); defaults to the whole timeline. */
+  rangeStart?: number
+  rangeEnd?: number
 }
 
 const f3 = (n: number) => n.toFixed(3)
@@ -75,11 +78,15 @@ export function buildTimelineExport(
       const vlabel = `v${vSeq}`
       const start = clip.timelineStart
       const end = clipEnd(clip)
-      // trim source window → reset PTS → shift to timelineStart → scale+pad.
+      // Fades go to/from black (base canvas is black); st is in the shifted PTS.
+      let fadeV = ''
+      if (clip.fadeIn && clip.fadeIn > 0) fadeV += `,fade=t=in:st=${f3(start)}:d=${f3(clip.fadeIn)}`
+      if (clip.fadeOut && clip.fadeOut > 0) fadeV += `,fade=t=out:st=${f3(end - clip.fadeOut)}:d=${f3(clip.fadeOut)}`
+      // trim source window → reset PTS → shift to timelineStart → scale+pad → fade.
       videoChains.push(
         `[${idx}:v]trim=${f3(clip.sourceIn)}:${f3(clip.sourceOut)},setpts=PTS-STARTPTS+${f3(start)}/TB,` +
           `scale=${W}:${H}:force_original_aspect_ratio=decrease,` +
-          `pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1[${vlabel}]`,
+          `pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1${fadeV}[${vlabel}]`,
       )
       const outLabel = `ov${vSeq}`
       videoChains.push(
@@ -111,9 +118,14 @@ export function buildTimelineExport(
     const delayMs = Math.round(clip.timelineStart * 1000)
     const vol = clip.volume ?? 1
     const label = `a${aSeq}`
+    const start = clip.timelineStart
+    const end = clipEnd(clip)
+    let fadeA = ''
+    if (clip.fadeIn && clip.fadeIn > 0) fadeA += `,afade=t=in:st=${f3(start)}:d=${f3(clip.fadeIn)}`
+    if (clip.fadeOut && clip.fadeOut > 0) fadeA += `,afade=t=out:st=${f3(end - clip.fadeOut)}:d=${f3(clip.fadeOut)}`
     chains.push(
       `[${idx}:a]atrim=${f3(clip.sourceIn)}:${f3(clip.sourceOut)},asetpts=PTS-STARTPTS,` +
-        `adelay=${delayMs}|${delayMs},volume=${vol}[${label}]`,
+        `adelay=${delayMs}|${delayMs},volume=${vol}${fadeA}[${label}]`,
     )
     audioLabels.push(`[${label}]`)
     aSeq++
@@ -157,7 +169,14 @@ export function buildTimelineExport(
   if (hasAudio) {
     args.push('-c:a', 'aac', '-b:a', `${opts.audioBitrateK ?? 192}k`)
   }
-  // Bound the output to the timeline length.
-  args.push('-t', f3(Math.max(total, 0.04)), '-movflags', '+faststart', opts.output)
+  // Bound the output: either the marked in/out range, or the whole timeline.
+  const { rangeStart: rs, rangeEnd: re } = opts
+  if (rs != null && re != null && re > rs) {
+    // Output-side seek trims the composited stream to [in, out].
+    args.push('-ss', f3(rs), '-t', f3(re - rs))
+  } else {
+    args.push('-t', f3(Math.max(total, 0.04)))
+  }
+  args.push('-movflags', '+faststart', opts.output)
   return { args, filterComplex, hasAudio, hasVideo }
 }

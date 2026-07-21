@@ -394,6 +394,20 @@ export function useTimeline() {
     [transient],
   )
 
+  const setClipFade = useCallback(
+    (clipId: string, edge: 'in' | 'out', seconds: number) => {
+      const key = edge === 'in' ? 'fadeIn' : 'fadeOut'
+      commit((p) => ({
+        ...p,
+        tracks: p.tracks.map((t) => ({
+          ...t,
+          clips: t.clips.map((c) => (c.id === clipId ? { ...c, [key]: Math.max(0, seconds) } : c)),
+        })),
+      }))
+    },
+    [commit],
+  )
+
   const toggleTrackMute = useCallback(
     (trackId: string) => {
       commit((p) => ({
@@ -486,6 +500,7 @@ export function useTimeline() {
     duplicateClip,
     insertClip,
     setClipVolume,
+    setClipFade,
     toggleTrackMute,
     toggleTrackSolo,
     toggleTrackLock,
