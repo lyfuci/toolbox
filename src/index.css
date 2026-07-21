@@ -163,3 +163,23 @@
 .markdown-preview img {
   max-width: 100%;
 }
+
+/* ── Media editor ("NLE") — DaVinci-inspired dark surface tokens ───────────
+   Scoped to the [data-nle] root on the Media page so the pro-dark timeline
+   look never leaks into the rest of the toolbox theme. Referenced from
+   Timeline.tsx via arbitrary values, e.g. bg-[var(--nle-timeline)]. Values
+   lean slightly bluer than zinc's neutral surfaces to read as a video editor.
+   The whole layer is a handful of surfaces zinc can't express: a red
+   selection, muted blue/green clips with a lighter top bevel, a near-white
+   triangle playhead, and a darker timeline "well". */
+[data-nle] {
+  --nle-timeline: oklch(0.17 0.012 250);
+  --nle-ruler: oklch(0.21 0.014 250);
+  --nle-selection: oklch(0.64 0.21 25);
+  --nle-clip-video: oklch(0.52 0.07 245);
+  --nle-clip-video-top: oklch(0.62 0.07 245);
+  --nle-clip-audio: oklch(0.5 0.08 155);
+  --nle-clip-audio-top: oklch(0.6 0.08 155);
+  --nle-playhead: oklch(0.99 0 0);
+  --nle-waveform: oklch(0.82 0.13 155);
+}

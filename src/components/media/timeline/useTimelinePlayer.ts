@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { type Project, clipAt, timelineToSource, projectDuration } from '@/lib/timeline/model'
+import { type Project, clipAt, timelineToSource, projectDuration, trackAudible, fadeFactor, clipSpeed } from '@/lib/timeline/model'
 import type { LoadedSource } from './useTimeline'
 
 /**
@@ -12,7 +12,13 @@ import type { LoadedSource } from './useTimeline'
  * Media elements are created lazily per source and cached. The caller renders
  * the returned `mediaRefs` as hidden elements and the canvas.
  */
-export function useTimelinePlayer(project: Project, sources: Record<string, LoadedSource>) {
+export type PlayerOptions = { loop?: boolean; rangeStart?: number | null; rangeEnd?: number | null }
+
+export function useTimelinePlayer(
+  project: Project,
+  sources: Record<string, LoadedSource>,
+  opts: PlayerOptions = {},
+) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const mediaEls = useRef<Map<string, HTMLVideoElement | HTMLAudioElement>>(new Map())
   const [playing, setPlaying] = useState(false)
@@ -21,6 +27,26 @@ export function useTimelinePlayer(project: Project, sources: Record<string, Load
   const startWallRef = useRef(0)
   const startTimeRef = useRef(0)
   const duration = projectDuration(project)
+
+  // Latest loop/range options for the rAF tick to read without re-creating play.
+  const optsRef = useRef(opts)
+  useEffect(() => {
+    optsRef.current = opts
+  })
+
+  // Mirror the latest playing/time into refs so async video frame callbacks
+  // (which fire after a seek resolves) can repaint against current values
+  // without being torn down/recreated. `renderAtRef` breaks the chicken-and-egg
+  // of a repaint callback that needs to call the very function defining it.
+  const playingRef = useRef(playing)
+  const timeRef = useRef(time)
+  const renderAtRef = useRef<(t: number, isPlaying: boolean) => void>(() => {})
+  useEffect(() => {
+    playingRef.current = playing
+  }, [playing])
+  useEffect(() => {
+    timeRef.current = time
+  }, [time])
 
   const getEl = useCallback(
     (sourceId: string): HTMLVideoElement | HTMLAudioElement | null => {
@@ -40,6 +66,27 @@ export function useTimelinePlayer(project: Project, sources: Record<string, Load
     [sources],
   )
 
+  // Setting video.currentTime is ASYNC — the decoded frame isn't ready in the
+  // same tick, so a paused single-frame step would otherwise paint the previous
+  // frame (and disagree with the timecode readout). Schedule ONE repaint once
+  // the frame actually lands, keyed to the latest time (not a captured one) so
+  // rapid steps converge instead of bouncing back. Deduped per element.
+  const scheduleRepaint = useCallback((v: HTMLVideoElement) => {
+    type VEl = HTMLVideoElement & {
+      __repaintPending?: boolean
+      requestVideoFrameCallback?: (cb: () => void) => number
+    }
+    const vv = v as VEl
+    if (vv.__repaintPending) return
+    vv.__repaintPending = true
+    const run = () => {
+      vv.__repaintPending = false
+      if (!playingRef.current) renderAtRef.current(timeRef.current, false)
+    }
+    if (typeof vv.requestVideoFrameCallback === 'function') vv.requestVideoFrameCallback(run)
+    else v.addEventListener('seeked', run, { once: true })
+  }, [])
+
   // Paint the active video frame for time t and sync audio elements.
   const renderAt = useCallback(
     (t: number, isPlaying: boolean) => {
@@ -52,6 +99,7 @@ export function useTimelinePlayer(project: Project, sources: Record<string, Load
 
       // Track which source elements should be audibly playing this frame.
       const activeAudio = new Set<string>()
+      const anySolo = project.tracks.some((tr) => tr.solo)
 
       for (const track of project.tracks) {
         const clip = clipAt(track, t)
@@ -60,11 +108,15 @@ export function useTimelinePlayer(project: Project, sources: Record<string, Load
         if (!src) continue
         const el = getEl(clip.sourceId)
         if (!el) continue
+        el.playbackRate = clipSpeed(clip)
         const srcTime = timelineToSource(clip, t)
 
         if (track.kind === 'video' && src.hasVideo && canvas && ctx) {
           const v = el as HTMLVideoElement
-          if (!isPlaying && Math.abs(v.currentTime - srcTime) > 0.05) v.currentTime = srcTime
+          if (!isPlaying && Math.abs(v.currentTime - srcTime) > 0.05) {
+            v.currentTime = srcTime
+            scheduleRepaint(v)
+          }
           // Letterbox-fit draw.
           const vw = v.videoWidth || src.width || canvas.width
           const vh = v.videoHeight || src.height || canvas.height
@@ -72,18 +124,20 @@ export function useTimelinePlayer(project: Project, sources: Record<string, Load
             const scale = Math.min(canvas.width / vw, canvas.height / vh)
             const dw = vw * scale
             const dh = vh * scale
+            ctx.globalAlpha = fadeFactor(clip, t) // fade to/from the black canvas
             try {
               ctx.drawImage(v, (canvas.width - dw) / 2, (canvas.height - dh) / 2, dw, dh)
             } catch {
               /* not yet decodable */
             }
+            ctx.globalAlpha = 1
           }
         }
 
         // Audio (from audio clips, and video clips that carry audio).
-        if (src.hasAudio && !track.muted) {
+        if (src.hasAudio && trackAudible(track, anySolo)) {
           activeAudio.add(clip.sourceId)
-          el.volume = Math.max(0, Math.min(1, clip.volume ?? 1))
+          el.volume = Math.max(0, Math.min(1, (clip.volume ?? 1) * fadeFactor(clip, t)))
           if (isPlaying) {
             if (Math.abs(el.currentTime - srcTime) > 0.25) el.currentTime = srcTime
             if (el.paused) el.play().catch(() => {})
@@ -98,8 +152,13 @@ export function useTimelinePlayer(project: Project, sources: Record<string, Load
         void sid
       }
     },
-    [project, sources, getEl],
+    [project, sources, getEl, scheduleRepaint],
   )
+
+  // Keep the ref pointing at the latest renderAt for async repaint callbacks.
+  useEffect(() => {
+    renderAtRef.current = renderAt
+  }, [renderAt])
 
   const stopRaf = () => {
     if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
@@ -123,17 +182,35 @@ export function useTimelinePlayer(project: Project, sources: Record<string, Load
 
   const play = useCallback(() => {
     if (duration <= 0) return
+    const o = optsRef.current
+    const rStart = o.rangeStart ?? 0
+    const rEnd = o.rangeEnd ?? duration
+    if (rEnd <= rStart) return
     setPlaying(true)
+    // Begin at the current playhead if it's inside the (possibly in/out) range,
+    // otherwise from the range start.
+    const from = timeRef.current < rStart || timeRef.current >= rEnd ? rStart : timeRef.current
     startWallRef.current = performance.now()
-    startTimeRef.current = time >= duration ? 0 : time
-    if (time >= duration) setTime(0)
+    startTimeRef.current = from
+    if (from !== timeRef.current) setTime(from)
 
     const tick = () => {
+      const oo = optsRef.current
+      const end = oo.rangeEnd ?? duration
+      const start = oo.rangeStart ?? 0
       const elapsed = (performance.now() - startWallRef.current) / 1000
       const t = startTimeRef.current + elapsed
-      if (t >= duration) {
-        setTime(duration)
-        renderAt(duration, false)
+      if (t >= end) {
+        if (oo.loop && end > start) {
+          startTimeRef.current = start
+          startWallRef.current = performance.now()
+          setTime(start)
+          renderAt(start, true)
+          rafRef.current = requestAnimationFrame(tick)
+          return
+        }
+        setTime(end)
+        renderAt(end, false)
         setPlaying(false)
         for (const el of mediaEls.current.values()) el.pause()
         stopRaf()
@@ -144,7 +221,7 @@ export function useTimelinePlayer(project: Project, sources: Record<string, Load
       rafRef.current = requestAnimationFrame(tick)
     }
     rafRef.current = requestAnimationFrame(tick)
-  }, [duration, time, renderAt])
+  }, [duration, renderAt])
 
   // Repaint a still frame when paused and the project/time changes.
   useEffect(() => {

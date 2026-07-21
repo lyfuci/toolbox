@@ -33,6 +33,28 @@ export type Clip = {
   sourceOut: number
   /** Linear gain for audio of this clip (1 = unchanged). */
   volume?: number
+  /** Fade-in / fade-out durations in seconds (video → from/to black; audio → gain ramp). */
+  fadeIn?: number
+  fadeOut?: number
+  /** Playback speed (1 = normal). >1 shortens the clip on the timeline. */
+  speed?: number
+}
+
+/** Playback speed of a clip, always a positive number (default 1). */
+export const clipSpeed = (c: Clip): number => (c.speed && c.speed > 0 ? c.speed : 1)
+
+/** Fade multiplier in [0,1] for a clip at timeline time `t` (1 = no fade here). */
+export function fadeFactor(clip: Clip, t: number): number {
+  const start = clip.timelineStart
+  const end = clipEnd(clip)
+  let f = 1
+  if (clip.fadeIn && clip.fadeIn > 0 && t < start + clip.fadeIn) {
+    f = Math.min(f, Math.max(0, (t - start) / clip.fadeIn))
+  }
+  if (clip.fadeOut && clip.fadeOut > 0 && t > end - clip.fadeOut) {
+    f = Math.min(f, Math.max(0, (end - t) / clip.fadeOut))
+  }
+  return f
 }
 
 export type TrackKind = 'video' | 'audio'
@@ -43,6 +65,19 @@ export type Track = {
   clips: Clip[]
   muted?: boolean
   hidden?: boolean
+  solo?: boolean
+  locked?: boolean
+}
+
+/** A track is audible if not muted and (nothing soloed, or it is soloed). */
+export function trackAudible(track: Track, anySolo: boolean): boolean {
+  return !track.muted && (!anySolo || !!track.solo)
+}
+
+export type Marker = {
+  id: string
+  time: number
+  label?: string
 }
 
 export type Project = {
@@ -50,9 +85,11 @@ export type Project = {
   height: number
   fps: number
   tracks: Track[]
+  markers?: Marker[]
 }
 
-export const clipDuration = (c: Clip): number => Math.max(0, c.sourceOut - c.sourceIn)
+// On-timeline duration: the source window compressed/expanded by playback speed.
+export const clipDuration = (c: Clip): number => Math.max(0, (c.sourceOut - c.sourceIn) / clipSpeed(c))
 export const clipEnd = (c: Clip): number => c.timelineStart + clipDuration(c)
 
 /** Total timeline length = max end across all clips on all tracks. */
@@ -89,7 +126,7 @@ export function clipAt(track: Track, t: number): Clip | null {
  * sourceIn + (t - timelineStart). Caller ensures t is within the clip.
  */
 export function timelineToSource(clip: Clip, t: number): number {
-  return clip.sourceIn + (t - clip.timelineStart)
+  return clip.sourceIn + (t - clip.timelineStart) * clipSpeed(clip)
 }
 
 let counter = 0
@@ -135,4 +172,64 @@ export function resolveDropStart(track: Track, moving: Clip, requestedStart: num
     if (start < oEnd && oStart < start + dur) start = oEnd
   }
   return start
+}
+
+const SPLIT_EPS = 1e-4
+
+/**
+ * Split a clip at timeline time `t` into [left, right] sharing the same source
+ * (left keeps the id, right gets a fresh one). Returns null if `t` isn't
+ * strictly inside the clip. Export-safe: two adjacent source windows render as
+ * two independent trims/overlays in export-graph.ts (clipEnd is exclusive, so
+ * the halves never overlap at the cut).
+ */
+export function splitClipAt(clip: Clip, t: number): [Clip, Clip] | null {
+  const start = clip.timelineStart
+  const end = clipEnd(clip)
+  if (t <= start + SPLIT_EPS || t >= end - SPLIT_EPS) return null
+  // Map the cut back to source time through the clip's speed.
+  const srcSplit = clip.sourceIn + (t - start) * clipSpeed(clip)
+  const left: Clip = { ...clip, sourceOut: srcSplit }
+  const right: Clip = { ...clip, id: newId('clip'), sourceIn: srcSplit, timelineStart: t }
+  return [left, right]
+}
+
+/**
+ * Remove a clip and pull every later clip on the same track left by its
+ * duration, closing the gap (DaVinci "ripple delete"). Pure; returns a new
+ * Track. No-op if the clip isn't on the track.
+ */
+export function rippleDeleteClip(track: Track, clipId: ClipId): Track {
+  const removed = track.clips.find((c) => c.id === clipId)
+  if (!removed) return track
+  const dur = clipDuration(removed)
+  const start = removed.timelineStart
+  const clips = track.clips
+    .filter((c) => c.id !== clipId)
+    .map((c) => (c.timelineStart >= start ? { ...c, timelineStart: Math.max(0, c.timelineStart - dur) } : c))
+  return { ...track, clips }
+}
+
+/**
+ * Snap a clip's proposed start so its leading OR trailing edge lands on the
+ * nearest `candidate` within `threshold` seconds. Returns the adjusted start
+ * (>= 0), unchanged if nothing is close. Pure — used by the drag math so a
+ * moved clip clicks onto the playhead / adjacent clip edges.
+ */
+export function snapStart(start: number, dur: number, candidates: number[], threshold: number): number {
+  let best = start
+  let bestDist = threshold
+  for (const cand of candidates) {
+    const dLead = Math.abs(start - cand)
+    if (dLead < bestDist) {
+      bestDist = dLead
+      best = cand
+    }
+    const dTrail = Math.abs(start + dur - cand)
+    if (dTrail < bestDist) {
+      bestDist = dTrail
+      best = cand - dur
+    }
+  }
+  return Math.max(0, best)
 }

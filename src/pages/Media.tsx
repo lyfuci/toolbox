@@ -1,17 +1,27 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Loader2, Play, Pause, Download, Trash2, Plus, Film, Music, ZoomIn, ZoomOut, Wand2 } from 'lucide-react'
+import {
+  Loader2, Play, Pause, Download, Trash2, Plus, Film, Music, ZoomIn, ZoomOut, Wand2,
+  ChevronFirst, ChevronLast, StepBack, StepForward, Maximize2, Minimize2, Keyboard,
+  Scissors, Magnet, Flag, X, Scan, Undo2, Redo2, Repeat, Brackets, Camera,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
 import { DropZone } from '@/components/media/DropZone'
 import { OutputView, type OutputResult } from '@/components/media/OutputView'
 import { QuickToolsDialog } from '@/components/media/QuickToolsDialog'
+import { MediaShortcutsDialog } from '@/components/media/MediaShortcutsDialog'
 import { useTimeline } from '@/components/media/timeline/useTimeline'
 import { useTimelinePlayer } from '@/components/media/timeline/useTimelinePlayer'
+import { useMediaShortcuts } from '@/components/media/timeline/useMediaShortcuts'
 import { Timeline } from '@/components/media/timeline/Timeline'
+import { Minimap } from '@/components/media/timeline/Minimap'
 import { probeSource } from '@/components/media/timeline/probe-source'
-import { getFFmpeg, fmtTime } from '@/lib/ffmpeg'
+import { getFFmpeg } from '@/lib/ffmpeg'
+import { formatTC, frameDuration } from '@/lib/timeline/timecode'
+import { clipDuration, clipEnd, clipAt } from '@/lib/timeline/model'
 import { runTimelineExport } from '@/lib/timeline/run-export'
 
 type ExportState =
@@ -19,18 +29,45 @@ type ExportState =
   | { kind: 'loading' }
   | { kind: 'exporting'; progress: number }
 
+// Snap epsilon for boundary navigation — treats "at a boundary" as within a
+// third of a frame so Up/Down don't get stuck re-selecting the current edge.
+const EPS = 0.001
+
+// Project resolution presets (aspect ratios common to web + social).
+const RATIOS: { label: string; w: number; h: number }[] = [
+  { label: '16:9', w: 1280, h: 720 },
+  { label: '9:16', w: 720, h: 1280 },
+  { label: '1:1', w: 1080, h: 1080 },
+  { label: '4:3', w: 960, h: 720 },
+]
+
 export function MediaPage() {
   const { t } = useTranslation()
   const tl = useTimeline()
+  const [inPoint, setInPoint] = useState<number | null>(null)
+  const [outPoint, setOutPoint] = useState<number | null>(null)
+  const [loop, setLoop] = useState(false)
+  const [playRange, setPlayRange] = useState(false)
   const { canvasRef, playing, time, duration: playerDuration, play, pause, seek } = useTimelinePlayer(
     tl.project,
     tl.sources,
+    { loop, rangeStart: playRange ? inPoint : null, rangeEnd: playRange ? outPoint : null },
   )
   const [pxPerSec, setPxPerSec] = useState(40)
   const [exp, setExp] = useState<ExportState>({ kind: 'idle' })
   const [output, setOutput] = useState<OutputResult | null>(null)
   const [crf, setCrf] = useState(23)
   const [quickOpen, setQuickOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const [snap, setSnap] = useState(true)
+  const [clipboard, setClipboard] = useState<
+    | { data: { sourceId: string; sourceIn: number; sourceOut: number; volume?: number }; kind: 'video' | 'audio' }
+    | null
+  >(null)
+  const [editingSource, setEditingSource] = useState<string | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; clipId: string } | null>(null)
+  const timelineWrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     return () => {
@@ -41,6 +78,20 @@ export function MediaPage() {
   }, [])
 
   const sourceList = useMemo(() => Object.values(tl.sources), [tl.sources])
+  const fps = tl.project.fps
+  const hasContent = sourceList.length > 0
+
+  // All distinct clip edges (+ 0 and end) for Up/Down playhead navigation.
+  const boundaries = useMemo(() => {
+    const set = new Set<number>([0, tl.duration])
+    for (const tr of tl.project.tracks) {
+      for (const c of tr.clips) {
+        set.add(c.timelineStart)
+        set.add(c.timelineStart + clipDuration(c))
+      }
+    }
+    return [...set].filter((n) => n >= 0).sort((a, b) => a - b)
+  }, [tl.project, tl.duration])
 
   const onFiles = async (files: File[]) => {
     for (const file of files) {
@@ -53,6 +104,126 @@ export function MediaPage() {
       tl.addClipFromSource(src)
     }
   }
+
+  // ── Transport ──────────────────────────────────────────────────────────
+  const stepFrame = (dir: 1 | -1) => seek(time + dir * frameDuration(fps))
+  const stepSecond = (dir: 1 | -1) => seek(time + dir)
+  const goStart = () => seek(0)
+  // Land one frame shy of the very end so the last real frame shows (clipAt
+  // treats clip ends as exclusive, so exactly-at-duration paints black).
+  const goEnd = () => seek(Math.max(0, playerDuration - frameDuration(fps)))
+  const stepBoundary = (dir: 1 | -1) => {
+    const next =
+      dir === 1
+        ? boundaries.find((b) => b > time + EPS)
+        : [...boundaries].reverse().find((b) => b < time - EPS)
+    if (next != null) seek(next)
+  }
+  const snapshot = () => {
+    const c = canvasRef.current
+    if (!c) return
+    c.toBlob((blob) => {
+      if (!blob) return
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `frame-${formatTC(time, fps).replace(/:/g, '-')}.png`
+      a.click()
+      URL.revokeObjectURL(url)
+    }, 'image/png')
+  }
+  const zoom = (dir: 1 | -1) => setPxPerSec((p) => Math.min(160, Math.max(10, p + dir * 10)))
+  const zoomFit = () => {
+    const w = timelineWrapRef.current?.clientWidth ?? 0
+    const total = Math.max(tl.duration, 1)
+    if (w > 0) setPxPerSec(Math.min(160, Math.max(10, (w - 24) / total)))
+  }
+  const togglePlay = () => (playing ? pause() : play())
+
+  // ── Editing ────────────────────────────────────────────────────────────
+  const splitAtPlayhead = () => tl.splitAtPlayhead(time)
+  const deleteSelected = () => tl.removeSelectedClips()
+  const rippleDeleteSelected = () => {
+    if (tl.selectedClipId) tl.rippleRemoveClip(tl.selectedClipId)
+  }
+
+  // ── Clipboard / duplicate / nudge ────────────────────────────────────────
+  const copySelected = () => {
+    for (const tr of tl.project.tracks) {
+      const c = tr.clips.find((x) => x.id === tl.selectedClipId)
+      if (c) {
+        setClipboard({
+          data: { sourceId: c.sourceId, sourceIn: c.sourceIn, sourceOut: c.sourceOut, volume: c.volume },
+          kind: tr.kind,
+        })
+        return
+      }
+    }
+  }
+  const cutSelected = () => {
+    copySelected()
+    tl.removeSelectedClips()
+  }
+  const pasteClip = () => {
+    if (clipboard) tl.insertClip(clipboard.kind, clipboard.data, time)
+  }
+  const duplicateSelected = () => {
+    if (tl.selectedClipId) tl.duplicateClip(tl.selectedClipId)
+  }
+  const nudgeSelected = (dir: 1 | -1, big: boolean) => {
+    tl.nudgeSelectedClips(dir * (big ? 1 : frameDuration(fps)))
+  }
+
+  // ── Marking ────────────────────────────────────────────────────────────
+  const markIn = () => setInPoint(time)
+  const markOut = () => setOutPoint(time)
+  const gotoIn = () => { if (inPoint != null) seek(inPoint) }
+  const gotoOut = () => { if (outPoint != null) seek(outPoint) }
+  const clearInOut = () => { setInPoint(null); setOutPoint(null) }
+  const markClipUnderPlayhead = () => {
+    for (const tr of tl.project.tracks) {
+      const c = clipAt(tr, time)
+      if (c) {
+        setInPoint(c.timelineStart)
+        setOutPoint(clipEnd(c))
+        return
+      }
+    }
+  }
+
+  useMediaShortcuts({
+    enabled: hasContent,
+    focused,
+    onPlayPause: togglePlay,
+    onStepFrame: stepFrame,
+    onStepSecond: stepSecond,
+    onStepClipBoundary: stepBoundary,
+    onGoStart: goStart,
+    onGoEnd: goEnd,
+    onZoom: zoom,
+    onZoomFit: zoomFit,
+    onSplit: splitAtPlayhead,
+    onDelete: deleteSelected,
+    onRippleDelete: rippleDeleteSelected,
+    onToggleSnap: () => setSnap((v) => !v),
+    onMarkIn: markIn,
+    onMarkOut: markOut,
+    onGotoIn: gotoIn,
+    onGotoOut: gotoOut,
+    onMarkClip: markClipUnderPlayhead,
+    onClearInOut: clearInOut,
+    onAddMarker: () => tl.addMarker(time),
+    onUndo: tl.undo,
+    onRedo: tl.redo,
+    onCopy: copySelected,
+    onCut: cutSelected,
+    onPaste: pasteClip,
+    onDuplicate: duplicateSelected,
+    onNudge: nudgeSelected,
+    onToggleFullscreen: () => setFocused((v) => !v),
+    onExitFullscreen: () => setFocused(false),
+    onToggleHelp: () => setShortcutsOpen((v) => !v),
+  })
 
   const doExport = async () => {
     if (exp.kind !== 'idle') return
@@ -71,6 +242,7 @@ export function MediaPage() {
         {
           crf,
           preset: 'veryfast',
+          ...(exportRange ? { rangeStart: inPoint!, rangeEnd: outPoint! } : {}),
           onProgress: (r) => setExp({ kind: 'exporting', progress: r }),
           onLog: (l) => console.info('[ffmpeg]', l.message),
         },
@@ -94,49 +266,180 @@ export function MediaPage() {
   }, [tl.project, tl.selectedClipId])
 
   const busy = exp.kind !== 'idle'
-  const hasContent = sourceList.length > 0
+  const exportRange = inPoint != null && outPoint != null && outPoint > inPoint
+
+  // Blur transport buttons after click so a following Space hits the global
+  // play/pause handler instead of re-activating the focused button.
+  const tap = (fn: () => void) => (e: React.MouseEvent<HTMLButtonElement>) => {
+    fn()
+    e.currentTarget.blur()
+  }
+
+  const rootClass = focused
+    ? 'fixed inset-0 z-50 flex flex-col bg-background'
+    : 'mx-auto max-w-7xl px-8 py-12'
 
   return (
-    <div className="mx-auto max-w-7xl px-8 py-12">
-      <header className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t('tools.media.name')}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t('media.description')}</p>
+    <div className={rootClass} data-nle="">
+      <header
+        className={cn(
+          'flex items-start justify-between gap-4',
+          focused ? 'shrink-0 border-b border-border px-4 py-2' : 'mb-6',
+        )}
+      >
+        <div className="min-w-0">
+          <h1 className={cn('font-semibold tracking-tight', focused ? 'text-base' : 'text-2xl')}>
+            {t('tools.media.name')}
+          </h1>
+          {!focused && <p className="mt-1 text-sm text-muted-foreground">{t('media.description')}</p>}
         </div>
-        <Button size="sm" variant="outline" onClick={() => setQuickOpen(true)} className="shrink-0">
-          <Wand2 className="mr-1 h-4 w-4" />
-          {t('media.quick.title')}
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          {hasContent && (
+            <div className="flex items-center">
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={tl.undo} disabled={!tl.canUndo} title={t('media.timeline.undo') + ' (⌘Z)'}>
+                <Undo2 className="h-4 w-4" />
+              </Button>
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={tl.redo} disabled={!tl.canRedo} title={t('media.timeline.redo') + ' (⇧⌘Z)'}>
+                <Redo2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setShortcutsOpen(true)}
+            title={t('media.shortcuts.title') + ' (?)'}
+          >
+            <Keyboard className="h-4 w-4" />
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setQuickOpen(true)}>
+            <Wand2 className="mr-1 h-4 w-4" />
+            {t('media.quick.title')}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setFocused((v) => !v)}
+            title={t(focused ? 'media.exitFullscreen' : 'media.fullscreen') + ' (F)'}
+          >
+            {focused ? <Minimize2 className="mr-1 h-4 w-4" /> : <Maximize2 className="mr-1 h-4 w-4" />}
+            {t(focused ? 'media.exitFullscreen' : 'media.fullscreen')}
+          </Button>
+        </div>
       </header>
 
       <QuickToolsDialog open={quickOpen} onOpenChange={setQuickOpen} />
+      <MediaShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+
+      {/* Clip right-click context menu */}
+      {ctxMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onPointerDown={() => setCtxMenu(null)} />
+          <div
+            className="fixed z-50 min-w-36 rounded-md border border-border bg-popover py-1 text-sm text-popover-foreground shadow-md"
+            style={{ left: ctxMenu.x, top: ctxMenu.y }}
+          >
+            {[
+              { label: t('media.timeline.split'), fn: () => tl.splitAtPlayhead(time) },
+              { label: t('media.timeline.duplicate'), fn: () => tl.duplicateClip(ctxMenu.clipId) },
+              { label: t('media.timeline.delete'), fn: () => tl.removeClip(ctxMenu.clipId) },
+              { label: t('media.timeline.rippleDelete'), fn: () => tl.rippleRemoveClip(ctxMenu.clipId) },
+            ].map((it) => (
+              <button
+                key={it.label}
+                type="button"
+                className="block w-full px-3 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
+                onClick={() => { it.fn(); setCtxMenu(null) }}
+              >
+                {it.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {!hasContent ? (
-        <DropZone onFiles={onFiles} />
+        <div className={cn(focused && 'min-h-0 flex-1 overflow-auto p-4')}>
+          <DropZone onFiles={onFiles} />
+        </div>
       ) : (
-        <div className="space-y-4">
+        <div className={cn('space-y-4', focused && 'flex min-h-0 flex-1 flex-col overflow-hidden p-4')}>
           {/* Preview + transport */}
-          <div className="grid gap-4 lg:grid-cols-[1fr_260px]">
-            <div className="flex flex-col items-center rounded-lg border border-border bg-black/60 p-3">
-              <canvas
-                ref={canvasRef}
-                width={tl.project.width}
-                height={tl.project.height}
-                className="max-h-[360px] w-auto max-w-full rounded bg-black"
-                style={{ aspectRatio: `${tl.project.width} / ${tl.project.height}` }}
-              />
-              <div className="mt-3 flex w-full items-center gap-3">
-                <Button size="icon" variant="secondary" onClick={() => (playing ? pause() : play())}>
-                  {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                </Button>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {fmtTime(time)} / {fmtTime(playerDuration)}
+          <div
+            className={cn(
+              'grid gap-4',
+              focused ? 'min-h-0 flex-1 lg:grid-cols-[1fr_280px]' : 'lg:grid-cols-[1fr_260px]',
+            )}
+          >
+            <div
+              className={cn(
+                'flex flex-col items-center rounded-lg border border-border bg-black/60 p-3',
+                focused && 'min-h-0',
+              )}
+            >
+              <div className={cn('flex w-full items-center justify-center', focused && 'min-h-0 flex-1')}>
+                <canvas
+                  ref={canvasRef}
+                  width={tl.project.width}
+                  height={tl.project.height}
+                  className={cn(
+                    'w-auto max-w-full rounded bg-black object-contain',
+                    focused ? 'max-h-full' : 'max-h-[360px]',
+                  )}
+                  style={{ aspectRatio: `${tl.project.width} / ${tl.project.height}` }}
+                />
+              </div>
+              <div className="mt-3 flex w-full items-center gap-2">
+                <div className="flex items-center gap-0.5">
+                  <Button size="icon" variant="ghost" onClick={tap(goStart)} title={t('media.transport.start')}>
+                    <ChevronFirst className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={tap(() => stepFrame(-1))} title={t('media.transport.stepBack')}>
+                    <StepBack className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="secondary" onClick={tap(togglePlay)} title={t('media.transport.playPause')}>
+                    {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={tap(() => stepFrame(1))} title={t('media.transport.stepFwd')}>
+                    <StepForward className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={tap(goEnd)} title={t('media.transport.end')}>
+                    <ChevronLast className="h-4 w-4" />
+                  </Button>
+                </div>
+                <span className="ml-1 font-mono text-xs tabular-nums text-foreground/90">
+                  {formatTC(time, fps)}
+                  <span className="text-muted-foreground"> / {formatTC(playerDuration, fps)}</span>
                 </span>
-                <div className="ml-auto flex items-center gap-1">
-                  <Button size="icon" variant="ghost" onClick={() => setPxPerSec((p) => Math.max(10, p - 10))} title={t('media.timeline.zoomOut')}>
+                <div className="ml-auto flex items-center gap-0.5">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className={cn(loop && 'text-primary')}
+                    onClick={() => setLoop((v) => !v)}
+                    title={t('media.transport.loop')}
+                    aria-pressed={loop}
+                  >
+                    <Repeat className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className={cn(playRange && 'text-primary')}
+                    onClick={() => setPlayRange((v) => !v)}
+                    title={t('media.transport.playRange')}
+                    aria-pressed={playRange}
+                  >
+                    <Brackets className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={snapshot} title={t('media.transport.snapshot')}>
+                    <Camera className="h-4 w-4" />
+                  </Button>
+                  <div className="mx-1 h-4 w-px bg-border" />
+                  <Button size="icon" variant="ghost" onClick={() => zoom(-1)} title={t('media.timeline.zoomOut')}>
                     <ZoomOut className="h-4 w-4" />
                   </Button>
-                  <Button size="icon" variant="ghost" onClick={() => setPxPerSec((p) => Math.min(160, p + 10))} title={t('media.timeline.zoomIn')}>
+                  <Button size="icon" variant="ghost" onClick={() => zoom(1)} title={t('media.timeline.zoomIn')}>
                     <ZoomIn className="h-4 w-4" />
                   </Button>
                 </div>
@@ -144,7 +447,7 @@ export function MediaPage() {
             </div>
 
             {/* Source bin + clip inspector */}
-            <div className="space-y-3">
+            <div className={cn('space-y-3', focused && 'min-h-0 overflow-y-auto')}>
               <div className="rounded-lg border border-border bg-card/40 p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <Label className="text-xs text-muted-foreground">{t('media.timeline.sources')}</Label>
@@ -167,7 +470,26 @@ export function MediaPage() {
                   {sourceList.map((s) => (
                     <li key={s.id} className="flex items-center gap-2 text-xs">
                       {s.hasVideo ? <Film className="h-3 w-3 shrink-0 text-sky-400" /> : <Music className="h-3 w-3 shrink-0 text-emerald-400" />}
-                      <span className="truncate" title={s.name}>{s.name}</span>
+                      {editingSource === s.id ? (
+                        <input
+                          autoFocus
+                          defaultValue={s.name}
+                          onBlur={(e) => { tl.renameSource(s.id, e.target.value.trim() || s.name); setEditingSource(null) }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.currentTarget.blur()
+                            if (e.key === 'Escape') setEditingSource(null)
+                          }}
+                          className="min-w-0 flex-1 rounded border border-input bg-background px-1 py-0.5 text-xs"
+                        />
+                      ) : (
+                        <span
+                          className="truncate"
+                          title={t('media.timeline.renameHint')}
+                          onDoubleClick={() => setEditingSource(s.id)}
+                        >
+                          {s.name}
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() => tl.addClipFromSource(s.id)}
@@ -192,10 +514,52 @@ export function MediaPage() {
                       max={2}
                       step={0.05}
                       value={selectedClip.volume ?? 1}
+                      onPointerDown={tl.beginInteraction}
+                      onPointerUp={tl.endInteraction}
                       onChange={(e) => tl.setClipVolume(selectedClip.id, Number(e.target.value))}
                       className="flex-1 accent-primary"
                     />
                     <span className="w-8 text-right font-mono text-xs">{((selectedClip.volume ?? 1) * 100).toFixed(0)}%</span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground">{t('media.timeline.fadeIn')}</Label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      value={selectedClip.fadeIn ?? 0}
+                      onChange={(e) => tl.setClipFade(selectedClip.id, 'in', Number(e.target.value))}
+                      className="h-7 w-16 rounded border border-input bg-transparent px-1 font-mono text-xs"
+                    />
+                    <Label className="ml-1 text-xs text-muted-foreground">{t('media.timeline.fadeOut')}</Label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      value={selectedClip.fadeOut ?? 0}
+                      onChange={(e) => tl.setClipFade(selectedClip.id, 'out', Number(e.target.value))}
+                      className="h-7 w-16 rounded border border-input bg-transparent px-1 font-mono text-xs"
+                    />
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground">{t('media.timeline.speed')}</Label>
+                    <div className="flex rounded-md border border-input text-xs">
+                      {[0.5, 1, 1.5, 2].map((sp) => (
+                        <button
+                          key={sp}
+                          type="button"
+                          onClick={() => tl.setClipSpeed(selectedClip.id, sp)}
+                          className={cn(
+                            'px-2 py-1 tabular-nums transition-colors first:rounded-l-md last:rounded-r-md',
+                            (selectedClip.speed ?? 1) === sp
+                              ? 'bg-accent text-accent-foreground'
+                              : 'text-muted-foreground hover:text-foreground',
+                          )}
+                        >
+                          {sp}×
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <Button size="sm" variant="ghost" className="mt-2 text-destructive" onClick={() => tl.removeClip(selectedClip.id)}>
                     <Trash2 className="mr-1 h-3.5 w-3.5" />
@@ -206,35 +570,113 @@ export function MediaPage() {
             </div>
           </div>
 
-          {/* Timeline */}
-          <Timeline
-            project={tl.project}
-            sources={tl.sources}
-            pxPerSec={pxPerSec}
-            time={time}
-            selectedClipId={tl.selectedClipId}
-            onSeek={seek}
-            onSelectClip={tl.setSelectedClipId}
-            onMoveClip={tl.moveClip}
-            onTrimClip={tl.trimClip}
-            onToggleMute={tl.toggleTrackMute}
-          />
+          {/* Timeline toolbar + timeline */}
+          <div ref={timelineWrapRef} className={cn('space-y-1.5', focused && 'shrink-0')}>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={splitAtPlayhead}
+                title={t('media.timeline.split') + ' (B)'}
+              >
+                <Scissors className="mr-1 h-3.5 w-3.5" />
+                {t('media.timeline.split')}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className={cn('h-7 px-2 text-xs', snap ? 'text-primary' : 'text-muted-foreground')}
+                onClick={() => setSnap((v) => !v)}
+                title={t('media.timeline.snap') + ' (N)'}
+                aria-pressed={snap}
+              >
+                <Magnet className="mr-1 h-3.5 w-3.5" />
+                {t('media.timeline.snap')}
+              </Button>
+              <div className="mx-1 h-4 w-px bg-border" />
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 font-mono text-xs" onClick={markIn} title={t('media.timeline.markIn') + ' (I)'}>
+                [
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 font-mono text-xs" onClick={markOut} title={t('media.timeline.markOut') + ' (O)'}>
+                ]
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => tl.addMarker(time)} title={t('media.timeline.addMarker') + ' (M)'}>
+                <Flag className="h-3.5 w-3.5" />
+              </Button>
+              {(inPoint != null || outPoint != null) && (
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground" onClick={clearInOut} title={t('media.timeline.clearInOut') + ' (⌥X)'}>
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" className="ml-auto h-7 px-2 text-xs text-muted-foreground" onClick={zoomFit} title={t('media.timeline.zoomFit') + ' (⇧Z)'}>
+                <Scan className="mr-1 h-3.5 w-3.5" />
+                {t('media.timeline.zoomFit')}
+              </Button>
+            </div>
+            <Minimap project={tl.project} total={Math.max(tl.duration, 10)} time={time} onSeek={seek} />
+            <Timeline
+              project={tl.project}
+              sources={tl.sources}
+              pxPerSec={pxPerSec}
+              time={time}
+              selectedIds={tl.selectedIds}
+              snap={snap}
+              markers={tl.project.markers ?? []}
+              inPoint={inPoint}
+              outPoint={outPoint}
+              onSeek={seek}
+              onSelectClip={tl.selectClip}
+              onMoveClip={tl.moveClip}
+              onTrimClip={tl.trimClip}
+              onToggleMute={tl.toggleTrackMute}
+              onToggleSolo={tl.toggleTrackSolo}
+              onToggleLock={tl.toggleTrackLock}
+              onRemoveTrack={tl.removeTrack}
+              onRemoveMarker={tl.removeMarker}
+              onBeginInteraction={tl.beginInteraction}
+              onEndInteraction={tl.endInteraction}
+              onClipContextMenu={(clipId, x, y) => setCtxMenu({ clipId, x, y })}
+            />
+          </div>
 
           {/* Add-track + export */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className={cn('flex flex-wrap items-center gap-3', focused && 'shrink-0')}>
             <Button size="sm" variant="outline" onClick={() => tl.addTrack('video')}>
               <Film className="mr-1 h-4 w-4" /> {t('media.timeline.addVideoTrack')}
             </Button>
             <Button size="sm" variant="outline" onClick={() => tl.addTrack('audio')}>
               <Music className="mr-1 h-4 w-4" /> {t('media.timeline.addAudioTrack')}
             </Button>
+            <div className="flex items-center gap-1.5">
+              <Label className="text-xs text-muted-foreground">{t('media.timeline.ratio')}</Label>
+              <select
+                value={`${tl.project.width}x${tl.project.height}`}
+                onChange={(e) => {
+                  const [w, h] = e.target.value.split('x').map(Number)
+                  tl.setResolution(w, h)
+                }}
+                className="h-8 rounded-md border border-input bg-transparent px-2 text-xs"
+              >
+                {!RATIOS.some((r) => `${r.w}x${r.h}` === `${tl.project.width}x${tl.project.height}`) && (
+                  <option value={`${tl.project.width}x${tl.project.height}`}>
+                    {tl.project.width}×{tl.project.height}
+                  </option>
+                )}
+                {RATIOS.map((r) => (
+                  <option key={r.label} value={`${r.w}x${r.h}`}>
+                    {r.label} ({r.w}×{r.h})
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="ml-auto flex items-center gap-2">
               <Label className="text-xs text-muted-foreground">{t('media.crf')}</Label>
               <input type="range" min={18} max={32} value={crf} onChange={(e) => setCrf(Number(e.target.value))} className="w-28 accent-primary" disabled={busy} />
               <span className="w-6 font-mono text-xs">{crf}</span>
-              <Button onClick={doExport} disabled={busy}>
+              <Button onClick={doExport} disabled={busy} title={exportRange ? t('media.timeline.exportRangeHint') : undefined}>
                 {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
-                {t('media.timeline.export')}
+                {exportRange ? t('media.timeline.exportRange') : t('media.timeline.export')}
               </Button>
             </div>
           </div>
