@@ -36,7 +36,12 @@ export type Clip = {
   /** Fade-in / fade-out durations in seconds (video → from/to black; audio → gain ramp). */
   fadeIn?: number
   fadeOut?: number
+  /** Playback speed (1 = normal). >1 shortens the clip on the timeline. */
+  speed?: number
 }
+
+/** Playback speed of a clip, always a positive number (default 1). */
+export const clipSpeed = (c: Clip): number => (c.speed && c.speed > 0 ? c.speed : 1)
 
 /** Fade multiplier in [0,1] for a clip at timeline time `t` (1 = no fade here). */
 export function fadeFactor(clip: Clip, t: number): number {
@@ -83,7 +88,8 @@ export type Project = {
   markers?: Marker[]
 }
 
-export const clipDuration = (c: Clip): number => Math.max(0, c.sourceOut - c.sourceIn)
+// On-timeline duration: the source window compressed/expanded by playback speed.
+export const clipDuration = (c: Clip): number => Math.max(0, (c.sourceOut - c.sourceIn) / clipSpeed(c))
 export const clipEnd = (c: Clip): number => c.timelineStart + clipDuration(c)
 
 /** Total timeline length = max end across all clips on all tracks. */
@@ -120,7 +126,7 @@ export function clipAt(track: Track, t: number): Clip | null {
  * sourceIn + (t - timelineStart). Caller ensures t is within the clip.
  */
 export function timelineToSource(clip: Clip, t: number): number {
-  return clip.sourceIn + (t - clip.timelineStart)
+  return clip.sourceIn + (t - clip.timelineStart) * clipSpeed(clip)
 }
 
 let counter = 0
@@ -181,7 +187,8 @@ export function splitClipAt(clip: Clip, t: number): [Clip, Clip] | null {
   const start = clip.timelineStart
   const end = clipEnd(clip)
   if (t <= start + SPLIT_EPS || t >= end - SPLIT_EPS) return null
-  const srcSplit = clip.sourceIn + (t - start)
+  // Map the cut back to source time through the clip's speed.
+  const srcSplit = clip.sourceIn + (t - start) * clipSpeed(clip)
   const left: Clip = { ...clip, sourceOut: srcSplit }
   const right: Clip = { ...clip, id: newId('clip'), sourceIn: srcSplit, timelineStart: t }
   return [left, right]

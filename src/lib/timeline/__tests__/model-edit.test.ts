@@ -5,6 +5,8 @@ import {
   snapStart,
   clipDuration,
   clipEnd,
+  clipSpeed,
+  timelineToSource,
   type Clip,
   type Track,
 } from '@/lib/timeline/model'
@@ -82,5 +84,33 @@ describe('snapStart', () => {
   })
   it('never returns a negative start', () => {
     expect(snapStart(0.05, 3, [0], 0.2)).toBe(0)
+  })
+})
+
+describe('clip speed', () => {
+  it('clipSpeed defaults to 1 and stays positive', () => {
+    expect(clipSpeed(clip({}))).toBe(1)
+    expect(clipSpeed(clip({ speed: 2 }))).toBe(2)
+    expect(clipSpeed(clip({ speed: 0 }))).toBe(1)
+    expect(clipSpeed(clip({ speed: -3 }))).toBe(1)
+  })
+  it('clipDuration shrinks with speed', () => {
+    expect(clipDuration(clip({ sourceIn: 0, sourceOut: 10 }))).toBe(10)
+    expect(clipDuration(clip({ sourceIn: 0, sourceOut: 10, speed: 2 }))).toBe(5)
+    expect(clipDuration(clip({ sourceIn: 0, sourceOut: 10, speed: 0.5 }))).toBe(20)
+  })
+  it('timelineToSource walks source time at speed rate', () => {
+    const c = clip({ timelineStart: 0, sourceIn: 0, sourceOut: 10, speed: 2 })
+    expect(timelineToSource(c, 0)).toBe(0)
+    expect(timelineToSource(c, 2.5)).toBe(5) // 2.5s timeline → 5s source at 2x
+  })
+  it('splitClipAt maps the cut through speed', () => {
+    const c = clip({ timelineStart: 0, sourceIn: 0, sourceOut: 10, speed: 2 }) // 5s on timeline
+    const parts = splitClipAt(c, 2.5)! // half-way
+    expect(parts[0].sourceOut).toBe(5) // 2.5s * 2x
+    expect(parts[1].sourceIn).toBe(5)
+    expect(parts[0].speed).toBe(2)
+    expect(parts[1].speed).toBe(2)
+    expect(clipDuration(parts[0]) + clipDuration(parts[1])).toBeCloseTo(clipDuration(c))
   })
 })

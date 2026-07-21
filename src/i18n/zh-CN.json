@@ -2139,6 +2139,7 @@
       "snap": "吸附",
       "fadeIn": "淡入",
       "fadeOut": "淡出",
+      "speed": "速度",
       "markIn": "标入点",
       "markOut": "标出点",
       "addMarker": "加标记",

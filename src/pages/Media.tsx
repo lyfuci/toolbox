@@ -541,6 +541,26 @@ export function MediaPage() {
                       className="h-7 w-16 rounded border border-input bg-transparent px-1 font-mono text-xs"
                     />
                   </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground">{t('media.timeline.speed')}</Label>
+                    <div className="flex rounded-md border border-input text-xs">
+                      {[0.5, 1, 1.5, 2].map((sp) => (
+                        <button
+                          key={sp}
+                          type="button"
+                          onClick={() => tl.setClipSpeed(selectedClip.id, sp)}
+                          className={cn(
+                            'px-2 py-1 tabular-nums transition-colors first:rounded-l-md last:rounded-r-md',
+                            (selectedClip.speed ?? 1) === sp
+                              ? 'bg-accent text-accent-foreground'
+                              : 'text-muted-foreground hover:text-foreground',
+                          )}
+                        >
+                          {sp}×
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <Button size="sm" variant="ghost" className="mt-2 text-destructive" onClick={() => tl.removeClip(selectedClip.id)}>
                     <Trash2 className="mr-1 h-3.5 w-3.5" />
                     {t('media.timeline.deleteClip')}

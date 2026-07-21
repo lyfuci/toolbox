@@ -21,6 +21,7 @@ import {
   type Clip,
   clipDuration,
   clipEnd,
+  clipSpeed,
   projectDuration,
 } from './model'
 
@@ -78,13 +79,17 @@ export function buildTimelineExport(
       const vlabel = `v${vSeq}`
       const start = clip.timelineStart
       const end = clipEnd(clip)
+      const speed = clipSpeed(clip)
+      // Compress/expand the source-window PTS by speed, then shift to start.
+      const ptsExpr =
+        speed === 1 ? `PTS-STARTPTS+${f3(start)}/TB` : `(PTS-STARTPTS)/${f3(speed)}+${f3(start)}/TB`
       // Fades go to/from black (base canvas is black); st is in the shifted PTS.
       let fadeV = ''
       if (clip.fadeIn && clip.fadeIn > 0) fadeV += `,fade=t=in:st=${f3(start)}:d=${f3(clip.fadeIn)}`
       if (clip.fadeOut && clip.fadeOut > 0) fadeV += `,fade=t=out:st=${f3(end - clip.fadeOut)}:d=${f3(clip.fadeOut)}`
-      // trim source window → reset PTS → shift to timelineStart → scale+pad → fade.
+      // trim source window → speed/shift PTS → scale+pad → fade.
       videoChains.push(
-        `[${idx}:v]trim=${f3(clip.sourceIn)}:${f3(clip.sourceOut)},setpts=PTS-STARTPTS+${f3(start)}/TB,` +
+        `[${idx}:v]trim=${f3(clip.sourceIn)}:${f3(clip.sourceOut)},setpts=${ptsExpr},` +
           `scale=${W}:${H}:force_original_aspect_ratio=decrease,` +
           `pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1${fadeV}[${vlabel}]`,
       )
@@ -120,11 +125,14 @@ export function buildTimelineExport(
     const label = `a${aSeq}`
     const start = clip.timelineStart
     const end = clipEnd(clip)
+    const speed = clipSpeed(clip)
+    const tempo = speed === 1 ? '' : `,atempo=${f3(speed)}`
     let fadeA = ''
     if (clip.fadeIn && clip.fadeIn > 0) fadeA += `,afade=t=in:st=${f3(start)}:d=${f3(clip.fadeIn)}`
     if (clip.fadeOut && clip.fadeOut > 0) fadeA += `,afade=t=out:st=${f3(end - clip.fadeOut)}:d=${f3(clip.fadeOut)}`
+    // atrim source window → reset PTS → speed (atempo) → delay to start → gain → fade.
     chains.push(
-      `[${idx}:a]atrim=${f3(clip.sourceIn)}:${f3(clip.sourceOut)},asetpts=PTS-STARTPTS,` +
+      `[${idx}:a]atrim=${f3(clip.sourceIn)}:${f3(clip.sourceOut)},asetpts=PTS-STARTPTS${tempo},` +
         `adelay=${delayMs}|${delayMs},volume=${vol}${fadeA}[${label}]`,
     )
     audioLabels.push(`[${label}]`)

@@ -2139,6 +2139,7 @@
       "snap": "Snap",
       "fadeIn": "Fade in",
       "fadeOut": "Fade out",
+      "speed": "Speed",
       "markIn": "Mark In",
       "markOut": "Mark Out",
       "addMarker": "Add marker",

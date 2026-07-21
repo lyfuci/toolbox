@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { type Project, clipAt, timelineToSource, projectDuration, trackAudible, fadeFactor } from '@/lib/timeline/model'
+import { type Project, clipAt, timelineToSource, projectDuration, trackAudible, fadeFactor, clipSpeed } from '@/lib/timeline/model'
 import type { LoadedSource } from './useTimeline'
 
 /**
@@ -108,6 +108,7 @@ export function useTimelinePlayer(
         if (!src) continue
         const el = getEl(clip.sourceId)
         if (!el) continue
+        el.playbackRate = clipSpeed(clip)
         const srcTime = timelineToSource(clip, t)
 
         if (track.kind === 'video' && src.hasVideo && canvas && ctx) {
