@@ -17,6 +17,7 @@ import { useTimeline } from '@/components/media/timeline/useTimeline'
 import { useTimelinePlayer } from '@/components/media/timeline/useTimelinePlayer'
 import { useMediaShortcuts } from '@/components/media/timeline/useMediaShortcuts'
 import { Timeline } from '@/components/media/timeline/Timeline'
+import { Minimap } from '@/components/media/timeline/Minimap'
 import { probeSource } from '@/components/media/timeline/probe-source'
 import { getFFmpeg } from '@/lib/ffmpeg'
 import { formatTC, frameDuration } from '@/lib/timeline/timecode'
@@ -64,6 +65,8 @@ export function MediaPage() {
     | { data: { sourceId: string; sourceIn: number; sourceOut: number; volume?: number }; kind: 'video' | 'audio' }
     | null
   >(null)
+  const [editingSource, setEditingSource] = useState<string | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; clipId: string } | null>(null)
   const timelineWrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -139,9 +142,7 @@ export function MediaPage() {
 
   // ── Editing ────────────────────────────────────────────────────────────
   const splitAtPlayhead = () => tl.splitAtPlayhead(time)
-  const deleteSelected = () => {
-    if (tl.selectedClipId) tl.removeClip(tl.selectedClipId)
-  }
+  const deleteSelected = () => tl.removeSelectedClips()
   const rippleDeleteSelected = () => {
     if (tl.selectedClipId) tl.rippleRemoveClip(tl.selectedClipId)
   }
@@ -161,7 +162,7 @@ export function MediaPage() {
   }
   const cutSelected = () => {
     copySelected()
-    if (tl.selectedClipId) tl.removeClip(tl.selectedClipId)
+    tl.removeSelectedClips()
   }
   const pasteClip = () => {
     if (clipboard) tl.insertClip(clipboard.kind, clipboard.data, time)
@@ -170,7 +171,7 @@ export function MediaPage() {
     if (tl.selectedClipId) tl.duplicateClip(tl.selectedClipId)
   }
   const nudgeSelected = (dir: 1 | -1, big: boolean) => {
-    if (tl.selectedClipId) tl.nudgeClip(tl.selectedClipId, dir * (big ? 1 : frameDuration(fps)))
+    tl.nudgeSelectedClips(dir * (big ? 1 : frameDuration(fps)))
   }
 
   // ── Marking ────────────────────────────────────────────────────────────
@@ -328,6 +329,33 @@ export function MediaPage() {
       <QuickToolsDialog open={quickOpen} onOpenChange={setQuickOpen} />
       <MediaShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
 
+      {/* Clip right-click context menu */}
+      {ctxMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onPointerDown={() => setCtxMenu(null)} />
+          <div
+            className="fixed z-50 min-w-36 rounded-md border border-border bg-popover py-1 text-sm text-popover-foreground shadow-md"
+            style={{ left: ctxMenu.x, top: ctxMenu.y }}
+          >
+            {[
+              { label: t('media.timeline.split'), fn: () => tl.splitAtPlayhead(time) },
+              { label: t('media.timeline.duplicate'), fn: () => tl.duplicateClip(ctxMenu.clipId) },
+              { label: t('media.timeline.delete'), fn: () => tl.removeClip(ctxMenu.clipId) },
+              { label: t('media.timeline.rippleDelete'), fn: () => tl.rippleRemoveClip(ctxMenu.clipId) },
+            ].map((it) => (
+              <button
+                key={it.label}
+                type="button"
+                className="block w-full px-3 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
+                onClick={() => { it.fn(); setCtxMenu(null) }}
+              >
+                {it.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
       {!hasContent ? (
         <div className={cn(focused && 'min-h-0 flex-1 overflow-auto p-4')}>
           <DropZone onFiles={onFiles} />
@@ -440,7 +468,26 @@ export function MediaPage() {
                   {sourceList.map((s) => (
                     <li key={s.id} className="flex items-center gap-2 text-xs">
                       {s.hasVideo ? <Film className="h-3 w-3 shrink-0 text-sky-400" /> : <Music className="h-3 w-3 shrink-0 text-emerald-400" />}
-                      <span className="truncate" title={s.name}>{s.name}</span>
+                      {editingSource === s.id ? (
+                        <input
+                          autoFocus
+                          defaultValue={s.name}
+                          onBlur={(e) => { tl.renameSource(s.id, e.target.value.trim() || s.name); setEditingSource(null) }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.currentTarget.blur()
+                            if (e.key === 'Escape') setEditingSource(null)
+                          }}
+                          className="min-w-0 flex-1 rounded border border-input bg-background px-1 py-0.5 text-xs"
+                        />
+                      ) : (
+                        <span
+                          className="truncate"
+                          title={t('media.timeline.renameHint')}
+                          onDoubleClick={() => setEditingSource(s.id)}
+                        >
+                          {s.name}
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() => tl.addClipFromSource(s.id)}
@@ -525,18 +572,19 @@ export function MediaPage() {
                 {t('media.timeline.zoomFit')}
               </Button>
             </div>
+            <Minimap project={tl.project} total={Math.max(tl.duration, 10)} time={time} onSeek={seek} />
             <Timeline
               project={tl.project}
               sources={tl.sources}
               pxPerSec={pxPerSec}
               time={time}
-              selectedClipId={tl.selectedClipId}
+              selectedIds={tl.selectedIds}
               snap={snap}
               markers={tl.project.markers ?? []}
               inPoint={inPoint}
               outPoint={outPoint}
               onSeek={seek}
-              onSelectClip={tl.setSelectedClipId}
+              onSelectClip={tl.selectClip}
               onMoveClip={tl.moveClip}
               onTrimClip={tl.trimClip}
               onToggleMute={tl.toggleTrackMute}
@@ -546,6 +594,7 @@ export function MediaPage() {
               onRemoveMarker={tl.removeMarker}
               onBeginInteraction={tl.beginInteraction}
               onEndInteraction={tl.endInteraction}
+              onClipContextMenu={(clipId, x, y) => setCtxMenu({ clipId, x, y })}
             />
           </div>
 

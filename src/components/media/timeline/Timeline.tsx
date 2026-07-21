@@ -22,13 +22,13 @@ type Props = {
   sources: Record<string, LoadedSource>
   pxPerSec: number
   time: number
-  selectedClipId: string | null
+  selectedIds: string[]
   snap: boolean
   markers: Marker[]
   inPoint: number | null
   outPoint: number | null
   onSeek: (t: number) => void
-  onSelectClip: (id: string | null) => void
+  onSelectClip: (id: string | null, additive?: boolean) => void
   onMoveClip: (clipId: string, trackId: string, start: number) => void
   onTrimClip: (clipId: string, edge: 'in' | 'out', deltaSec: number) => void
   onToggleMute: (trackId: string) => void
@@ -38,6 +38,7 @@ type Props = {
   onRemoveMarker: (id: string) => void
   onBeginInteraction: () => void
   onEndInteraction: () => void
+  onClipContextMenu: (clipId: string, x: number, y: number) => void
 }
 
 export function Timeline({
@@ -45,7 +46,7 @@ export function Timeline({
   sources,
   pxPerSec,
   time,
-  selectedClipId,
+  selectedIds,
   snap,
   markers,
   inPoint,
@@ -61,6 +62,7 @@ export function Timeline({
   onRemoveMarker,
   onBeginInteraction,
   onEndInteraction,
+  onClipContextMenu,
 }: Props) {
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -171,7 +173,7 @@ export function Timeline({
               track={track}
               sources={sources}
               pxPerSec={pxPerSec}
-              selectedClipId={selectedClipId}
+              selectedIds={selectedIds}
               snap={snap}
               snapTargets={snapTargets}
               onSelectClip={onSelectClip}
@@ -183,6 +185,7 @@ export function Timeline({
               onRemoveTrack={onRemoveTrack}
               onBeginInteraction={onBeginInteraction}
               onEndInteraction={onEndInteraction}
+              onClipContextMenu={onClipContextMenu}
               canRemove={project.tracks.length > 1}
             />
           ))}
@@ -196,7 +199,7 @@ function TrackRow({
   track,
   sources,
   pxPerSec,
-  selectedClipId,
+  selectedIds,
   snap,
   snapTargets,
   onSelectClip,
@@ -208,15 +211,16 @@ function TrackRow({
   onRemoveTrack,
   onBeginInteraction,
   onEndInteraction,
+  onClipContextMenu,
   canRemove,
 }: {
   track: Track
   sources: Record<string, LoadedSource>
   pxPerSec: number
-  selectedClipId: string | null
+  selectedIds: string[]
   snap: boolean
   snapTargets: number[]
-  onSelectClip: (id: string | null) => void
+  onSelectClip: (id: string | null, additive?: boolean) => void
   onMoveClip: (clipId: string, trackId: string, start: number) => void
   onTrimClip: (clipId: string, edge: 'in' | 'out', deltaSec: number) => void
   onToggleMute: (trackId: string) => void
@@ -225,6 +229,7 @@ function TrackRow({
   onRemoveTrack: (trackId: string) => void
   onBeginInteraction: () => void
   onEndInteraction: () => void
+  onClipContextMenu: (clipId: string, x: number, y: number) => void
   canRemove: boolean
 }) {
   const { t } = useTranslation()
@@ -235,7 +240,7 @@ function TrackRow({
       className="relative border-b border-border/60"
       style={{ height: TRACK_H }}
       onPointerDown={(e) => {
-        if (e.target === e.currentTarget) onSelectClip(null)
+        if (e.target === e.currentTarget) onSelectClip(null, false)
       }}
     >
       {/* Track header cluster: kind badge + mute / solo / lock / remove */}
@@ -267,7 +272,7 @@ function TrackRow({
           name={sources[clip.sourceId]?.name ?? '?'}
           source={sources[clip.sourceId]}
           pxPerSec={pxPerSec}
-          selected={clip.id === selectedClipId}
+          selected={selectedIds.includes(clip.id)}
           snap={snap}
           snapTargets={snapTargets}
           onSelectClip={onSelectClip}
@@ -275,6 +280,7 @@ function TrackRow({
           onTrimClip={onTrimClip}
           onBeginInteraction={onBeginInteraction}
           onEndInteraction={onEndInteraction}
+          onClipContextMenu={onClipContextMenu}
         />
       ))}
     </div>
@@ -297,6 +303,7 @@ function TimelineClipView({
   onTrimClip,
   onBeginInteraction,
   onEndInteraction,
+  onClipContextMenu,
 }: {
   clip: Clip
   trackId: string
@@ -308,11 +315,12 @@ function TimelineClipView({
   selected: boolean
   snap: boolean
   snapTargets: number[]
-  onSelectClip: (id: string | null) => void
+  onSelectClip: (id: string | null, additive?: boolean) => void
   onMoveClip: (clipId: string, trackId: string, start: number) => void
   onTrimClip: (clipId: string, edge: 'in' | 'out', deltaSec: number) => void
   onBeginInteraction: () => void
   onEndInteraction: () => void
+  onClipContextMenu: (clipId: string, x: number, y: number) => void
 }) {
   const [drag, setDrag] = useState<null | { mode: 'move' | 'in' | 'out'; startX: number; cands: number[] }>(null)
   const left = clip.timelineStart * pxPerSec
@@ -321,8 +329,13 @@ function TimelineClipView({
   const onPointerDown = (mode: 'move' | 'in' | 'out') => (e: ReactPointerEvent) => {
     if (locked) return // locked track — no select/move/trim
     e.stopPropagation()
+    // Shift-click the body toggles multi-selection without starting a drag.
+    if (mode === 'move' && e.shiftKey) {
+      onSelectClip(clip.id, true)
+      return
+    }
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-    onSelectClip(clip.id)
+    onSelectClip(clip.id, false)
     onBeginInteraction() // snapshot for one coalesced undo entry per drag
     // Capture snap candidates once, excluding this clip's own edges so it
     // doesn't stick to where it started.
@@ -358,6 +371,7 @@ function TimelineClipView({
   return (
     <div
       data-clip-id={clip.id}
+      data-selected={selected ? '1' : '0'}
       className={cn(
         'absolute top-[7px] isolate flex h-[46px] items-stretch overflow-hidden rounded-[2px] text-[11px] select-none',
         isVideo
@@ -369,6 +383,12 @@ function TimelineClipView({
       style={{ left, width: w }}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onContextMenu={(e) => {
+        if (locked) return
+        e.preventDefault()
+        onSelectClip(clip.id, false)
+        onClipContextMenu(clip.id, e.clientX, e.clientY)
+      }}
     >
       {/* Audio waveform, behind the handles/label */}
       {!isVideo && source?.hasAudio && (

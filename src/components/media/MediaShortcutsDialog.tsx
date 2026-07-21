@@ -41,6 +41,7 @@ const GROUPS: Group[] = [
     titleKey: 'media.shortcuts.groupEdit',
     items: [
       { keys: 'B  /  ⌘B', descKey: 'media.shortcuts.split' },
+      { keys: '⇧-click', descKey: 'media.shortcuts.multiSelect' },
       { keys: 'Del', descKey: 'media.shortcuts.delete' },
       { keys: '⇧Del', descKey: 'media.shortcuts.rippleDelete' },
       { keys: '⌘C / ⌘X / ⌘V', descKey: 'media.shortcuts.clipboard' },

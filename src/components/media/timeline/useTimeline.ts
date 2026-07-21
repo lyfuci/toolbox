@@ -41,7 +41,9 @@ const EMPTY_HISTORY: History = { past: [], future: [] }
 export function useTimeline() {
   const [project, setProject] = useState<Project>(() => emptyProject())
   const [sources, setSources] = useState<Record<string, LoadedSource>>({})
-  const [selectedClipId, setSelectedClipId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  // Primary selection (drives the single-clip inspector) = the last selected.
+  const selectedClipId = selectedIds.length ? selectedIds[selectedIds.length - 1] : null
   const [history, setHistory] = useState<History>(EMPTY_HISTORY)
 
   const sourcesRef = useRef(sources)
@@ -212,7 +214,7 @@ export function useTimeline() {
         ...p,
         tracks: p.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => c.id !== clipId) })),
       }))
-      setSelectedClipId((cur) => (cur === clipId ? null : cur))
+      setSelectedIds((prev) => prev.filter((x) => x !== clipId))
     },
     [commit],
   )
@@ -250,7 +252,7 @@ export function useTimeline() {
         ...p,
         tracks: p.tracks.map((t) => (t.clips.some((c) => c.id === clipId) ? rippleDeleteClip(t, clipId) : t)),
       }))
-      setSelectedClipId((cur) => (cur === clipId ? null : cur))
+      setSelectedIds((prev) => prev.filter((x) => x !== clipId))
     },
     [commit],
   )
@@ -298,10 +300,61 @@ export function useTimeline() {
         }
         return p
       })
-      if (placedId) setSelectedClipId(placedId)
+      if (placedId) setSelectedIds([placedId])
     },
     [commit],
   )
+
+  // Selection: plain click selects one; additive (Shift) toggles multi-select.
+  const selectClip = useCallback((id: string | null, additive = false) => {
+    setSelectedIds((prev) => {
+      if (id == null) return []
+      if (!additive) return [id]
+      return prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    })
+  }, [])
+
+  // Lift every selected clip (group delete).
+  const removeSelectedClips = useCallback(() => {
+    const ids = new Set(selectedIds)
+    if (!ids.size) return
+    commit((p) => ({
+      ...p,
+      tracks: p.tracks.map((t) => ({ ...t, clips: t.clips.filter((c) => !ids.has(c.id)) })),
+    }))
+    setSelectedIds([])
+  }, [commit, selectedIds])
+
+  // Nudge every selected clip by a signed delta (one undo entry).
+  const nudgeSelectedClips = useCallback(
+    (deltaSec: number) => {
+      const ids = new Set(selectedIds)
+      if (!ids.size) return
+      commit((p) => ({
+        ...p,
+        tracks: p.tracks.map((t) => {
+          if (!t.clips.some((c) => ids.has(c.id))) return t
+          const moving = t.clips.filter((c) => ids.has(c.id))
+          const track = { ...t, clips: t.clips.filter((c) => !ids.has(c.id)) }
+          // Re-place shifted clips outermost-first so they don't collide.
+          const order = [...moving].sort((a, b) =>
+            deltaSec > 0 ? b.timelineStart - a.timelineStart : a.timelineStart - b.timelineStart,
+          )
+          for (const c of order) {
+            const start = resolveDropStart(track, c, Math.max(0, c.timelineStart + deltaSec))
+            track.clips.push({ ...c, timelineStart: start })
+          }
+          return track
+        }),
+      }))
+    },
+    [commit, selectedIds],
+  )
+
+  // Rename a loaded source (a label — not part of the serializable Project).
+  const renameSource = useCallback((sourceId: string, name: string) => {
+    setSources((prev) => (prev[sourceId] ? { ...prev, [sourceId]: { ...prev[sourceId], name } } : prev))
+  }, [])
 
   // Insert a clip (from the clipboard) onto the first track of `kind` at `atTime`.
   const insertClip = useCallback(
@@ -321,7 +374,7 @@ export function useTimeline() {
         placedId = placed.id
         return { ...p, tracks }
       })
-      if (placedId) setSelectedClipId(placedId)
+      if (placedId) setSelectedIds([placedId])
     },
     [commit],
   )
@@ -410,14 +463,18 @@ export function useTimeline() {
     applyProject(emptyProject())
     applyHistory(EMPTY_HISTORY)
     setSources({})
-    setSelectedClipId(null)
+    setSelectedIds([])
   }, [applyProject, applyHistory])
 
   return {
     project,
     sources,
     selectedClipId,
-    setSelectedClipId,
+    selectedIds,
+    selectClip,
+    removeSelectedClips,
+    nudgeSelectedClips,
+    renameSource,
     addSource,
     addClipFromSource,
     moveClip,
