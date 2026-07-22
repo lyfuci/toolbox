@@ -32,6 +32,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { CodeEditor } from '@/components/CodeEditor'
 import { formatRelative, formatTimestampBreakdown } from '@/lib/time'
+import { stripBearerPrefix } from '@/lib/jwt'
 
 const SAMPLE_TOKEN =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
@@ -411,7 +412,9 @@ export function JwtPage() {
   )
 
   // ---- Handlers ----
-  const onTokenChange = (next: string) => {
+  const onTokenChange = (raw: string) => {
+    // Auto-clean a copied Authorization header value ("Bearer eyJ…").
+    const next = stripBearerPrefix(raw)
     setToken(next)
     setVerify({ kind: 'idle' })
     if (!next.trim()) {
