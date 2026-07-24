@@ -4,17 +4,23 @@ import { Upload } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
- * Compact drop-zone used by Base64 / Hex / Hash / HMAC. Single-file: emits the
- * first file picked or dropped. Click anywhere on it to open the file picker.
+ * Compact drop-zone used by Base64 / Hex / Hash / HMAC (single-file) and the
+ * image-compression tool (multi-file). Click anywhere on it to open the picker.
+ * Pass `multiple` + `onFiles` to accept several files at once; otherwise it
+ * emits the first file via `onFile`.
  */
 export function FileDrop({
   onFile,
+  onFiles,
+  multiple,
   accept,
   className,
   label,
   hint,
 }: {
-  onFile: (file: File) => void
+  onFile?: (file: File) => void
+  onFiles?: (files: File[]) => void
+  multiple?: boolean
   accept?: string
   className?: string
   label?: ReactNode
@@ -26,7 +32,8 @@ export function FileDrop({
 
   const acceptFiles = (files: FileList | null) => {
     if (!files || !files.length) return
-    onFile(files[0])
+    if (onFiles) onFiles([...files])
+    else onFile?.(files[0])
   }
 
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -59,6 +66,7 @@ export function FileDrop({
         ref={inputRef}
         type="file"
         accept={accept}
+        multiple={multiple}
         hidden
         onChange={(e) => {
           acceptFiles(e.target.files)

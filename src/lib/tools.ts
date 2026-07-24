@@ -20,6 +20,7 @@ import {
   Globe,
   Hash,
   Image as ImageIcon,
+  ImageDown,
   KeyRound,
   Link,
   Link2,
@@ -102,6 +103,7 @@ export const tools: Tool[] = [
   { slug: 'cidr', path: '/cidr', icon: Network, category: 'network' },
   { slug: 'pdf', path: '/pdf', icon: FileImage, category: 'file' },
   { slug: 'image-editor', path: '/image-editor', icon: ImageIcon, category: 'media' },
+  { slug: 'image-compress', path: '/image-compress', icon: ImageDown, category: 'media' },
   { slug: 'media', path: '/media', icon: Film, category: 'media' },
 ]
 
