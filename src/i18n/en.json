@@ -239,6 +239,10 @@
     "image-editor": {
       "name": "Image Editor",
       "description": "Crop / rotate / filter / annotate, with project save/reload"
+    },
+    "image-compress": {
+      "name": "Image Compress",
+      "description": "Shrink images by quality or target size — JPEG / WebP / PNG, batch, local"
     }
   },
   "pages": {
@@ -1935,6 +1939,29 @@
         "disjoint": "A and B are disjoint",
         "familyMismatch": "A and B are in different families (IPv4 vs IPv6)"
       }
+    },
+    "imageCompress": {
+      "description": "Compress images by quality or a target file size, convert to JPEG / WebP / PNG, and optionally resize — batch, all in your browser.",
+      "dropLabel": "Drop images here",
+      "dropHint": "or click to choose — multiple files supported (JPEG / PNG / WebP …)",
+      "errNotImage": "Skipped {{n}} non-image file(s)",
+      "mode": "Compress by",
+      "mode_quality": "Quality",
+      "mode_target": "Target size",
+      "format": "Output format",
+      "formatOriginal": "Original",
+      "quality": "Quality: {{value}}",
+      "qualityHint": "Lower = smaller file, lower quality (JPEG / WebP only).",
+      "targetSize": "Target size",
+      "targetHint": "Finds the highest quality that stays under this size (JPEG / WebP).",
+      "maxEdge": "Max edge",
+      "maxEdgePlaceholder": "no limit",
+      "maxEdgeHint": "Downscale so the longest side fits this many pixels.",
+      "addMore": "+ Add more",
+      "processing": "Compressing…",
+      "summary": "{{n}} images · {{before}} → {{after}} ({{pct}}%)",
+      "downloadZip": "Download all ({{n}}) as ZIP",
+      "errDecode": "Could not decode this image"
     },
     "pdf": {
       "description": "Render PDF pages to PNG / JPEG / WebP images — fully in your browser, nothing uploaded.",

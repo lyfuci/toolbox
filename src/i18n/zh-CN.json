@@ -239,6 +239,10 @@
     "image-editor": {
       "name": "图片编辑",
       "description": "裁剪 / 旋转 / 滤镜 / 标注，可保存项目文件继续编辑"
+    },
+    "image-compress": {
+      "name": "图片压缩",
+      "description": "按质量或目标大小压缩图片 —— JPEG / WebP / PNG，支持批量，本地完成"
     }
   },
   "pages": {
@@ -1935,6 +1939,29 @@
         "disjoint": "A 与 B 完全不重叠",
         "familyMismatch": "A 与 B 不在同一协议族（IPv4 vs IPv6）"
       }
+    },
+    "imageCompress": {
+      "description": "按质量或目标大小压缩图片，可转换 JPEG / WebP / PNG、可选缩放 —— 支持批量，全部在浏览器本地完成。",
+      "dropLabel": "把图片拖到这里",
+      "dropHint": "或点击选择 —— 支持多选（JPEG / PNG / WebP …）",
+      "errNotImage": "已跳过 {{n}} 个非图片文件",
+      "mode": "压缩方式",
+      "mode_quality": "按质量",
+      "mode_target": "按目标大小",
+      "format": "输出格式",
+      "formatOriginal": "原格式",
+      "quality": "质量：{{value}}",
+      "qualityHint": "越低文件越小、画质越低（仅 JPEG / WebP 有效）。",
+      "targetSize": "目标大小",
+      "targetHint": "自动找到不超过该大小的最高质量（JPEG / WebP）。",
+      "maxEdge": "最长边",
+      "maxEdgePlaceholder": "不限",
+      "maxEdgeHint": "把最长边缩小到不超过这么多像素。",
+      "addMore": "+ 继续添加",
+      "processing": "压缩中…",
+      "summary": "{{n}} 张 · {{before}} → {{after}}（{{pct}}%）",
+      "downloadZip": "打包下载全部（{{n}}）",
+      "errDecode": "无法解码这张图片"
     },
     "pdf": {
       "description": "将 PDF 各页渲染为 PNG / JPEG / WebP 图片 —— 全部在浏览器本地完成，文件不上传。",

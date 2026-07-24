@@ -161,6 +161,10 @@ export const router = createBrowserRouter([
         lazy: async () => ({ Component: (await import('@/pages/ImageEditor')).ImageEditorPage }),
       },
       {
+        path: 'image-compress',
+        lazy: async () => ({ Component: (await import('@/pages/ImageCompress')).ImageCompressPage }),
+      },
+      {
         path: 'media',
         lazy: async () => ({ Component: (await import('@/pages/Media')).MediaPage }),
       },
