@@ -243,6 +243,10 @@
     "image-compress": {
       "name": "图片压缩",
       "description": "按质量或目标大小压缩图片 —— JPEG / WebP / PNG，支持批量，本地完成"
+    },
+    "images-to-pdf": {
+      "name": "图片转 PDF",
+      "description": "把多张图片合并成一个 PDF —— 可调页面顺序与纸张大小，本地完成"
     }
   },
   "pages": {
@@ -1985,6 +1989,42 @@
       "errLoad": "无法打开 PDF：{{error}}",
       "errRange": "页码范围无效。",
       "errRender": "渲染失败：{{error}}"
+    },
+    "imagesToPdf": {
+      "description": "把多张图片合并成一个 PDF —— 拖动卡片调整页面顺序。全部在浏览器本地完成，文件不上传。",
+      "dropLabel": "将图片拖到这里",
+      "dropHint": "或点击选择 —— 支持 JPEG / PNG / WebP，文件不会离开本机",
+      "addMore": "继续添加图片",
+      "pageSize": "页面尺寸",
+      "pageSize_fit": "跟随图片",
+      "pageSize_a4": "A4",
+      "pageSize_letter": "Letter",
+      "pageSizeHint": "跟随图片：每页尺寸等于图片本身（按 96 dpi 换算）；A4 / Letter：等比缩放并居中。",
+      "orientation": "方向",
+      "orientation_auto": "自动",
+      "orientation_portrait": "纵向",
+      "orientation_landscape": "横向",
+      "orientationIgnored": "页面跟随图片时该项无效。",
+      "mode": "图像数据",
+      "mode_jpeg": "JPEG",
+      "mode_lossless": "无损",
+      "modeHint_jpeg": "每页重新编码为 JPEG —— 文件小得多。",
+      "modeHint_lossless": "存原始像素（zlib 压缩）—— 体积大，但无质量损失。",
+      "quality": "质量 {{value}}%",
+      "margin": "页边距",
+      "fileName": "文件名",
+      "sortName": "按名称排序",
+      "sortTime": "按时间排序",
+      "reverse": "反转顺序",
+      "reorderHint": "把某一页拖到另一页上即可移动到该位置，也可以用左右箭头。第一张卡片就是第 1 页。",
+      "moveEarlier": "前移",
+      "moveLater": "后移",
+      "summary": "{{n}} 张图片 · {{size}}",
+      "generate": "生成 PDF（{{n}} 页）",
+      "building": "生成中 {{done}}/{{total}}…",
+      "doneToast": "PDF 已生成 —— {{n}} 页，{{size}}",
+      "errNotImage": "已跳过 {{n}} 个非图片文件。",
+      "errBuild": "生成 PDF 失败：{{error}}"
     }
   },
   "fieldMeta": {
