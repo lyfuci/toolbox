@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { useTranslation } from 'react-i18next'
 import { Search } from 'lucide-react'
@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/command'
 import { Button } from '@/components/ui/button'
 import { toolsByCategory } from '@/lib/tools'
+import { TOOL_ALIASES, toolSearchKeywords } from '@/lib/tool-search'
+import { SUPPORTED_LANGS } from '@/i18n'
 import { cn } from '@/lib/utils'
 
 type PaletteContextValue = { setOpen: (open: boolean) => void }
@@ -34,7 +36,28 @@ function usePalette() {
 export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+
+  // Search terms are locale-independent on purpose: someone reading the
+  // Chinese UI still types "image", and vice versa. Built once — the
+  // contents don't change when the display language does.
+  const keywordsBySlug = useMemo(() => {
+    const fixedT = SUPPORTED_LANGS.map((lang) => i18n.getFixedT(lang))
+    const index: Record<string, string[]> = {}
+    for (const cat of toolsByCategory()) {
+      for (const tool of cat.tools) {
+        index[tool.slug] = toolSearchKeywords(
+          fixedT.flatMap((tt) => [
+            tt(`tools.${tool.slug}.name`),
+            tt(`tools.${tool.slug}.description`),
+            tt(`categories.${cat.slug}.name`),
+          ]),
+          TOOL_ALIASES[tool.slug],
+        )
+      }
+    }
+    return index
+  }, [i18n])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -70,7 +93,8 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
                   return (
                     <CommandItem
                       key={tool.slug}
-                      value={`${toolName} ${toolDesc} ${catName}`}
+                      value={tool.slug}
+                      keywords={keywordsBySlug[tool.slug]}
                       onSelect={() => {
                         navigate(tool.path)
                         setOpen(false)
