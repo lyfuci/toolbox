@@ -41,6 +41,12 @@ single file drives both the sidebar nav and the home page card grid.
   2. Add route in `src/app/router.tsx`
   3. Append to `src/lib/tools.ts` (icon + slug + description) — this single
      edit makes it appear in sidebar + home grid.
+  4. Add `tools.<slug>.*` + `pages.<camelCase>.*` to **both** `src/i18n/en.json`
+     and `src/i18n/zh-CN.json`.
+  5. Add search aliases to `src/lib/tool-search.ts`. The ⌘K palette matches a
+     tool against every locale's name/description plus that alias list, so a
+     Chinese reader still finds it typing "image" and vice versa. A test fails
+     if a registered tool has no aliases, or lacks either language.
 - Use `cn()` from `@/lib/utils` for conditional class merging.
 - Default to dark theme (`html.dark` is set in `src/main.tsx`); design with
   the shadcn semantic tokens (`bg-background`, `text-foreground`,
