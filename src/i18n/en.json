@@ -243,6 +243,10 @@
     "image-compress": {
       "name": "Image Compress",
       "description": "Shrink images by quality or target size — JPEG / WebP / PNG, batch, local"
+    },
+    "images-to-pdf": {
+      "name": "Images to PDF",
+      "description": "Combine images into one PDF — reorder pages, pick page size, local"
     }
   },
   "pages": {
@@ -1985,6 +1989,42 @@
       "errLoad": "Couldn't open the PDF: {{error}}",
       "errRange": "No valid pages in that range.",
       "errRender": "Rendering failed: {{error}}"
+    },
+    "imagesToPdf": {
+      "description": "Merge images into a single PDF — drag the cards to set page order. Everything runs in your browser; nothing is uploaded.",
+      "dropLabel": "Drop images here",
+      "dropHint": "or click to choose — JPEG / PNG / WebP, stays on your device",
+      "addMore": "Add more images",
+      "pageSize": "Page size",
+      "pageSize_fit": "Fit image",
+      "pageSize_a4": "A4",
+      "pageSize_letter": "Letter",
+      "pageSizeHint": "Fit gives each page the image's own size (96 dpi); A4 / Letter scale the image to fit and centre it.",
+      "orientation": "Orientation",
+      "orientation_auto": "Auto",
+      "orientation_portrait": "Portrait",
+      "orientation_landscape": "Landscape",
+      "orientationIgnored": "Ignored while pages follow the image.",
+      "mode": "Image data",
+      "mode_jpeg": "JPEG",
+      "mode_lossless": "Lossless",
+      "modeHint_jpeg": "Re-encodes each page as JPEG — much smaller files.",
+      "modeHint_lossless": "Stores raw pixels (zlib) — larger, no quality loss.",
+      "quality": "Quality {{value}}%",
+      "margin": "Margin",
+      "fileName": "File name",
+      "sortName": "Sort by name",
+      "sortTime": "Sort by date",
+      "reverse": "Reverse",
+      "reorderHint": "Drag a page onto another to move it there, or use the arrows. Page 1 is the first card.",
+      "moveEarlier": "Move earlier",
+      "moveLater": "Move later",
+      "summary": "{{n}} images · {{size}}",
+      "generate": "Create PDF ({{n}} pages)",
+      "building": "Building {{done}}/{{total}}…",
+      "doneToast": "PDF created — {{n}} pages, {{size}}",
+      "errNotImage": "Skipped {{n}} file(s) that aren't images.",
+      "errBuild": "Couldn't build the PDF: {{error}}"
     }
   },
   "fieldMeta": {

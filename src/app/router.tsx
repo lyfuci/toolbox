@@ -157,6 +157,10 @@ export const router = createBrowserRouter([
         lazy: async () => ({ Component: (await import('@/pages/Pdf')).PdfPage }),
       },
       {
+        path: 'images-to-pdf',
+        lazy: async () => ({ Component: (await import('@/pages/ImagesToPdf')).ImagesToPdfPage }),
+      },
+      {
         path: 'image-editor',
         lazy: async () => ({ Component: (await import('@/pages/ImageEditor')).ImageEditorPage }),
       },
