@@ -88,6 +88,10 @@
     }
   },
   "tools": {
+    "translate": {
+      "name": "Translate",
+      "description": "Machine translation, keeps Markdown intact (click to trigger)"
+    },
     "json": {
       "name": "JSON",
       "description": "Format, minify, validate JSON"
@@ -250,6 +254,21 @@
     }
   },
   "pages": {
+    "translate": {
+      "description": "Translate text or a whole Markdown document. Code blocks, inline code and URLs are left untouched, so a translated README stays copy-pasteable. Requests only fire when you click Translate.",
+      "action": "Translate",
+      "auto": "Detect language",
+      "sourceLabel": "Source language",
+      "targetLabel": "Target language",
+      "swap": "Swap languages and text",
+      "preserveMarkdown": "Preserve Markdown",
+      "placeholder": "Paste text or Markdown here, then press Translate (Cmd/Ctrl + Enter)",
+      "outputPlaceholder": "Translation appears here",
+      "chars": "{{n}} characters",
+      "detected": "detected: {{lang}}",
+      "partial": "Some segments were left in the original language:",
+      "privacy": "Unlike the rest of this toolbox, translation <1>sends your text to a third party</1> (Google's free endpoint, falling back to MyMemory). Neither needs an API key. Don't paste secrets."
+    },
     "json": {
       "description": "Format, minify, validate JSON; explore the parsed tree and filter with JSONPath. All processing runs locally.",
       "placeholder": "Paste JSON here…",

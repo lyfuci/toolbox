@@ -54,6 +54,8 @@ export const TOOL_ALIASES: Readonly<Record<string, readonly string[]>> = {
   // network
   'http-status': ['404', '500', '403', '301', '200', '401', '429', '503', 'error code', 'response code', 'not found', '错误码', '响应码', '返回码', 'http错误'],
   'ip-info': ['my ip', 'ip address', 'geoip', 'whois', 'ip location', 'asn', 'ipv4', 'ipv6', '我的ip', 'ip地址', 'ip定位', '公网ip', '归属地'],
+  translate: ['translation', 'translator', 'i18n', 'language', 'chinese', 'english', 'japanese',
+    '翻译', '翻譯', '译文', '中译英', '英译中', '机翻', '语言'],
   dns: ['nslookup', 'dig', 'cname', 'srv', 'domain', 'resolve', 'nameserver', '域名', '域名解析', 'dns解析'],
   cidr: ['netmask', 'ip range', 'prefix length', 'network address', 'broadcast', 'subnet', 'subnet mask', 'ipv4', '网段', 'ip段', '子网', '子网掩码', '广播地址', 'ip计算器'],
 

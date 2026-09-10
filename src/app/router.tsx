@@ -141,6 +141,10 @@ export const router = createBrowserRouter([
         lazy: async () => ({ Component: (await import('@/pages/Regex')).RegexPage }),
       },
       {
+        path: 'translate',
+        lazy: async () => ({ Component: (await import('@/pages/Translate')).TranslatePage }),
+      },
+      {
         path: 'ip-info',
         lazy: async () => ({ Component: (await import('@/pages/IpInfo')).IpInfoPage }),
       },

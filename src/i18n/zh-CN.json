@@ -88,6 +88,10 @@
     }
   },
   "tools": {
+    "translate": {
+      "name": "Translate",
+      "description": "机器翻译，保留 Markdown 结构（点击触发）"
+    },
     "json": {
       "name": "JSON",
       "description": "格式化、压缩、校验 JSON"
@@ -250,6 +254,21 @@
     }
   },
   "pages": {
+    "translate": {
+      "description": "翻译一段文字或整篇 Markdown。代码块、行内代码和 URL 原样保留，翻完的 README 仍然可以直接复制粘贴。点击「翻译」才会发起请求。",
+      "action": "翻译",
+      "auto": "自动检测",
+      "sourceLabel": "源语言",
+      "targetLabel": "目标语言",
+      "swap": "对调语言和文本",
+      "preserveMarkdown": "保留 Markdown",
+      "placeholder": "把文字或 Markdown 粘到这里，然后点「翻译」（Cmd/Ctrl + Enter）",
+      "outputPlaceholder": "译文显示在这里",
+      "chars": "{{n}} 字符",
+      "detected": "检测到：{{lang}}",
+      "partial": "以下片段没能翻译，保留了原文：",
+      "privacy": "和 toolbox 里其它工具不同，翻译会<1>把你的文本发给第三方</1>（Google 的免费入口，失败时退到 MyMemory）。两者都不需要 API key。别粘密钥之类的东西。"
+    },
     "json": {
       "description": "格式化、压缩、校验 JSON；浏览解析后的树结构，并用 JSONPath 过滤。所有处理本地完成。",
       "placeholder": "在此粘贴 JSON…",
