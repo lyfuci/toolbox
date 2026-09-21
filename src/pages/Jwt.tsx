@@ -32,7 +32,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { CodeEditor } from '@/components/CodeEditor'
 import { formatRelative, formatTimestampBreakdown } from '@/lib/time'
-import { stripBearerPrefix } from '@/lib/jwt'
+import { jsonHoverAt, stripBearerPrefix } from '@/lib/jwt'
 
 const SAMPLE_TOKEN =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
@@ -703,9 +703,6 @@ function Panel({
   )
 }
 
-// Time-bearing claims whose value gets a readable-time hover tooltip.
-const TIME_CLAIMS = new Set(['exp', 'nbf', 'iat', 'auth_time'])
-
 /** Small DOM node for a CodeMirror hover tooltip (pre-line keeps the breaks). */
 function hoverDom(text: string): HTMLElement {
   const dom = document.createElement('div')
@@ -730,9 +727,10 @@ const hoverTheme = EditorView.theme({
  * A CodeMirror hover extension that annotates the JSON IN PLACE — no separate
  * panel. Hovering a field NAME shows its RFC description (resolved from
  * `${keyPrefix}${name}`; skipped for unknown/custom keys), and — when
- * `withTime` — hovering a numeric time claim's VALUE shows its local / UTC /
- * relative time. Pretty-printed JSON keeps one key per line, so a per-line
- * parse pinpoints the key and value spans without a full JSON syntax tree.
+ * `withTime` — a time claim also shows its local / UTC / relative time,
+ * whether the pointer is on the NAME or on the VALUE. The name carries the
+ * time too because "what does exp mean" and "when does this expire" are the
+ * same question in practice, and `1789698399` answers neither on its own.
  */
 function makeJsonHover(args: {
   keyPrefix: string
@@ -742,56 +740,31 @@ function makeJsonHover(args: {
   hasKey: (key: string) => boolean
 }) {
   const { keyPrefix, withTime, locale, t, hasKey } = args
+
+  const formatTime = withTime
+    ? (seconds: number) => {
+        const { utc, local, relative } = formatTimestampBreakdown(seconds, locale)
+        return (
+          `${t('pages.jwt.timeLocal')}: ${local}\n` +
+          `${t('pages.jwt.timeUtc')}: ${utc}\n` +
+          `${t('pages.jwt.timeRelative')}: ${relative}`
+        )
+      }
+    : null
+
   const ext = hoverTooltip((view, pos) => {
     const line = view.state.doc.lineAt(pos)
-    const m = /^(\s*)"([^"]+)"(\s*:\s*)(.*?)(,?\s*)$/.exec(line.text)
-    if (!m) return null
-    const indent = m[1].length
-    const key = m[2]
-    const keyStart = indent // opening quote
-    const keyEnd = indent + 1 + key.length + 1 // just past the closing quote
-    const valueStart = keyEnd + m[3].length
-    const valueEnd = valueStart + m[4].length
-    const col = pos - line.from
-
-    // Field name → description.
-    if (col >= keyStart && col <= keyEnd) {
-      const dk = keyPrefix + key
-      if (!hasKey(dk)) return null
-      return {
-        pos: line.from + keyStart,
-        end: line.from + keyEnd,
-        above: true,
-        create: () => ({ dom: hoverDom(t(dk)) }),
-      }
+    const hover = jsonHoverAt(line.text, pos - line.from, {
+      describe: (key) => (hasKey(keyPrefix + key) ? t(keyPrefix + key) : null),
+      formatTime,
+    })
+    if (!hover) return null
+    return {
+      pos: line.from + hover.from,
+      end: line.from + hover.to,
+      above: true,
+      create: () => ({ dom: hoverDom(hover.body) }),
     }
-    // Numeric time value → readable time.
-    if (
-      withTime &&
-      TIME_CLAIMS.has(key) &&
-      col >= valueStart &&
-      col <= valueEnd
-    ) {
-      const num = Number(m[4])
-      if (Number.isFinite(num)) {
-        const d = new Date(num * 1000)
-        // Guard nonsensical timestamps — no "Invalid Date" tooltip.
-        if (!Number.isNaN(d.getTime())) {
-          const { utc, local, relative } = formatTimestampBreakdown(num, locale)
-          const body =
-            `${t('pages.jwt.timeLocal')}: ${local}\n` +
-            `${t('pages.jwt.timeUtc')}: ${utc}\n` +
-            `${t('pages.jwt.timeRelative')}: ${relative}`
-          return {
-            pos: line.from + valueStart,
-            end: line.from + valueEnd,
-            above: true,
-            create: () => ({ dom: hoverDom(body) }),
-          }
-        }
-      }
-    }
-    return null
   })
   return [ext, hoverTheme]
 }
