@@ -277,8 +277,11 @@
       "jsonpathLabel": "JSONPath",
       "jsonpathPlaceholder": "$.tools[*]  ·  $..meta",
       "matchCount": "{{n}} 个匹配",
-      "clickHint": "点击任意节点可复制其 JSONPath",
-      "copiedPath": "已复制 {{path}}"
+      "clickHint": "点击键名复制 JSONPath，点击值复制值本身",
+      "copiedPath": "已复制 {{path}}",
+      "copiedValue": "已复制 {{path}} 的值（{{chars}} 字符）",
+      "copyPathTitle": "复制 JSONPath：{{path}}",
+      "copyValueTitle": "复制这个值（对象 / 数组复制整段 JSON，字符串不带引号）"
     },
     "xml": {
       "description": "XML 格式化、压缩、校验；浏览解析后的树结构，并用 XPath 查询。基于浏览器原生 DOMParser（无第三方依赖）。",

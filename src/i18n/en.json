@@ -277,8 +277,11 @@
       "jsonpathLabel": "JSONPath",
       "jsonpathPlaceholder": "$.tools[*]  ·  $..meta",
       "matchCount": "{{n}} match(es)",
-      "clickHint": "Click any node to copy its JSONPath",
-      "copiedPath": "Copied {{path}}"
+      "clickHint": "Click a key to copy its JSONPath, click a value to copy the value",
+      "copiedPath": "Copied {{path}}",
+      "copiedValue": "Copied the value of {{path}} ({{chars}} chars)",
+      "copyPathTitle": "Copy JSONPath: {{path}}",
+      "copyValueTitle": "Copy this value (objects / arrays copy the whole JSON; strings copy unquoted)"
     },
     "xml": {
       "description": "Format, minify, validate XML; browse the parsed tree and query with XPath. Uses the native DOMParser (no third-party dep).",

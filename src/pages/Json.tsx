@@ -7,6 +7,12 @@ import { CodeEditor } from '@/components/CodeEditor'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+import {
+  buildPath,
+  toFriendlyPath,
+  valueToClipboardText,
+  type JsonValue,
+} from '@/lib/json-tree'
 import { toast } from 'sonner'
 
 const SAMPLE = `{"name":"toolbox","version":1,"tools":["json","jwt","media"],"meta":{"local":true}}`
@@ -23,23 +29,6 @@ function parse(input: string, emptyMsg: string): ParseState {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
 }
-
-// Build a normalized JSONPath string identifying a node: $['foo'][0]['bar'].
-// This matches what jsonpath-plus returns when resultType: 'path'.
-function buildPath(parent: string, segment: string | number): string {
-  if (typeof segment === 'number') return `${parent}[${segment}]`
-  // Escape single quotes for the bracket-notation key.
-  return `${parent}['${segment.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}']`
-}
-
-// Convert the verbose bracket form to a human-friendly dot path where keys are
-// valid JS identifiers. e.g. $['foo'][0]['bar'] -> $.foo[0].bar
-function toFriendlyPath(p: string): string {
-  return p.replace(/\['([A-Za-z_$][A-Za-z0-9_$]*)'\]/g, '.$1')
-}
-
-type Primitive = string | number | boolean | null
-type JsonValue = Primitive | JsonValue[] | { [k: string]: JsonValue }
 
 function isObject(v: unknown): v is Record<string, JsonValue> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -73,6 +62,7 @@ type NodeProps = {
   matched: Set<string>
   hasFilter: boolean
   onCopyPath: (path: string) => void
+  onCopyValue: (path: string, value: JsonValue) => void
   firstMatchRef: React.MutableRefObject<HTMLDivElement | null>
 }
 
@@ -84,8 +74,10 @@ function JsonNode({
   matched,
   hasFilter,
   onCopyPath,
+  onCopyValue,
   firstMatchRef,
 }: NodeProps) {
+  const { t } = useTranslation()
   const isMatch = matched.has(path)
   const hasMatchedKid = pathHasMatchedDescendant(path, matched)
   const isDim = hasFilter && !isMatch && !hasMatchedKid
@@ -110,9 +102,16 @@ function JsonNode({
     }
   }, [isMatch, firstMatchRef])
 
-  const handleCopy = (e: React.MouseEvent) => {
+  // Two targets, because a row answers two different questions: the key is
+  // "where is this?" (JSONPath), the value is "what is this?" (the value).
+  // One row-wide button meant clicking a value handed back a path.
+  const handleCopyPath = (e: React.MouseEvent) => {
     e.stopPropagation()
     onCopyPath(path)
+  }
+  const handleCopyValue = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onCopyValue(path, value)
   }
 
   return (
@@ -138,32 +137,38 @@ function JsonNode({
         ) : (
           <span className="mt-1 inline-block h-4 w-4 shrink-0" />
         )}
-        <button
-          type="button"
-          title={toFriendlyPath(path)}
-          onClick={handleCopy}
-          className="flex flex-1 cursor-pointer flex-wrap items-center gap-1 text-left"
-        >
+        <div className="flex flex-1 flex-wrap items-center gap-1 text-left">
           {label !== null && (
-            <span
+            <button
+              type="button"
+              title={t('pages.json.copyPathTitle', { path: toFriendlyPath(path) })}
+              onClick={handleCopyPath}
               className={cn(
+                'cursor-pointer rounded hover:underline',
                 typeof label === 'number' ? 'text-muted-foreground' : 'text-fuchsia-400',
               )}
             >
               {labelText}
-            </span>
+            </button>
           )}
           <span className="text-muted-foreground">{colon}</span>
-          {isContainer ? (
-            <span className="text-muted-foreground">
-              {isArr
-                ? `[${(value as JsonValue[]).length}]`
-                : `{${Object.keys(value as Record<string, JsonValue>).length}}`}
-            </span>
-          ) : (
-            <span className={valueClass(value)}>{renderPrimitive(value)}</span>
-          )}
-        </button>
+          <button
+            type="button"
+            title={t('pages.json.copyValueTitle')}
+            onClick={handleCopyValue}
+            className="cursor-pointer rounded hover:underline"
+          >
+            {isContainer ? (
+              <span className="text-muted-foreground">
+                {isArr
+                  ? `[${(value as JsonValue[]).length}]`
+                  : `{${Object.keys(value as Record<string, JsonValue>).length}}`}
+              </span>
+            ) : (
+              <span className={valueClass(value)}>{renderPrimitive(value)}</span>
+            )}
+          </button>
+        </div>
       </div>
       {isContainer && open && (
         <div className="ml-4 border-l border-border/60 pl-2">
@@ -178,6 +183,7 @@ function JsonNode({
                   matched={matched}
                   hasFilter={hasFilter}
                   onCopyPath={onCopyPath}
+                  onCopyValue={onCopyValue}
                   firstMatchRef={firstMatchRef}
                 />
               ))
@@ -191,6 +197,7 @@ function JsonNode({
                   matched={matched}
                   hasFilter={hasFilter}
                   onCopyPath={onCopyPath}
+                  onCopyValue={onCopyValue}
                   firstMatchRef={firstMatchRef}
                 />
               ))}
@@ -262,6 +269,18 @@ export function JsonPage() {
     const friendly = toFriendlyPath(rawPath)
     await navigator.clipboard.writeText(friendly)
     toast.success(t('pages.json.copiedPath', { path: friendly }))
+  }
+
+  const handleCopyValue = async (rawPath: string, value: JsonValue) => {
+    const text = valueToClipboardText(value, indent)
+    await navigator.clipboard.writeText(text)
+    // Say how much came along: a collapsed `{6}` can be a megabyte of subtree.
+    toast.success(
+      t('pages.json.copiedValue', {
+        path: toFriendlyPath(rawPath),
+        chars: text.length.toLocaleString(),
+      }),
+    )
   }
 
   const stats = state.ok
@@ -379,6 +398,7 @@ export function JsonPage() {
                 matched={matched}
                 hasFilter={hasFilter}
                 onCopyPath={handleCopyPath}
+                onCopyValue={handleCopyValue}
                 firstMatchRef={firstMatchRef}
               />
             ) : (
