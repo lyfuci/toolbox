@@ -7,7 +7,52 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { formatXml, minifyXml } from '@/lib/xml'
+import {
+  attributeXPath,
+  formatXml,
+  formatXPath,
+  minifyXml,
+  stepIndex,
+  textXPath,
+  type XPathStep,
+} from '@/lib/xml'
+
+/**
+ * Absolute XPath of a node, as the tree's copy actions hand it out.
+ *
+ * Walks up to the document element collecting one step per ancestor, adding a
+ * 1-based position only where siblings share a tag name. The DOM walk stays
+ * here; the composition rules live in lib/xml.ts where they are unit-tested.
+ */
+function xpathOf(node: Node): string {
+  const steps: XPathStep[] = []
+  let current: Node | null =
+    node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode
+  while (current && current.nodeType === Node.ELEMENT_NODE) {
+    const el = current as Element
+    const parent: Node | null = el.parentNode
+    const siblings =
+      parent && parent.nodeType === Node.ELEMENT_NODE
+        ? Array.from((parent as Element).children)
+        : [el]
+    const selfIndex = siblings.indexOf(el)
+    steps.unshift({
+      tag: el.tagName,
+      index: stepIndex(
+        el.tagName,
+        siblings.map((s) => s.tagName),
+        selfIndex < 0 ? 0 : selfIndex,
+      ),
+    })
+    current = parent
+  }
+  return formatXPath(steps)
+}
+
+/** Serialize one element (and its subtree) back to XML text. */
+function serializeElement(el: Element): string {
+  return new XMLSerializer().serializeToString(el)
+}
 
 const SAMPLE = `<?xml version="1.0"?><root><item id="1">first</item><item id="2"><nested>value</nested></item></root>`
 
@@ -30,15 +75,26 @@ function parseXml(input: string, emptyMsg: string): ParsedDoc {
   }
 }
 
+type CopyKind = 'path' | 'value' | 'element'
+
 type XmlNodeProps = {
   node: Node
   depth: number
   matched: Set<Node>
   hasQuery: boolean
+  onCopy: (kind: CopyKind, what: string, text: string) => void
   firstMatchRef: React.MutableRefObject<HTMLDivElement | null>
 }
 
-function XmlElementNode({ node, depth, matched, hasQuery, firstMatchRef }: XmlNodeProps) {
+function XmlElementNode({
+  node,
+  depth,
+  matched,
+  hasQuery,
+  onCopy,
+  firstMatchRef,
+}: XmlNodeProps) {
+  const { t } = useTranslation()
   const isMatch = matched.has(node)
   // Auto-expand to reveal matched descendants. Derived from `matched` rather
   // than synced via effect → avoids the setState-in-effect lint rule and the
@@ -65,7 +121,14 @@ function XmlElementNode({ node, depth, matched, hasQuery, firstMatchRef }: XmlNo
     return (
       <div className="font-mono text-sm leading-6">
         <div className="flex items-start gap-1 rounded px-1 pl-5">
-          <span className="text-emerald-400">{text}</span>
+          <button
+            type="button"
+            title={t('pages.xml.copyValueTitle')}
+            onClick={() => onCopy('value', textXPath(xpathOf(node)), text)}
+            className="cursor-pointer rounded text-left text-emerald-400 hover:underline"
+          >
+            {text}
+          </button>
         </div>
       </div>
     )
@@ -90,6 +153,7 @@ function XmlElementNode({ node, depth, matched, hasQuery, firstMatchRef }: XmlNo
     (c) => c.nodeType === Node.ELEMENT_NODE || c.nodeType === Node.COMMENT_NODE,
   )
   const attrs = Array.from(el.attributes)
+  const elementPath = xpathOf(el)
 
   return (
     <div className="font-mono text-sm leading-6">
@@ -114,14 +178,45 @@ function XmlElementNode({ node, depth, matched, hasQuery, firstMatchRef }: XmlNo
         ) : (
           <span className="mt-1 inline-block h-4 w-4 shrink-0" />
         )}
-        <div className="flex flex-1 flex-wrap items-center gap-1">
+        <div className="group flex flex-1 flex-wrap items-center gap-1">
           <span className="text-muted-foreground">&lt;</span>
-          <span className="text-sky-400">{el.tagName}</span>
+          <button
+            type="button"
+            title={t('pages.xml.copyPathTitle', { path: elementPath })}
+            onClick={() => onCopy('path', elementPath, elementPath)}
+            className="cursor-pointer rounded text-sky-400 hover:underline"
+          >
+            {el.tagName}
+          </button>
           {attrs.map((a) => (
             <span key={a.name} className="ml-1">
-              <span className="text-fuchsia-400">{a.name}</span>
+              <button
+                type="button"
+                title={t('pages.xml.copyPathTitle', {
+                  path: attributeXPath(elementPath, a.name),
+                })}
+                onClick={() =>
+                  onCopy(
+                    'path',
+                    attributeXPath(elementPath, a.name),
+                    attributeXPath(elementPath, a.name),
+                  )
+                }
+                className="cursor-pointer rounded text-fuchsia-400 hover:underline"
+              >
+                {a.name}
+              </button>
               <span className="text-muted-foreground">=</span>
-              <span className="text-amber-400">"{a.value}"</span>
+              <button
+                type="button"
+                title={t('pages.xml.copyValueTitle')}
+                onClick={() =>
+                  onCopy('value', attributeXPath(elementPath, a.name), a.value)
+                }
+                className="cursor-pointer rounded text-amber-400 hover:underline"
+              >
+                "{a.value}"
+              </button>
             </span>
           ))}
           <span className="text-muted-foreground">
@@ -129,12 +224,34 @@ function XmlElementNode({ node, depth, matched, hasQuery, firstMatchRef }: XmlNo
           </span>
           {!hasContainerChildren && children.length === 1 && children[0].nodeType === Node.TEXT_NODE && (
             <>
-              <span className="text-emerald-400">{children[0].textContent?.trim()}</span>
+              <button
+                type="button"
+                title={t('pages.xml.copyValueTitle')}
+                onClick={() =>
+                  onCopy(
+                    'value',
+                    textXPath(elementPath),
+                    children[0].textContent?.trim() ?? '',
+                  )
+                }
+                className="cursor-pointer rounded text-emerald-400 hover:underline"
+              >
+                {children[0].textContent?.trim()}
+              </button>
               <span className="text-muted-foreground">&lt;/</span>
               <span className="text-sky-400">{el.tagName}</span>
               <span className="text-muted-foreground">&gt;</span>
             </>
           )}
+          <button
+            type="button"
+            title={t('pages.xml.copyElementTitle')}
+            onClick={() => onCopy('element', elementPath, serializeElement(el))}
+            aria-label={t('pages.xml.copyElementTitle')}
+            className="ml-1 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100"
+          >
+            <Copy className="h-3 w-3" />
+          </button>
         </div>
       </div>
       {hasContainerChildren && open && (
@@ -147,6 +264,7 @@ function XmlElementNode({ node, depth, matched, hasQuery, firstMatchRef }: XmlNo
                 depth={depth + 1}
                 matched={matched}
                 hasQuery={hasQuery}
+                onCopy={onCopy}
                 firstMatchRef={firstMatchRef}
               />
             ))}
@@ -240,6 +358,22 @@ export function XmlPage() {
     toast.success(t('common.copied'))
   }
   const handleClear = () => setInput('')
+
+  // One handler for all three tree copies; the toast says which one happened,
+  // and for a whole element how much came along (a subtree can be huge).
+  const handleTreeCopy = async (kind: CopyKind, what: string, text: string) => {
+    await navigator.clipboard.writeText(text)
+    if (kind === 'path') return toast.success(t('pages.xml.copiedPath', { path: what }))
+    if (kind === 'element') {
+      return toast.success(
+        t('pages.xml.copiedElement', {
+          path: what,
+          chars: text.length.toLocaleString(),
+        }),
+      )
+    }
+    toast.success(t('pages.xml.copiedValue', { path: what }))
+  }
 
   const hasQuery = xpath.trim().length > 0
 
@@ -345,6 +479,7 @@ export function XmlPage() {
                 depth={0}
                 matched={matched}
                 hasQuery={hasQuery}
+                onCopy={handleTreeCopy}
                 firstMatchRef={firstMatchRef}
               />
             ) : (

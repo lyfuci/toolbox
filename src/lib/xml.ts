@@ -71,3 +71,46 @@ function serialize(node: Node, depth: number, indent: number): string {
   out += `${pad}</${el.tagName}>\n`
   return out
 }
+
+/**
+ * One step of an XPath: a tag name, plus a 1-based position when siblings
+ * share that name. `index === null` means the step is unambiguous.
+ */
+export type XPathStep = { tag: string; index: number | null }
+
+/**
+ * Position of an element among its same-tag siblings, or null when the tag is
+ * unique there. XPath positions are 1-based, and `/a/b` already means "every b
+ * under a", so an index is only worth printing when it disambiguates.
+ */
+export function stepIndex(
+  tag: string,
+  siblingTags: readonly string[],
+  selfIndex: number,
+): number | null {
+  const sameTag = siblingTags.filter((t) => t === tag)
+  if (sameTag.length <= 1) return null
+  let position = 0
+  for (let i = 0; i <= selfIndex && i < siblingTags.length; i++) {
+    if (siblingTags[i] === tag) position++
+  }
+  return position
+}
+
+/** Join steps into an absolute XPath: `/root/item[2]/nested`. */
+export function formatXPath(steps: readonly XPathStep[]): string {
+  if (steps.length === 0) return '/'
+  return steps
+    .map((s) => `/${s.tag}${s.index === null ? '' : `[${s.index}]`}`)
+    .join('')
+}
+
+/** XPath of an attribute on the element at `elementPath`: `/root/item[2]/@id`. */
+export function attributeXPath(elementPath: string, attr: string): string {
+  return `${elementPath}/@${attr}`
+}
+
+/** XPath selecting an element's own text: `/root/item[2]/text()`. */
+export function textXPath(elementPath: string): string {
+  return `${elementPath}/text()`
+}
