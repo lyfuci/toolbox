@@ -291,7 +291,13 @@
       "xpathLabel": "XPath",
       "xpathPlaceholder": "//item  ·  //*[@id='1']",
       "matchCount": "{{n}} match(es)",
-      "treeHint": "Type an XPath to highlight matching elements"
+      "treeHint": "Click a tag to copy its XPath, click an attribute value or text to copy it; type an XPath to highlight matches",
+      "copyPathTitle": "Copy XPath: {{path}}",
+      "copyValueTitle": "Copy this value",
+      "copyElementTitle": "Copy this element as XML",
+      "copiedPath": "Copied {{path}}",
+      "copiedValue": "Copied the value of {{path}}",
+      "copiedElement": "Copied {{path}} as XML ({{chars}} chars)"
     },
     "yaml": {
       "description": "Convert between YAML and JSON. Powered by js-yaml, supporting YAML 1.2 subset."
