@@ -21,8 +21,8 @@ import {
   hasGifMagic,
   isGifFile,
   GifCancelledError,
-  type GifColors,
-  type GifFrameSkip,
+  type GifColorMode,
+  type GifDropFrames,
 } from '@/lib/gif-compress'
 
 type Mode = 'quality' | 'target'
@@ -43,8 +43,9 @@ type Result =
 
 const FORMATS: OutFormat[] = ['original', 'jpeg', 'webp', 'png']
 const FORMAT_LABEL: Record<OutFormat, string> = { original: '', jpeg: 'JPEG', webp: 'WebP', png: 'PNG' }
-const GIF_COLORS: GifColors[] = [256, 128, 64, 32]
-const GIF_FRAME_SKIPS: GifFrameSkip[] = [1, 2, 3]
+const GIF_DROP_OPTIONS: GifDropFrames[] = ['none', 'every2', 'every3', 'every4', 'every5', 'keep1of3']
+const GIF_COLOR_MODES: GifColorMode[] = ['none', 'dither', 'no-dither']
+const GIF_COLOR_PRESETS = [256, 128, 64, 32, 16] as const
 
 let idCounter = 0
 const nextId = () => `img_${++idCounter}`
@@ -63,11 +64,18 @@ export function ImageCompressPage() {
   const [targetKB, setTargetKB] = useState(200)
   const [format, setFormat] = useState<OutFormat>('original')
   const [maxEdge, setMaxEdge] = useState('') // '' = no resize
-  const [gifColors, setGifColors] = useState<GifColors>(256)
-  const [gifFrameSkip, setGifFrameSkip] = useState<GifFrameSkip>(1)
+  // GIF-specific options (FreeConvert-inspired: lossy level, drop frames,
+  // color reduction + dithering, transparency optimization, undo optimizations).
+  const [gifLossy, setGifLossy] = useState(75)
+  const [gifDropFrames, setGifDropFrames] = useState<GifDropFrames>('none')
+  const [gifColorMode, setGifColorMode] = useState<GifColorMode>('none')
+  const [gifColorCount, setGifColorCount] = useState(128)
+  const [gifOptimizeTransparency, setGifOptimizeTransparency] = useState(true)
+  const [gifUndoOptimizations, setGifUndoOptimizations] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const hasGif = useMemo(() => sources.some((s) => isGifFile(s.file)), [sources])
+  const onlyGif = useMemo(() => hasGif && sources.every((s) => isGifFile(s.file)), [hasGif, sources])
   const keepsGif = hasGif && format === 'original'
 
   const runRef = useRef(0)
@@ -136,11 +144,14 @@ export function ImageCompressPage() {
             handledAsGif = true
             const gifRes = await compressGif(file, {
               mode,
-              quality,
+              lossy: gifLossy,
               targetBytes,
               maxEdge: maxE,
-              colors: gifColors,
-              frameSkip: gifFrameSkip,
+              colorMode: gifColorMode,
+              colorCount: gifColorCount,
+              dropFrames: gifDropFrames,
+              optimizeTransparency: gifOptimizeTransparency,
+              undoOptimizations: gifUndoOptimizations,
               isCancelled: () => runRef.current !== run,
             })
             if (runRef.current !== run) return
@@ -151,7 +162,6 @@ export function ImageCompressPage() {
               outName: `${baseName(file.name)}.gif`,
               outW: gifRes.outW,
               outH: gifRes.outH,
-              quality: gifRes.quality,
               framesBefore: gifRes.framesBefore,
               framesAfter: gifRes.framesAfter,
             })
@@ -210,7 +220,20 @@ export function ImageCompressPage() {
       }
     }
     if (runRef.current === run) setBusy(false)
-  }, [sources, mode, quality, targetKB, format, maxEdge, gifColors, gifFrameSkip])
+  }, [
+    sources,
+    mode,
+    quality,
+    targetKB,
+    format,
+    maxEdge,
+    gifLossy,
+    gifDropFrames,
+    gifColorMode,
+    gifColorCount,
+    gifOptimizeTransparency,
+    gifUndoOptimizations,
+  ])
 
   // Re-process (debounced) whenever the file set or any setting changes. A new
   // run bumps runRef at its start, so any still-in-flight run supersedes itself.
@@ -265,6 +288,24 @@ export function ImageCompressPage() {
 
   const hasContent = sources.length > 0
 
+  const renderGifLossySlider = (id: string) => (
+    <div>
+      <Label htmlFor={id} className="mb-1.5 block text-xs text-muted-foreground">
+        {t('pages.imageCompress.gifLossy', { value: gifLossy })}
+      </Label>
+      <input
+        id={id}
+        type="range"
+        min={0}
+        max={200}
+        value={gifLossy}
+        onChange={(e) => setGifLossy(Number(e.target.value))}
+        className="mt-2 w-full accent-foreground"
+      />
+      <p className="mt-1 text-[11px] text-muted-foreground">{t('pages.imageCompress.gifLossyHint')}</p>
+    </div>
+  )
+
   return (
     <div className="mx-auto max-w-5xl px-8 py-12">
       <header className="mb-6">
@@ -282,7 +323,7 @@ export function ImageCompressPage() {
         />
       ) : (
         <div className="space-y-6">
-          {/* Options */}
+          {/* Primary Options */}
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
               <Label className="mb-1.5 block text-xs text-muted-foreground">{t('pages.imageCompress.mode')}</Label>
@@ -326,21 +367,25 @@ export function ImageCompressPage() {
             </div>
 
             {mode === 'quality' ? (
-              <div>
-                <Label htmlFor="ic-quality" className="mb-1.5 block text-xs text-muted-foreground">
-                  {t('pages.imageCompress.quality', { value: quality })}
-                </Label>
-                <input
-                  id="ic-quality"
-                  type="range"
-                  min={30}
-                  max={100}
-                  value={quality}
-                  onChange={(e) => setQuality(Number(e.target.value))}
-                  className="mt-2 w-full accent-foreground"
-                />
-                <p className="mt-1 text-[11px] text-muted-foreground">{t('pages.imageCompress.qualityHint')}</p>
-              </div>
+              onlyGif && keepsGif ? (
+                renderGifLossySlider('ic-gif-lossy')
+              ) : (
+                <div>
+                  <Label htmlFor="ic-quality" className="mb-1.5 block text-xs text-muted-foreground">
+                    {t('pages.imageCompress.quality', { value: quality })}
+                  </Label>
+                  <input
+                    id="ic-quality"
+                    type="range"
+                    min={30}
+                    max={100}
+                    value={quality}
+                    onChange={(e) => setQuality(Number(e.target.value))}
+                    className="mt-2 w-full accent-foreground"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">{t('pages.imageCompress.qualityHint')}</p>
+                </div>
+              )
             ) : (
               <div>
                 <Label htmlFor="ic-target" className="mb-1.5 block text-xs text-muted-foreground">
@@ -379,59 +424,133 @@ export function ImageCompressPage() {
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">{t('pages.imageCompress.maxEdgeHint')}</p>
             </div>
-
-            {keepsGif && (
-              <>
-                <div>
-                  <Label className="mb-1.5 block text-xs text-muted-foreground">
-                    {t('pages.imageCompress.gifColors')}
-                  </Label>
-                  <div className="flex w-fit rounded-md border border-input bg-transparent text-sm">
-                    {GIF_COLORS.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setGifColors(c)}
-                        className={cn(
-                          'px-3 py-1.5 transition-colors first:rounded-l-md last:rounded-r-md',
-                          gifColors === c
-                            ? 'bg-accent text-accent-foreground'
-                            : 'text-muted-foreground hover:text-foreground',
-                        )}
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">{t('pages.imageCompress.gifColorsHint')}</p>
-                </div>
-
-                <div>
-                  <Label className="mb-1.5 block text-xs text-muted-foreground">
-                    {t('pages.imageCompress.gifFrameSkip')}
-                  </Label>
-                  <div className="flex w-fit rounded-md border border-input bg-transparent text-sm">
-                    {GIF_FRAME_SKIPS.map((skip) => (
-                      <button
-                        key={skip}
-                        type="button"
-                        onClick={() => setGifFrameSkip(skip)}
-                        className={cn(
-                          'px-3 py-1.5 transition-colors first:rounded-l-md last:rounded-r-md',
-                          gifFrameSkip === skip
-                            ? 'bg-accent text-accent-foreground'
-                            : 'text-muted-foreground hover:text-foreground',
-                        )}
-                      >
-                        {t(`pages.imageCompress.gifFrameSkip_${skip}`)}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">{t('pages.imageCompress.gifFrameSkipHint')}</p>
-                </div>
-              </>
-            )}
           </div>
+
+          {/* GIF-specific compression options (FreeConvert-style) */}
+          {keepsGif && (
+            <div className="space-y-4 rounded-lg border border-border/70 bg-card/30 p-4">
+              <p className="text-xs font-medium text-foreground">{t('pages.imageCompress.gifOptionsTitle')}</p>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                {mode === 'quality' && !onlyGif && renderGifLossySlider('ic-gif-lossy-mixed')}
+
+                <div>
+                  <Label htmlFor="ic-gif-drop" className="mb-1.5 block text-xs text-muted-foreground">
+                    {t('pages.imageCompress.gifDropFrames')}
+                  </Label>
+                  <select
+                    id="ic-gif-drop"
+                    value={gifDropFrames}
+                    onChange={(e) => setGifDropFrames(e.target.value as GifDropFrames)}
+                    className="h-9 w-full max-w-xs rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    {GIF_DROP_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {t(`pages.imageCompress.gifDrop_${opt}`)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-muted-foreground">{t('pages.imageCompress.gifDropHint')}</p>
+                </div>
+
+                <div>
+                  <Label className="mb-1.5 block text-xs text-muted-foreground">
+                    {t('pages.imageCompress.gifReduceColors')}
+                  </Label>
+                  <div className="flex w-fit rounded-md border border-input bg-transparent text-sm">
+                    {GIF_COLOR_MODES.map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setGifColorMode(m)}
+                        className={cn(
+                          'px-3 py-1.5 transition-colors first:rounded-l-md last:rounded-r-md',
+                          gifColorMode === m
+                            ? 'bg-accent text-accent-foreground'
+                            : 'text-muted-foreground hover:text-foreground',
+                        )}
+                      >
+                        {t(`pages.imageCompress.gifColorMode_${m}`)}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {t('pages.imageCompress.gifReduceColorsHint')}
+                  </p>
+                </div>
+
+                {gifColorMode !== 'none' && (
+                  <div className="sm:col-span-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <Label htmlFor="ic-gif-colors" className="text-xs text-muted-foreground">
+                        {t('pages.imageCompress.gifColorCount', { value: gifColorCount })}
+                      </Label>
+                      <div className="flex items-center gap-1">
+                        {GIF_COLOR_PRESETS.map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => setGifColorCount(n)}
+                            className={cn(
+                              'rounded border px-2 py-0.5 text-[11px] transition-colors',
+                              gifColorCount === n
+                                ? 'border-foreground/40 bg-accent text-accent-foreground'
+                                : 'border-input text-muted-foreground hover:text-foreground',
+                            )}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <input
+                      id="ic-gif-colors"
+                      type="range"
+                      min={2}
+                      max={256}
+                      value={gifColorCount}
+                      onChange={(e) => setGifColorCount(Number(e.target.value))}
+                      className="mt-2 w-full accent-foreground"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-border/50 pt-3">
+                <label
+                  className={cn(
+                    'flex items-center gap-2 text-xs',
+                    gifUndoOptimizations ? 'cursor-not-allowed text-muted-foreground/50' : 'cursor-pointer text-foreground',
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={gifOptimizeTransparency && !gifUndoOptimizations}
+                    disabled={gifUndoOptimizations}
+                    onChange={(e) => setGifOptimizeTransparency(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-foreground"
+                  />
+                  <span>{t('pages.imageCompress.gifOptimizeTransparency')}</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    ({t('pages.imageCompress.gifOptimizeTransparencyHint')})
+                  </span>
+                </label>
+
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={gifUndoOptimizations}
+                    onChange={(e) => setGifUndoOptimizations(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-foreground"
+                  />
+                  <span>{t('pages.imageCompress.gifUndoOptimizations')}</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    ({t('pages.imageCompress.gifUndoOptimizationsHint')})
+                  </span>
+                </label>
+              </div>
+            </div>
+          )}
 
           {/* Action bar */}
           <div className="flex flex-wrap items-center gap-3">

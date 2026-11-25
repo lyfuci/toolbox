@@ -6,9 +6,9 @@ import {
   hasGifMagic,
   isGifFile,
   parseGifInfo,
-  qualityToGifLossy,
+  clampGifLossy,
+  clampGifColors,
   planKeptFrames,
-  pickOptimizeLevel,
   buildGifCommands,
   compressGif,
   GifCancelledError,
@@ -145,7 +145,6 @@ describe('parseGifInfo', () => {
   })
 
   it('parses a single-frame GIF without Graphic Control Extension', () => {
-    // Minimal GIF87a with 1 frame and no GCE
     const bytes = new Uint8Array([
       0x47, 0x49, 0x46, 0x38, 0x37, 0x61, // GIF87a
       10, 0, 20, 0, // 10x20
@@ -165,133 +164,177 @@ describe('parseGifInfo', () => {
   it('returns null for non-GIF or truncated buffers', () => {
     expect(parseGifInfo(new Uint8Array([1, 2, 3]))).toBeNull()
     expect(parseGifInfo(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))).toBeNull()
-    // Valid header but zero frames
     expect(
       parseGifInfo(new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 10, 0, 10, 0, 0, 0, 0, 0x3b])),
     ).toBeNull()
   })
 })
 
-describe('qualityToGifLossy', () => {
-  it('maps 100 -> 0 (lossless), 80 -> ~57, and 30 -> 200 monotonically', () => {
-    expect(qualityToGifLossy(100)).toBe(0)
-    expect(qualityToGifLossy(80)).toBe(57)
-    expect(qualityToGifLossy(30)).toBe(200)
-    expect(qualityToGifLossy(120)).toBe(0)
-    expect(qualityToGifLossy(5)).toBe(200)
-    expect(qualityToGifLossy(90)).toBeLessThan(qualityToGifLossy(70))
+describe('clampGifLossy / clampGifColors', () => {
+  it('clamps lossy to [0, 200] and colors to [2, 256]', () => {
+    expect(clampGifLossy(-10)).toBe(0)
+    expect(clampGifLossy(75.4)).toBe(75)
+    expect(clampGifLossy(300)).toBe(200)
+    expect(clampGifColors(1)).toBe(2)
+    expect(clampGifColors(64)).toBe(64)
+    expect(clampGifColors(512)).toBe(256)
   })
 })
 
 describe('planKeptFrames', () => {
-  it('keeps all frames unchanged when frameSkip is 1 or single-frame', () => {
-    expect(planKeptFrames([5, 5, 10], 1)).toEqual([
+  it('keeps all frames unchanged when mode is none or single-frame', () => {
+    expect(planKeptFrames([5, 5, 10], 'none')).toEqual([
       { index: 0, delayCs: 5 },
       { index: 1, delayCs: 5 },
       { index: 2, delayCs: 10 },
     ])
-    expect(planKeptFrames([0], 2)).toEqual([{ index: 0, delayCs: 0 }])
+    expect(planKeptFrames([0], 'every2')).toEqual([{ index: 0, delayCs: 0 }])
   })
 
-  it('merges dropped frame delays to preserve total animation duration', () => {
-    const kept = planKeptFrames([5, 5, 10, 5, 5, 10], 2)
+  it('drops every 2nd frame and preserves total duration', () => {
+    const delays = [5, 5, 10, 5, 5, 10]
+    const kept = planKeptFrames(delays, 'every2')
     expect(kept).toEqual([
       { index: 0, delayCs: 10 },
       { index: 2, delayCs: 15 },
       { index: 4, delayCs: 15 },
     ])
-    const totalBefore = [5, 5, 10, 5, 5, 10].reduce((a, b) => a + b, 0)
-    const totalAfter = kept.reduce((a, f) => a + f.delayCs, 0)
-    expect(totalAfter).toBe(totalBefore)
+    expect(kept.reduce((a, f) => a + f.delayCs, 0)).toBe(delays.reduce((a, b) => a + b, 0))
   })
 
-  it('handles uneven frame counts and browser 0/1-cs clamping', () => {
-    // 5 frames with step 3 -> keeps #0 (d0+d1+d2) and #3 (d3+d4)
-    expect(planKeptFrames([4, 4, 4, 6, 6], 3)).toEqual([
+  it('drops every 3rd, 4th, and 5th frame accurately while keeping total duration', () => {
+    // 6 frames of 5 cs each = 30 cs total
+    const six = [5, 5, 5, 5, 5, 5]
+    expect(planKeptFrames(six, 'every3')).toEqual([
+      { index: 0, delayCs: 5 },
+      { index: 1, delayCs: 10 }, // #2 folded into #1
+      { index: 3, delayCs: 5 },
+      { index: 4, delayCs: 10 }, // #5 folded into #4
+    ])
+    expect(planKeptFrames(six, 'every4')).toEqual([
+      { index: 0, delayCs: 5 },
+      { index: 1, delayCs: 5 },
+      { index: 2, delayCs: 10 }, // #3 folded into #2
+      { index: 4, delayCs: 5 },
+      { index: 5, delayCs: 5 },
+    ])
+    expect(planKeptFrames(six, 'every5')).toEqual([
+      { index: 0, delayCs: 5 },
+      { index: 1, delayCs: 5 },
+      { index: 2, delayCs: 5 },
+      { index: 3, delayCs: 10 }, // #4 folded into #3
+      { index: 5, delayCs: 5 },
+    ])
+  })
+
+  it('handles keep1of3 and browser 0/1-cs delay clamping', () => {
+    expect(planKeptFrames([4, 4, 4, 6, 6], 'keep1of3')).toEqual([
       { index: 0, delayCs: 12 },
       { index: 3, delayCs: 12 },
     ])
-    // 0-cs delays in multi-frame GIF are treated as 10 cs (browser default)
-    expect(planKeptFrames([0, 0, 1, 5], 2)).toEqual([
+    expect(planKeptFrames([0, 0, 1, 5], 'every2')).toEqual([
       { index: 0, delayCs: 20 },
       { index: 2, delayCs: 15 },
     ])
   })
 })
 
-describe('pickOptimizeLevel / buildGifCommands', () => {
-  it('drops from -O2 to -O1 for large files or very long animations', () => {
-    expect(pickOptimizeLevel(1_000_000, 40)).toBe(2)
-    expect(pickOptimizeLevel(6 * 1024 * 1024, 40)).toBe(1)
-    expect(pickOptimizeLevel(500_000, 150)).toBe(1)
-  })
-
-  it('builds a single-pass command when not dropping frames, omitting no-op flags', () => {
+describe('buildGifCommands', () => {
+  it('builds single-pass commands for transparency on/off, undo-optimizations, and dithering', () => {
     expect(
       buildGifCommands({
         lossy: 0,
-        colors: 256,
-        frameSkip: 1,
+        colorMode: 'none',
+        colorCount: 256,
+        dropFrames: 'none',
         delaysCs: [5, 5],
+        optimizeTransparency: true,
+        undoOptimizations: false,
       }),
-    ).toEqual(['-O2 /input.gif -o /out/output.gif'])
+    ).toEqual(['-w --no-comments --no-names -O2 /input.gif -o /out/output.gif'])
 
     expect(
       buildGifCommands({
-        lossy: 60,
-        colors: 128,
+        lossy: 75,
+        colorMode: 'no-dither',
+        colorCount: 64,
         resizeWidth: 480,
         resizeHeight: 270,
-        frameSkip: 1,
+        dropFrames: 'none',
         delaysCs: [5, 5],
+        optimizeTransparency: false,
+        undoOptimizations: false,
       }),
-    ).toEqual(['-O2 --lossy=60 --colors 128 --resize-fit 480x270 /input.gif -o /out/output.gif'])
+    ).toEqual([
+      '-w --no-comments --no-names -O1 --lossy=75 --colors 64 --no-dither --resize-fit 480x270 /input.gif -o /out/output.gif',
+    ])
+
+    expect(
+      buildGifCommands({
+        lossy: 0,
+        colorMode: 'dither',
+        colorCount: 128,
+        dropFrames: 'none',
+        delaysCs: [5, 5],
+        optimizeTransparency: true,
+        undoOptimizations: true,
+      }),
+    ).toEqual(['-w --no-comments --no-names -U --colors 128 --dither /input.gif -o /out/output.gif'])
   })
 
   it('builds a 2-pass unoptimize + frame-drop command and deduplicates consecutive -d flags', () => {
     expect(
       buildGifCommands({
         lossy: 80,
-        colors: 64,
+        colorMode: 'dither',
+        colorCount: 64,
         resizeWidth: 320,
         resizeHeight: 240,
-        frameSkip: 2,
+        dropFrames: 'every2',
         delaysCs: [5, 5, 10, 5, 5, 10],
+        optimizeTransparency: true,
+        undoOptimizations: false,
       }),
     ).toEqual([
-      '-U /input.gif -o /tem/u.gif',
-      '-O2 --lossy=80 --colors 64 --resize-fit 320x240 /tem/u.gif -d10 #0 -d15 #2 #4 -o /out/output.gif',
+      '-w -U /input.gif -o /tem/u.gif',
+      '-w --no-comments --no-names -O2 --lossy=80 --colors 64 --dither --resize-fit 320x240 /tem/u.gif -d10 #0 -d15 #2 #4 -o /out/output.gif',
     ])
   })
 
-  it('stays single-pass for a single-frame GIF even if frameSkip > 1', () => {
+  it('stays single-pass when dropFrames would remove 0 frames (e.g. 2-frame GIF with every3)', () => {
     expect(
       buildGifCommands({
         lossy: 50,
-        colors: 256,
-        frameSkip: 2,
-        delaysCs: [0],
+        colorMode: 'none',
+        colorCount: 256,
+        dropFrames: 'every3',
+        delaysCs: [5, 5],
+        optimizeTransparency: true,
+        undoOptimizations: false,
       }),
-    ).toEqual(['-O2 --lossy=50 /input.gif -o /out/output.gif'])
+    ).toEqual(['-w --no-comments --no-names -O2 --lossy=50 /input.gif -o /out/output.gif'])
   })
 })
 
 describe('compressGif (real gifsicle WASM integration)', () => {
   const realRunner = loadRealNodeGifsicleRunner()
 
-  it('compresses, resizes, reduces colors, and drops frames while preserving duration', async () => {
-    const raw = makeSyntheticGif(32, 24, [5, 5, 10, 5, 5, 10])
+  it('compresses, resizes, reduces colors with dithering, and drops every 3rd frame while preserving duration', async () => {
+    const raw = makeSyntheticGif(32, 24, [5, 5, 5, 5, 5, 5])
     const file = new Blob([raw], { type: 'image/gif' })
 
     const res = await compressGif(
       file,
       {
         mode: 'quality',
-        quality: 70,
+        lossy: 75,
         targetBytes: 100_000,
         maxEdge: 16,
-        colors: 64,
-        frameSkip: 2,
+        colorMode: 'dither',
+        colorCount: 4,
+        dropFrames: 'every3',
+        optimizeTransparency: true,
+        undoOptimizations: false,
       },
       realRunner,
     )
@@ -299,46 +342,96 @@ describe('compressGif (real gifsicle WASM integration)', () => {
     expect(res.outW).toBe(16)
     expect(res.outH).toBe(12)
     expect(res.framesBefore).toBe(6)
-    expect(res.framesAfter).toBe(3)
+    expect(res.framesAfter).toBe(4)
+    expect(res.lossy).toBe(75)
     expect(res.blob.size).toBeLessThan(raw.byteLength)
 
     const outInfo = parseGifInfo(new Uint8Array(await res.blob.arrayBuffer()))
     expect(outInfo).toEqual({
       width: 16,
       height: 12,
-      frameCount: 3,
-      delaysCs: [10, 15, 15],
+      frameCount: 4,
+      delaysCs: [5, 10, 5, 10],
     })
   })
 
-  it('supports target-size binary search without redundant final re-encode', async () => {
+  it('supports undoOptimizations and no-dither flags in real gifsicle WASM', async () => {
+    const raw = makeSyntheticGif(16, 16, [5, 5, 5, 5])
+    const file = new Blob([raw], { type: 'image/gif' })
+
+    const res = await compressGif(
+      file,
+      {
+        mode: 'quality',
+        lossy: 40,
+        targetBytes: 100_000,
+        maxEdge: null,
+        colorMode: 'no-dither',
+        colorCount: 4,
+        dropFrames: 'none',
+        optimizeTransparency: true,
+        undoOptimizations: true,
+      },
+      realRunner,
+    )
+
+    const outInfo = parseGifInfo(new Uint8Array(await res.blob.arrayBuffer()))
+    expect(outInfo?.frameCount).toBe(4)
+    expect(outInfo?.width).toBe(16)
+  })
+
+  it('returns immediately on target-size fast path when lossless already fits, otherwise binary-searches', async () => {
     const raw = makeSyntheticGif(32, 24, [5, 5, 5, 5])
     const file = new Blob([raw], { type: 'image/gif' })
-    let calls = 0
+
+    // Fast path: lossless size (2000 B) <= target (5000 B) -> 1 call
+    let fastCalls = 0
     const mockRunner = async (_buf: ArrayBuffer, commands: string[]) => {
-      calls++
-      // Larger lossy -> smaller mock size
+      fastCalls++
       const m = commands[commands.length - 1].match(/--lossy=(\d+)/)
       const lossy = m ? Number(m[1]) : 0
       const fakeSize = Math.max(100, 2000 - lossy * 8)
       return new Blob([new Uint8Array(fakeSize)], { type: 'image/gif' })
     }
 
-    const res = await compressGif(
+    const fastRes = await compressGif(
       file,
       {
         mode: 'target',
-        quality: 80,
-        targetBytes: 1200,
+        lossy: 75,
+        targetBytes: 5000,
         maxEdge: null,
-        colors: 256,
-        frameSkip: 1,
+        colorMode: 'none',
+        colorCount: 128,
+        dropFrames: 'none',
+        optimizeTransparency: true,
+        undoOptimizations: false,
       },
       mockRunner,
     )
+    expect(fastRes.lossy).toBe(0)
+    expect(fastCalls).toBe(1)
 
-    expect(res.blob.size).toBeLessThanOrEqual(1200)
-    expect(calls).toBeLessThanOrEqual(7)
+    // Search path: target = 1200 B -> needs lossy >= 100
+    fastCalls = 0
+    const searchRes = await compressGif(
+      file,
+      {
+        mode: 'target',
+        lossy: 75,
+        targetBytes: 1200,
+        maxEdge: null,
+        colorMode: 'none',
+        colorCount: 128,
+        dropFrames: 'none',
+        optimizeTransparency: true,
+        undoOptimizations: false,
+      },
+      mockRunner,
+    )
+    expect(searchRes.blob.size).toBeLessThanOrEqual(1200)
+    expect(searchRes.lossy).toBe(100)
+    expect(fastCalls).toBeLessThanOrEqual(9)
   })
 
   it('aborts promptly with GifCancelledError when cancelled', async () => {
@@ -349,11 +442,14 @@ describe('compressGif (real gifsicle WASM integration)', () => {
         file,
         {
           mode: 'quality',
-          quality: 80,
+          lossy: 75,
           targetBytes: 500,
           maxEdge: null,
-          colors: 256,
-          frameSkip: 1,
+          colorMode: 'none',
+          colorCount: 128,
+          dropFrames: 'none',
+          optimizeTransparency: true,
+          undoOptimizations: false,
           isCancelled: () => true,
         },
         realRunner,

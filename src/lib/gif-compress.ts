@@ -3,14 +3,15 @@
  *
  * Pure binary parsing (`parseGifInfo`) and gifsicle CLI builders stay separate
  * from the browser Worker runner (`compressGif`) so every decision — lossy
- * mapping, frame-skip delay merging, optimization level, and resize flags — is
- * unit-testable without a browser.
+ * level, frame-drop delay merging, color quantization/dithering, transparency
+ * optimization, unoptimization, and resize flags — is unit-testable without a
+ * browser.
  */
 
 import { fitDimensions, searchQualityForSize } from '@/lib/image-compress'
 
-export type GifColors = 256 | 128 | 64 | 32
-export type GifFrameSkip = 1 | 2 | 3
+export type GifDropFrames = 'none' | 'every2' | 'every3' | 'every4' | 'every5' | 'keep1of3'
+export type GifColorMode = 'none' | 'dither' | 'no-dither'
 
 export type GifInfo = {
   width: number
@@ -32,25 +33,34 @@ export type GifCommandOptions = {
   outputPath?: string
   /** Gifsicle `--lossy` strength: 0 = lossless (omitted), 1..200 = lossy. */
   lossy: number
-  colors: GifColors
+  /** Color reduction mode (`none` keeps original palette). */
+  colorMode: GifColorMode
+  /** Target palette size in [2, 256] when `colorMode !== 'none'`. */
+  colorCount: number
   /** Target box for `--resize-fit`; pass null/undefined when not scaling down. */
   resizeWidth?: number | null
   resizeHeight?: number | null
-  frameSkip: GifFrameSkip
+  dropFrames: GifDropFrames
   delaysCs: readonly number[]
-  optimizeLevel?: 1 | 2 | 3
+  /** Use `-O2` transparency optimization (otherwise `-O1`). Ignored if `undoOptimizations` is true. */
+  optimizeTransparency: boolean
+  /** Expand delta frames (`-U`) and skip re-optimizing (useful for fixing glitchy GIFs). */
+  undoOptimizations: boolean
 }
 
 export type GifCompressOptions = {
   mode: 'quality' | 'target'
-  /** UI quality slider value in [30, 100]. */
-  quality: number
+  /** Gifsicle lossy compression level in [0, 200] (0 = lossless, 75 = balanced default). */
+  lossy: number
   /** Target output size in bytes (used when `mode === 'target'`). */
   targetBytes: number
   /** Max longest edge in px (null = keep original dimensions). */
   maxEdge: number | null
-  colors: GifColors
-  frameSkip: GifFrameSkip
+  colorMode: GifColorMode
+  colorCount: number
+  dropFrames: GifDropFrames
+  optimizeTransparency: boolean
+  undoOptimizations: boolean
   /** Optional cancellation check polled between target-size search iterations. */
   isCancelled?: () => boolean
 }
@@ -61,7 +71,7 @@ export type GifCompressResult = {
   outH: number
   framesBefore: number
   framesAfter: number
-  quality: number
+  lossy: number
 }
 
 export class GifCancelledError extends Error {
@@ -160,52 +170,62 @@ export function parseGifInfo(bytes: Uint8Array): GifInfo | null {
   return { width, height, frameCount: delaysCs.length, delaysCs }
 }
 
-/**
- * Map the page's quality slider (30..100) monotonically to gifsicle's
- * `--lossy` value (200..0).
- *  - 100 → 0 (lossless optimization only)
- *  - 80  → 57 (balanced default, right inside gifsicle's 30–60 sweet spot)
- *  - 30  → 200 (strongest lossy compression)
- */
-export function qualityToGifLossy(quality: number): number {
-  const clamped = Math.max(30, Math.min(100, quality))
-  if (clamped >= 100) return 0
-  return Math.round(((100 - clamped) / 70) * 200)
+/** Clamp lossy compression strength to gifsicle's supported [0, 200] integer range. */
+export function clampGifLossy(lossy: number): number {
+  if (!Number.isFinite(lossy)) return 75
+  return Math.max(0, Math.min(200, Math.round(lossy)))
+}
+
+/** Clamp GIF palette size to [2, 256]. */
+export function clampGifColors(colors: number): number {
+  if (!Number.isFinite(colors)) return 128
+  return Math.max(2, Math.min(256, Math.round(colors)))
 }
 
 // Browsers clamp 0-cs and 1-cs frame delays to 10 cs (100 ms) in animated GIFs.
 const effectiveFrameDelay = (d: number) => (d <= 1 ? 10 : d)
 
-/**
- * Pick every `frameSkip`-th frame and fold dropped frames' delays into the
- * kept frame preceding them so overall animation speed stays unchanged.
- */
-export function planKeptFrames(delaysCs: readonly number[], frameSkip: GifFrameSkip): PlannedFrame[] {
-  const n = delaysCs.length
-  if (n === 0) return []
-  if (frameSkip <= 1 || n === 1) {
-    return delaysCs.map((delayCs, index) => ({ index, delayCs }))
+function shouldDropFrame(index: number, mode: GifDropFrames): boolean {
+  if (index === 0) return false
+  switch (mode) {
+    case 'none':
+      return false
+    case 'every2':
+      return (index + 1) % 2 === 0 // drop #1, #3, #5... (-50%)
+    case 'every3':
+      return (index + 1) % 3 === 0 // drop #2, #5, #8... (-33%)
+    case 'every4':
+      return (index + 1) % 4 === 0 // drop #3, #7, #11... (-25%)
+    case 'every5':
+      return (index + 1) % 5 === 0 // drop #4, #9, #14... (-20%)
+    case 'keep1of3':
+      return index % 3 !== 0 // keep #0, #3, #6... (-67%)
   }
-  const kept: PlannedFrame[] = []
-  for (let i = 0; i < n; i += frameSkip) {
-    let sum = 0
-    const end = Math.min(i + frameSkip, n)
-    for (let j = i; j < end; j++) {
-      sum += effectiveFrameDelay(delaysCs[j])
-    }
-    kept.push({ index: i, delayCs: Math.min(65535, sum) })
-  }
-  return kept
 }
 
 /**
- * Choose `-O2` for normal GIFs and `-O1` for very large / long animations so
- * WASM runtime stays responsive (gifsicle `-O2`/`-O3` scales superlinearly on
- * multi-megabyte animations with minimal extra savings over `-O1`).
+ * Drop frames according to `dropFrames` and fold each dropped frame's duration
+ * into the immediately preceding kept frame so total playback speed stays
+ * unchanged.
  */
-export function pickOptimizeLevel(byteLength: number, frameCount: number): 1 | 2 {
-  if (byteLength > 5 * 1024 * 1024 || frameCount > 120) return 1
-  return 2
+export function planKeptFrames(delaysCs: readonly number[], dropFrames: GifDropFrames): PlannedFrame[] {
+  const n = delaysCs.length
+  if (n === 0) return []
+  if (dropFrames === 'none' || n === 1) {
+    return delaysCs.map((delayCs, index) => ({ index, delayCs }))
+  }
+
+  const kept: PlannedFrame[] = []
+  for (let i = 0; i < n; i++) {
+    const d = effectiveFrameDelay(delaysCs[i])
+    if (shouldDropFrame(i, dropFrames) && kept.length > 0) {
+      const prev = kept[kept.length - 1]
+      prev.delayCs = Math.min(65535, prev.delayCs + d)
+    } else {
+      kept.push({ index: i, delayCs: Math.min(65535, d) })
+    }
+  }
+  return kept
 }
 
 /**
@@ -213,37 +233,50 @@ export function pickOptimizeLevel(byteLength: number, frameCount: number): 1 | 2
  *
  * When frame dropping is active on a multi-frame GIF, we run a 2-pass pipeline
  * inside the same MEMFS:
- *  1. `-U /input.gif -o /tem/u.gif` — unoptimize delta rectangles first so
+ *  1. `-w -U /input.gif -o /tem/u.gif` — unoptimize delta rectangles first so
  *     deleting intermediate frames never corrupts subsequent frames.
- *  2. Select kept frames with merged `-d<cs>` delays, then resize/quantize/
- *     lossy-optimize into `/out/output.gif`.
+ *  2. Select kept frames with merged `-d<cs>` delays, then apply resize,
+ *     palette reduction, dithering, lossy LZW, and optimization into `/out/output.gif`.
  */
 export function buildGifCommands(opts: GifCommandOptions): string[] {
   const inputName = opts.inputName ?? '/input.gif'
   const outputPath = opts.outputPath ?? '/out/output.gif'
-  const optLevel = opts.optimizeLevel ?? 2
-  const dropFrames = opts.frameSkip > 1 && opts.delaysCs.length > 1
+  const planned = opts.dropFrames !== 'none' && opts.delaysCs.length > 1 ? planKeptFrames(opts.delaysCs, opts.dropFrames) : null
+  const dropFrames = planned !== null && planned.length < opts.delaysCs.length
 
   const commands: string[] = []
   let sourcePath = inputName
 
   if (dropFrames) {
     const unoptPath = '/tem/u.gif'
-    commands.push(`-U ${inputName} -o ${unoptPath}`)
+    commands.push(`-w -U ${inputName} -o ${unoptPath}`)
     sourcePath = unoptPath
   }
 
-  const tokens: string[] = [`-O${optLevel}`]
-  if (opts.lossy > 0) tokens.push(`--lossy=${Math.min(200, Math.round(opts.lossy))}`)
-  if (opts.colors < 256) tokens.push('--colors', String(opts.colors))
+  const tokens: string[] = ['-w', '--no-comments', '--no-names']
+  if (opts.undoOptimizations) {
+    // If pass 1 already unoptimized into /tem/u.gif, don't repeat -U on it.
+    if (!dropFrames) tokens.push('-U')
+  } else {
+    tokens.push(opts.optimizeTransparency ? '-O2' : '-O1')
+  }
+
+  const lossy = clampGifLossy(opts.lossy)
+  if (lossy > 0) tokens.push(`--lossy=${lossy}`)
+
+  if (opts.colorMode !== 'none') {
+    const colors = clampGifColors(opts.colorCount)
+    tokens.push('--colors', String(colors))
+    tokens.push(opts.colorMode === 'dither' ? '--dither' : '--no-dither')
+  }
+
   if (opts.resizeWidth && opts.resizeHeight) {
     tokens.push('--resize-fit', `${opts.resizeWidth}x${opts.resizeHeight}`)
   }
 
   tokens.push(sourcePath)
 
-  if (dropFrames) {
-    const planned = planKeptFrames(opts.delaysCs, opts.frameSkip)
+  if (dropFrames && planned) {
     let lastDelay = -1
     for (const frame of planned) {
       if (frame.delayCs !== lastDelay) {
@@ -278,8 +311,9 @@ async function runGifsicleBrowser(inputBuf: ArrayBuffer, commands: string[]): Pr
 
 /**
  * Compress a GIF in a background Web Worker via gifsicle-wasm-browser.
- * Supports both quality mode and target-size binary search, optional resizing,
- * color reduction, and speed-preserving frame dropping.
+ * Supports direct lossy level (0..200) and target-size binary search, optional
+ * resizing, color reduction with/without dithering, transparency optimization,
+ * undo-optimizations, and speed-preserving frame dropping.
  */
 export async function compressGif(
   file: Blob,
@@ -293,58 +327,78 @@ export async function compressGif(
 
   const { width: outW, height: outH } = fitDimensions(info.width, info.height, opts.maxEdge)
   const needsResize = outW < info.width || outH < info.height
-  const optimizeLevel = pickOptimizeLevel(bytes.byteLength, info.frameCount)
   const framesAfter =
-    opts.frameSkip > 1 && info.frameCount > 1
-      ? planKeptFrames(info.delaysCs, opts.frameSkip).length
+    opts.dropFrames !== 'none' && info.frameCount > 1
+      ? planKeptFrames(info.delaysCs, opts.dropFrames).length
       : info.frameCount
 
-  const encodeAt = async (q: number): Promise<Blob> => {
+  const encodeAtLossy = async (lossy: number): Promise<Blob> => {
     if (opts.isCancelled?.()) throw new GifCancelledError()
     const commands = buildGifCommands({
-      lossy: qualityToGifLossy(q),
-      colors: opts.colors,
+      lossy,
+      colorMode: opts.colorMode,
+      colorCount: opts.colorCount,
       resizeWidth: needsResize ? outW : null,
       resizeHeight: needsResize ? outH : null,
-      frameSkip: opts.frameSkip,
+      dropFrames: opts.dropFrames,
       delaysCs: info.delaysCs,
-      optimizeLevel,
+      optimizeTransparency: opts.optimizeTransparency,
+      undoOptimizations: opts.undoOptimizations,
     })
     return runner(rawBuf, commands)
   }
 
   if (opts.mode === 'target') {
+    // Fast path: if lossless (lossy = 0) already fits under target, avoid searching.
+    const lossless = await encodeAtLossy(0)
+    if (opts.isCancelled?.()) throw new GifCancelledError()
+    if (lossless.size <= opts.targetBytes) {
+      return {
+        blob: lossless,
+        outW,
+        outH,
+        framesBefore: info.frameCount,
+        framesAfter,
+        lossy: 0,
+      }
+    }
+
+    // Binary-search inverted quality q = 200 - lossy in [0..199] (higher q =
+    // lower lossy = larger file) to find the least aggressive lossy that fits.
     const cache = new Map<number, Blob>()
     const bestQ = await searchQualityForSize(
       async (q) => {
-        const blob = await encodeAt(q)
-        cache.set(q, blob)
+        const lossy = 200 - q
+        const blob = await encodeAtLossy(lossy)
+        cache.set(lossy, blob)
         return blob.size
       },
       opts.targetBytes,
-      30,
-      100,
-      7,
+      0,
+      199,
+      8,
     )
     if (opts.isCancelled?.()) throw new GifCancelledError()
-    const blob = cache.get(bestQ) ?? (await encodeAt(bestQ))
+    const bestLossy = 200 - bestQ
+    const blob = cache.get(bestLossy) ?? (await encodeAtLossy(bestLossy))
     return {
       blob,
       outW,
       outH,
       framesBefore: info.frameCount,
       framesAfter,
-      quality: bestQ,
+      lossy: bestLossy,
     }
   }
 
-  const blob = await encodeAt(opts.quality)
+  const usedLossy = clampGifLossy(opts.lossy)
+  const blob = await encodeAtLossy(usedLossy)
   return {
     blob,
     outW,
     outH,
     framesBefore: info.frameCount,
     framesAfter,
-    quality: opts.quality,
+    lossy: usedLossy,
   }
 }
