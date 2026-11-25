@@ -80,7 +80,7 @@ export const TOOL_ALIASES: Readonly<Record<string, readonly string[]>> = {
 
   // media
   'image-editor': ['photo', 'picture', 'pic', 'img', 'ps', 'photoshop', 'gimp', 'crop', 'resize', 'rotate', 'flip', 'watermark', 'remove background', '图片', '照片', '图像', '修图', 'p图', '抠图', '裁剪', '调整大小', '旋转', '翻转', '水印', '去背景'],
-  'image-compress': ['photo', 'picture', 'pic', 'img', 'optimize', 'reduce file size', 'tinypng', 'shrink', 'png to jpg', 'jpg to webp', 'convert image format', '图片', '照片', '图像', '缩小', '减小体积', '图片瘦身', '转webp', 'png转jpg', '图片格式转换', '批量压缩'],
+  'image-compress': ['photo', 'picture', 'pic', 'img', 'gif', 'compress gif', 'gif compress', 'optimize', 'reduce file size', 'tinypng', 'shrink', 'png to jpg', 'jpg to webp', 'convert image format', '图片', '照片', '图像', '动图', 'gif压缩', '动图压缩', '缩小', '减小体积', '图片瘦身', '转webp', 'png转jpg', '图片格式转换', '批量压缩'],
   media: ['video', 'video editor', 'mp4', 'mov', 'mp3', 'wav', 'srt', 'ffmpeg', 'extract audio', 'compress video', 'convert video', 'concat', '视频', '音频', '剪辑', '剪视频', '提取音频', '压缩视频', '视频转码', '加字幕', '变速', '拼接视频'],
 }
 

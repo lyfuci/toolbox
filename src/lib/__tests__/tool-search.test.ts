@@ -116,6 +116,8 @@ describe('what a user types finds the tool they meant', () => {
     ['compress', 'image-compress'],
     ['shrink', 'image-compress'],
     ['tinypng', 'image-compress'],
+    ['gif', 'image-compress'],
+    ['动图压缩', 'image-compress'],
     // Chinese words, English UI
     ['图片', 'image-editor'],
     ['压缩', 'image-compress'],

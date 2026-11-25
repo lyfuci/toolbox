@@ -22,14 +22,15 @@ export type ResolvedOutput = { mime: string; ext: string; lossy: boolean }
 
 /**
  * Decide the output mime/ext given the source mime and the chosen format.
- * `original` keeps a re-encodable source format (jpeg/webp/png); anything the
- * canvas can't re-emit as-is (gif/bmp/svg/…) falls back to lossless PNG.
- * `lossy` is true for jpeg/webp (a quality applies), false for png.
+ * `original` keeps a re-encodable source format (jpeg/webp/png/gif); anything
+ * we can't re-emit as-is (bmp/svg/…) falls back to lossless PNG.
+ * `lossy` is true for jpeg/webp/gif (a quality applies), false for png.
  */
 export function resolveOutput(sourceMime: string, out: OutFormat): ResolvedOutput {
   if (out === 'original') {
     if (sourceMime === 'image/jpeg' || sourceMime === 'image/jpg') return { mime: 'image/jpeg', ext: 'jpg', lossy: true }
     if (sourceMime === 'image/webp') return { mime: 'image/webp', ext: 'webp', lossy: true }
+    if (sourceMime === 'image/gif') return { mime: 'image/gif', ext: 'gif', lossy: true }
     return { mime: 'image/png', ext: 'png', lossy: false }
   }
   return { mime: LOSSY_MIME[out], ext: OUT_EXT[out], lossy: out !== 'png' }

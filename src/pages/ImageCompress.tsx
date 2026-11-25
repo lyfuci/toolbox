@@ -16,15 +16,35 @@ import {
   fmtBytes,
   type OutFormat,
 } from '@/lib/image-compress'
+import {
+  compressGif,
+  hasGifMagic,
+  isGifFile,
+  GifCancelledError,
+  type GifColors,
+  type GifFrameSkip,
+} from '@/lib/gif-compress'
 
 type Mode = 'quality' | 'target'
 type Source = { id: string; file: File }
 type Result =
-  | { status: 'done'; url: string; blob: Blob; outName: string; outW: number; outH: number; quality?: number }
+  | {
+      status: 'done'
+      url: string
+      blob: Blob
+      outName: string
+      outW: number
+      outH: number
+      quality?: number
+      framesBefore?: number
+      framesAfter?: number
+    }
   | { status: 'error'; error: string }
 
 const FORMATS: OutFormat[] = ['original', 'jpeg', 'webp', 'png']
 const FORMAT_LABEL: Record<OutFormat, string> = { original: '', jpeg: 'JPEG', webp: 'WebP', png: 'PNG' }
+const GIF_COLORS: GifColors[] = [256, 128, 64, 32]
+const GIF_FRAME_SKIPS: GifFrameSkip[] = [1, 2, 3]
 
 let idCounter = 0
 const nextId = () => `img_${++idCounter}`
@@ -43,7 +63,12 @@ export function ImageCompressPage() {
   const [targetKB, setTargetKB] = useState(200)
   const [format, setFormat] = useState<OutFormat>('original')
   const [maxEdge, setMaxEdge] = useState('') // '' = no resize
+  const [gifColors, setGifColors] = useState<GifColors>(256)
+  const [gifFrameSkip, setGifFrameSkip] = useState<GifFrameSkip>(1)
   const [busy, setBusy] = useState(false)
+
+  const hasGif = useMemo(() => sources.some((s) => isGifFile(s.file)), [sources])
+  const keepsGif = hasGif && format === 'original'
 
   const runRef = useRef(0)
   const resultsRef = useRef(results)
@@ -58,7 +83,7 @@ export function ImageCompressPage() {
   )
 
   const onFiles = (files: File[]) => {
-    const imgs = files.filter((f) => f.type.startsWith('image/'))
+    const imgs = files.filter((f) => f.type.startsWith('image/') || isGifFile(f))
     const skipped = files.length - imgs.length
     if (skipped > 0) toast.error(t('pages.imageCompress.errNotImage', { n: skipped }))
     if (imgs.length) setSources((prev) => [...prev, ...imgs.map((f) => ({ id: nextId(), file: f }))])
@@ -100,6 +125,40 @@ export function ImageCompressPage() {
     for (const { id, file } of sources) {
       if (runRef.current !== run) return
       try {
+        // Keep animated GIFs intact via gifsicle-wasm when output format is Original
+        // and the file genuinely carries a GIF header (falls through to canvas if
+        // another format was misnamed `.gif`).
+        let handledAsGif = false
+        if (format === 'original' && isGifFile(file)) {
+          const head = new Uint8Array(await file.slice(0, 6).arrayBuffer())
+          if (runRef.current !== run) return
+          if (hasGifMagic(head)) {
+            handledAsGif = true
+            const gifRes = await compressGif(file, {
+              mode,
+              quality,
+              targetBytes,
+              maxEdge: maxE,
+              colors: gifColors,
+              frameSkip: gifFrameSkip,
+              isCancelled: () => runRef.current !== run,
+            })
+            if (runRef.current !== run) return
+            putResult(id, {
+              status: 'done',
+              url: URL.createObjectURL(gifRes.blob),
+              blob: gifRes.blob,
+              outName: `${baseName(file.name)}.gif`,
+              outW: gifRes.outW,
+              outH: gifRes.outH,
+              quality: gifRes.quality,
+              framesBefore: gifRes.framesBefore,
+              framesAfter: gifRes.framesAfter,
+            })
+          }
+        }
+        if (handledAsGif) continue
+
         const bmp = await createImageBitmap(file)
         const { width, height } = fitDimensions(bmp.width, bmp.height, maxE)
         const canvas = document.createElement('canvas')
@@ -107,7 +166,7 @@ export function ImageCompressPage() {
         canvas.height = height
         const ctx = canvas.getContext('2d')
         if (!ctx) throw new Error('canvas 2d context unavailable')
-        const { mime, ext, lossy } = resolveOutput(file.type, format)
+        const { mime, ext, lossy } = resolveOutput(file.type === 'image/gif' ? 'image/png' : file.type, format)
         // JPEG has no alpha — paint white so transparency doesn't turn black.
         if (mime === 'image/jpeg') {
           ctx.fillStyle = '#ffffff'
@@ -146,19 +205,19 @@ export function ImageCompressPage() {
           quality: usedQ,
         })
       } catch (e) {
-        if (runRef.current !== run) return
+        if (e instanceof GifCancelledError || runRef.current !== run) return
         putResult(id, { status: 'error', error: e instanceof Error ? e.message : String(e) })
       }
     }
     if (runRef.current === run) setBusy(false)
-  }, [sources, mode, quality, targetKB, format, maxEdge])
+  }, [sources, mode, quality, targetKB, format, maxEdge, gifColors, gifFrameSkip])
 
   // Re-process (debounced) whenever the file set or any setting changes. A new
   // run bumps runRef at its start, so any still-in-flight run supersedes itself.
   useEffect(() => {
-    const timer = setTimeout(() => void process(), 300)
+    const timer = setTimeout(() => void process(), keepsGif ? 450 : 300)
     return () => clearTimeout(timer)
-  }, [process])
+  }, [process, keepsGif])
 
   const summary = useMemo(() => {
     let before = 0
@@ -261,6 +320,9 @@ export function ImageCompressPage() {
                   </button>
                 ))}
               </div>
+              {hasGif && format !== 'original' && (
+                <p className="mt-1 text-[11px] text-amber-500">{t('pages.imageCompress.gifStaticWarning')}</p>
+              )}
             </div>
 
             {mode === 'quality' ? (
@@ -317,6 +379,58 @@ export function ImageCompressPage() {
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">{t('pages.imageCompress.maxEdgeHint')}</p>
             </div>
+
+            {keepsGif && (
+              <>
+                <div>
+                  <Label className="mb-1.5 block text-xs text-muted-foreground">
+                    {t('pages.imageCompress.gifColors')}
+                  </Label>
+                  <div className="flex w-fit rounded-md border border-input bg-transparent text-sm">
+                    {GIF_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setGifColors(c)}
+                        className={cn(
+                          'px-3 py-1.5 transition-colors first:rounded-l-md last:rounded-r-md',
+                          gifColors === c
+                            ? 'bg-accent text-accent-foreground'
+                            : 'text-muted-foreground hover:text-foreground',
+                        )}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">{t('pages.imageCompress.gifColorsHint')}</p>
+                </div>
+
+                <div>
+                  <Label className="mb-1.5 block text-xs text-muted-foreground">
+                    {t('pages.imageCompress.gifFrameSkip')}
+                  </Label>
+                  <div className="flex w-fit rounded-md border border-input bg-transparent text-sm">
+                    {GIF_FRAME_SKIPS.map((skip) => (
+                      <button
+                        key={skip}
+                        type="button"
+                        onClick={() => setGifFrameSkip(skip)}
+                        className={cn(
+                          'px-3 py-1.5 transition-colors first:rounded-l-md last:rounded-r-md',
+                          gifFrameSkip === skip
+                            ? 'bg-accent text-accent-foreground'
+                            : 'text-muted-foreground hover:text-foreground',
+                        )}
+                      >
+                        {t(`pages.imageCompress.gifFrameSkip_${skip}`)}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">{t('pages.imageCompress.gifFrameSkipHint')}</p>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Action bar */}
@@ -391,12 +505,25 @@ export function ImageCompressPage() {
                     </p>
                     {r?.status === 'done' ? (
                       <div className="mt-0.5 flex items-center justify-between gap-2">
-                        <p className="text-[11px] text-muted-foreground">
-                          {fmtBytes(s.file.size)} → {fmtBytes(r.blob.size)}
-                          <span className={cn('ml-1 font-medium', smaller ? 'text-emerald-500' : 'text-amber-500')}>
-                            {pctChange(s.file.size, r.blob.size)}%
-                          </span>
-                        </p>
+                        <div className="min-w-0">
+                          <p className="text-[11px] text-muted-foreground">
+                            {fmtBytes(s.file.size)} → {fmtBytes(r.blob.size)}
+                            <span className={cn('ml-1 font-medium', smaller ? 'text-emerald-500' : 'text-amber-500')}>
+                              {pctChange(s.file.size, r.blob.size)}%
+                            </span>
+                          </p>
+                          {r.framesBefore != null && r.framesAfter != null && (
+                            <p className="text-[10px] text-muted-foreground/80">
+                              {r.outW}×{r.outH} ·{' '}
+                              {r.framesBefore !== r.framesAfter
+                                ? t('pages.imageCompress.framesChanged', {
+                                    before: r.framesBefore,
+                                    after: r.framesAfter,
+                                  })
+                                : t('pages.imageCompress.frames', { n: r.framesAfter })}
+                            </p>
+                          )}
+                        </div>
                         <Button
                           size="icon"
                           variant="ghost"
