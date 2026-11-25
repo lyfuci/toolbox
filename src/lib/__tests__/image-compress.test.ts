@@ -12,9 +12,10 @@ describe('resolveOutput', () => {
     expect(resolveOutput('image/jpeg', 'original')).toEqual({ mime: 'image/jpeg', ext: 'jpg', lossy: true })
     expect(resolveOutput('image/webp', 'original')).toEqual({ mime: 'image/webp', ext: 'webp', lossy: true })
     expect(resolveOutput('image/png', 'original')).toEqual({ mime: 'image/png', ext: 'png', lossy: false })
+    expect(resolveOutput('image/gif', 'original')).toEqual({ mime: 'image/gif', ext: 'gif', lossy: true })
   })
-  it('falls back to PNG for formats the canvas cannot re-emit', () => {
-    expect(resolveOutput('image/gif', 'original').mime).toBe('image/png')
+  it('falls back to PNG for formats that cannot be re-emitted as-is', () => {
+    expect(resolveOutput('image/bmp', 'original').mime).toBe('image/png')
     expect(resolveOutput('image/svg+xml', 'original').ext).toBe('png')
   })
   it('honours an explicit output format', () => {
